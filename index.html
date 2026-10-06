@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12"><title>Beyblade X Tournament</title>
+<style>
+:root{--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--blue:#56a8ff;--warn:#f4c84b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif}
+header{position:sticky;top:0;z-index:10;background:#0b0d12eF;backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:14px 16px}
+.wrap{max-width:920px;margin:auto}.brand{display:flex;align-items:center;justify-content:space-between;gap:10px}.brand h1{font-size:19px;margin:0}.brand small{color:var(--muted)}
+main{padding:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:0 0 14px}.hero{padding:22px}.hero h2{font-size:26px;margin:0 0 8px}.muted{color:var(--muted);font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mode{background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:18px;cursor:pointer}.mode:hover{border-color:#657089}.mode h3{margin:8px 0}.icon{font-size:30px}
+button,input,select,textarea{font:inherit}button{border:0;border-radius:12px;padding:11px 14px;background:var(--accent);color:white;font-weight:800;cursor:pointer}.secondary{background:var(--panel2);border:1px solid var(--line)}.ghost{background:transparent;border:1px solid var(--line)}.danger{background:#3a1717;color:#ffb1a5;border:1px solid #71302a}
+input,select,textarea{width:100%;background:#0f131b;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.row button{flex:0 0 auto}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 6px}.tabs{display:flex;gap:8px;overflow:auto;margin:0 0 12px}.tab{white-space:nowrap;background:var(--panel2);border:1px solid var(--line)}.tab.active{background:var(--accent);border-color:var(--accent)}
+.player{display:flex;gap:8px;align-items:center;background:var(--panel2);padding:8px;border-radius:11px;margin:6px 0}.num{width:30px;color:var(--muted);text-align:center}.player input{padding:9px 10px;min-width:0}.player .mini{padding:8px 10px}
+.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#252c39;color:#cbd5e1;font-size:12px;margin:2px}
+.stageTitle{display:flex;align-items:center;justify-content:space-between;margin:20px 0 8px}.stageTitle h3{margin:0}.match{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin:8px 0}.match.done{border-color:#236c4b}.matchNo{color:var(--muted);font-size:12px;margin-bottom:7px}
+.side{display:grid;grid-template-columns:1fr 64px 42px;gap:7px;align-items:center;margin:5px 0}.side.winner{background:#143224;border-radius:9px;padding:4px}.score{text-align:center}.winbtn{padding:9px;background:#273040;border:1px solid var(--line)}.winbtn.on{background:var(--green);color:#07140d}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}.toolbar button{flex:1;min-width:120px}.hidden{display:none!important}.notice{background:#2a2515;border:1px solid #665b27;color:#f5df86;padding:11px;border-radius:11px;font-size:13px}
+table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}th{color:var(--muted)}
+.qrbox{background:white;border-radius:14px;padding:12px;width:max-content;margin:14px auto}.center{text-align:center}.spacer{height:6px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}.hero h2{font-size:22px}main{padding:10px}.card{padding:13px}.side{grid-template-columns:1fr 54px 38px}}
+
+/* v4 responsive bracket */
+.adminHero{background:linear-gradient(180deg,#151a24 0%,#10151e 100%);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:12px;box-shadow:0 12px 35px #0004}
+.adminHeroTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.adminHero h2{margin:3px 0 0;font-size:25px;line-height:1.15}.adminActions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}.adminActions button{min-width:0;padding:10px 8px}.adminActions .shareBtn{background:var(--accent)}
+.metaChips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.metaChip{padding:7px 10px;border-radius:999px;background:#0e141d;border:1px solid var(--line);color:#cfd6e4;font-size:12px}.adminTabs{display:flex;gap:8px;overflow:auto;padding:2px 0 12px}.adminTabs button{white-space:nowrap;min-width:auto;padding:9px 13px}
+.bracketShell{position:relative;margin-top:4px;border:1px solid #242d3c;border-radius:18px;background:radial-gradient(circle at 50% 0,#151d2a 0,#0b0d12 42%);overflow:hidden}.bracketTools{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;background:#0d1119e8;border-bottom:1px solid #242d3c;backdrop-filter:blur(10px)}.zoomGroup{display:flex;align-items:center;gap:6px}.zoomGroup button,.viewToggle{background:#171e2b;border:1px solid #354157;padding:8px 10px;border-radius:10px}.zoomLabel{min-width:52px;text-align:center;color:#cdd6e5;font-size:12px}.bracketHint{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bracketScroll{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 14px 26px;min-height:420px}.bracketStage{position:relative;min-width:1px;min-height:1px}.bracketCanvas{position:relative;display:flex;align-items:flex-start;gap:48px;width:max-content;transform-origin:top left;padding:8px 20px 28px 6px}.bracketLinks{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:0}.bracketLinks path{fill:none;stroke:#53627c;stroke-width:2;vector-effect:non-scaling-stroke}.bracketLinks path.live{stroke:#b7842d}
+.roundCol{position:relative;width:204px;flex:0 0 204px;z-index:1}.roundHead{min-height:54px;padding:4px 4px 10px;background:linear-gradient(180deg,#0b0d12 68%,transparent);position:relative;top:auto;z-index:2;margin-bottom:8px;pointer-events:none}.roundHead h3{margin:0;font-size:17px;line-height:1.1}.roundHead .roundSub{color:var(--muted);font-size:11px;margin-top:5px}.roundCol:first-of-type .roundHead h3{color:#ff8b74}.roundCol:nth-of-type(2) .roundHead h3,.roundCol:nth-of-type(3) .roundHead h3{color:#7cb8ff}
+.roundMatches{display:flex;flex-direction:column;gap:var(--gap,16px);padding-top:var(--top,0px)}
+.bracketMatch{position:relative;width:100%;height:112px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:13px;padding:8px 9px;text-align:left;color:var(--text);box-shadow:0 8px 22px #0004;cursor:pointer}.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 8px 22px #0004}.bracketMatch:hover{border-color:#62718b}.bracketMatch.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite;box-shadow:0 0 0 1px #ffd45a55 inset,0 0 22px #ffd45a55,0 8px 22px #0005}@keyframes judgePulse{0%,100%{box-shadow:0 0 0 1px #ffd45a44 inset,0 0 8px #ffd45a22,0 8px 22px #0005}50%{box-shadow:0 0 0 2px #ffd45aaa inset,0 0 26px #ffd45a99,0 8px 22px #0005}}.bracketMatch .matchNo{height:18px;line-height:18px;margin:0 62px 4px 0}.bSide{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;align-items:center;height:34px;padding:4px 6px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:13px;line-height:1.15}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bScore{display:flex;align-items:center;justify-content:center;width:36px;height:24px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px;line-height:1}.bSide.winner .bScore{border-color:#a8672e;color:#ffb371}.winnerDot{flex:0 0 auto;font-size:10px;color:#ff9b54}.tapEdit{position:absolute;right:8px;top:7px;color:#7c879a;font-size:10px}.refTag{position:absolute;left:9px;right:9px;bottom:4px;display:block;max-width:calc(100% - 18px);padding:2px 6px;border:1px solid #334158;border-radius:999px;background:#0d131c;color:#9fb0c8;font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.refTag.on{border-color:#6c5630;color:#f0c27a;background:#211a11}.refTag.live{border-color:#ffd45a;color:#ffe9a6;background:#342b12;font-weight:800}.bracketMatch.judging .bSide:last-of-type{margin-bottom:17px}
+.rrCol{position:relative;width:236px;flex:0 0 236px;z-index:1}.rrPanel{background:linear-gradient(180deg,#281e14,#141820);border:1px solid #855521;border-radius:15px;padding:12px;box-shadow:0 0 25px #ff8a2a18}.rrPlayers{margin:0}.rrRow{display:grid;grid-template-columns:24px 1fr auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #4a3827;font-size:12px}.rrRank{font-weight:900;color:#ffb45f}.rrGames{display:grid;gap:8px;margin-top:10px}.rrMini{background:#141a24;border:1px solid #3c465a;border-radius:10px;padding:8px;font-size:11px;display:flex;justify-content:space-between;gap:8px}.rrMini b{font-weight:700}.rrMini span{color:var(--muted)}.rrMini.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}
+.matchModal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#0009;padding:16px}.matchSheet{width:min(520px,100%);background:#151a24;border:1px solid #3a465b;border-radius:20px 20px 16px 16px;padding:16px;box-shadow:0 20px 60px #000a}.sheetHandle{width:46px;height:5px;border-radius:999px;background:#3d4657;margin:0 auto 12px}.sheetTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.sheetTitle h3{margin:0}.sheetClose{background:#222a38;border:1px solid #3b4658;padding:8px 10px}.sheetPlayer{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;padding:10px 0}.sheetPlayer+.sheetPlayer{border-top:1px solid #2b3444}.sheetPlayer input{text-align:center}.sheetRef{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #2b3444}.sheetRef select{min-width:0}.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sheetActions button{min-width:0}.sheetFooter{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.scorePickBtn{width:72px;height:52px;border:1px solid #3b4658;background:#0f141d;color:#f7f8fa;border-radius:14px;font-size:15px;line-height:1;white-space:nowrap;font-weight:800;display:flex;align-items:center;justify-content:center}.scorePickBtn.hasValue{border-color:#ff7d45;background:#2b1c15;color:#ffb17e}.scorePickerPop{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:#0007;padding:16px}.scorePickerCard{width:min(420px,100%);background:#171d28;border:1px solid #3a465b;border-radius:18px;padding:14px;box-shadow:0 20px 60px #000b}.scorePickerTitle{font-size:13px;color:#aeb7c6;margin-bottom:10px;text-align:center}.scoreGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.scoreGrid button{min-height:54px;font-size:22px;border-radius:14px}.scoreClear{width:100%;margin-top:10px;background:#202838;border:1px solid #3a465b;color:#d5dbe5}
+.refereeGrid{display:grid;grid-template-columns:300px 1fr;gap:12px}.refCard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}.refList{display:grid;gap:8px;margin-top:10px}.refPerson{display:flex;align-items:center;gap:8px;padding:9px 10px;background:#101620;border:1px solid #2d3748;border-radius:10px}.refPerson span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.refPerson button{padding:6px 9px}.judgeChooser{display:grid;gap:8px;margin:10px 0}.judgeChooser select{width:100%}.judgeStatus{padding:10px;border:1px solid #344158;border-radius:12px;background:#0f141d}.judgeStatus strong{color:#ffe39a}.liveMatchList{display:grid;gap:9px}.liveMatchRow{display:grid;grid-template-columns:92px 1fr auto;gap:8px;align-items:center;padding:10px;background:#101620;border:1px solid #2d3748;border-radius:12px}.liveMatchRow.busy{border-color:#7c6226;background:#191711}.liveMatchRow.mine{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}.liveMatchMeta{font-size:11px;color:#9aa6b8}.liveMatchPlayers{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.liveMatchAction{display:flex;gap:6px}.liveMatchAction button{padding:8px 10px;white-space:nowrap}.busyWho{font-size:11px;color:#f4d487;margin-top:3px}.refToolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.refToolbar button{flex:0 0 auto}@media(max-width:700px){.refereeGrid{grid-template-columns:1fr}.assignRow{grid-template-columns:72px 1fr}.assignRow select{grid-column:1/-1}.refCard{padding:12px}}
+body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{position:fixed;inset:0;z-index:40;border-radius:0;border:0;margin:0;background:#0b0d12}body.bracketFullscreen .bracketScroll{height:calc(100vh - 52px);min-height:0;padding-bottom:70px}body.bracketFullscreen header{display:none}
+@media(max-width:640px){header{padding:11px 10px}.brand h1{font-size:17px}main{padding:9px}.adminHero{padding:12px;border-radius:16px}.adminHero h2{font-size:21px}.adminActions{grid-template-columns:repeat(2,minmax(0,1fr))}.adminActions button{font-size:13px;padding:10px 7px}.metaChip{font-size:11px;padding:6px 8px}.bracketShell{border-radius:14px;margin-left:-2px;margin-right:-2px}.bracketTools{padding:7px 8px}.bracketHint{display:none}.bracketScroll{padding:10px 9px 22px;min-height:460px}.bracketCanvas{gap:38px;padding-left:4px}.roundCol{width:184px;flex-basis:184px}.rrCol{width:214px;flex-basis:214px}.roundHead{top:auto;min-height:50px}.roundHead h3{font-size:15px}.bracketMatch{height:104px;padding:7px}.bracketMatch .matchNo{height:16px;line-height:16px;margin-bottom:3px}.bSide{height:31px;padding:3px 6px}.bName{font-size:12px}.bScore{height:23px}.refTag{left:7px;right:7px;bottom:3px;max-width:calc(100% - 14px);line-height:13px}.bracketMatch.judging .bSide:last-of-type{margin-bottom:15px}.zoomGroup button,.viewToggle{padding:7px 9px}.zoomLabel{min-width:46px}.matchModal{padding:8px}.matchSheet{padding:14px;border-radius:18px 18px 12px 12px}}
+
+/* simplified referee flow */
+.refSimple{max-width:560px;margin:0 auto}.refCountRow{display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:end}.refCountRow input{min-width:0}.refHint{margin-top:10px;padding:11px 12px;border:1px solid #343e51;border-radius:12px;background:#0f141d;color:#aeb8c8;font-size:13px;line-height:1.6}.judgePick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.judgePick button{background:#202838;border:1px solid #3b465a}.judgePick button:hover{border-color:#ff8a4c}.sheetRefRow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.sheetRefRow .status{flex:1;min-width:160px}.sheetRefRow .releaseBtn{padding:8px 12px}.sheetRef .pickTitle{margin-top:8px;color:#9da9bb;font-size:12px}.refCountBadge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:7px 10px;border:1px solid #344158;border-radius:999px;background:#101620;color:#d9e0eb;font-size:13px}@media(max-width:520px){.refCountRow{grid-template-columns:1fr 90px}.refCountRow button{grid-column:1/-1}.judgePick{grid-template-columns:1fr 1fr}}
+
+
+.cloudBadge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:#cbd5e1;background:#10151e}
+.cloudBadge.on{border-color:#2f7c58;color:#8be4b6}.cloudBadge.off{border-color:#74413c;color:#ffb1a5}
+.organizerGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.organizerCode{font-size:34px;font-weight:900;letter-spacing:5px;text-align:center;padding:16px;border:1px dashed #647089;border-radius:14px;background:#0e131c}.adminQr{background:#fff;border-radius:14px;padding:12px;width:max-content;margin:12px auto}.cloudNote{font-size:13px;line-height:1.7;color:var(--muted)}
+@media(max-width:640px){.organizerGrid{grid-template-columns:1fr}.organizerCode{font-size:28px}}
+
+.savedCard{margin-top:14px}
+.homeSection{margin-top:14px}.homeSectionTitle{font-size:14px;font-weight:900;color:#cfd6e4;margin:0 0 9px 2px}.homeChoices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choiceCard{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:16px;cursor:pointer;min-height:132px;transition:.18s ease}.choiceCard h3{margin:8px 0 6px}.choiceCard .muted{line-height:1.55}.choiceCard.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;background:linear-gradient(180deg,#251b1a,#1c2230)}.choiceCard.selected:after{content:"✓";position:absolute;right:12px;top:10px;width:25px;height:25px;border-radius:999px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff}.choiceIcon{font-size:28px}.homeNext{width:100%;margin-top:14px;padding:14px;font-size:17px}.homeSelectionSummary{margin-top:10px;text-align:center;color:var(--muted);font-size:12px}
+@media(max-width:520px){.homeChoices{grid-template-columns:1fr 1fr}.choiceCard{padding:14px;min-height:142px}.choiceCard h3{font-size:17px}}
+.savedList{display:grid;gap:10px;margin-top:12px}
+.savedEvent{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px;border:1px solid var(--line);border-radius:14px;background:#10151e}
+.savedEvent.cloud{border-color:#315d87;background:linear-gradient(180deg,#101a27,#10151e)}
+.savedEvent.test{border-color:#76562b;background:linear-gradient(180deg,#241c12,#10151e)}
+.savedType{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:800;margin-right:6px}
+.savedType.cloud{background:#17324d;color:#8fc8ff;border:1px solid #315d87}
+.savedType.test{background:#3a2914;color:#ffc46f;border:1px solid #76562b}
+.savedEventName{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.savedEventMeta{color:var(--muted);font-size:12px;margin-top:4px}
+.savedEventActions{display:flex;gap:7px;align-items:center}.savedEventActions button{padding:9px 11px;font-size:13px}.savedEmpty{padding:14px;border:1px dashed var(--line);border-radius:13px;color:var(--muted);font-size:13px;text-align:center}
+@media(max-width:520px){.savedEvent{grid-template-columns:1fr}.savedEventActions{width:100%}.savedEventActions button{flex:1}}
+</style>
+</head>
+<body>
+<header><div class="wrap brand"><div><h1>⚔️ Beyblade X Tournament</h1><small id="headSub">戰鬥陀螺賽程表</small></div><button class="ghost" id="homeBtn" onclick="goHome()">首頁</button></div></header>
+<main class="wrap">
+<section id="home">
+ <div class="card hero">
+  <h2>建立新賽事</h2>
+  <div class="muted">先選擇賽制，再選擇這場要使用雲端同步或只在本機測試。</div>
+
+  <div class="homeSection">
+   <div class="homeSectionTitle">① 選擇賽制</div>
+   <div class="homeChoices">
+    <div id="choiceFree" class="choiceCard" onclick="selectHomeMode('free')"><div class="choiceIcon">🛠️</div><h3>自由編排</h3><div class="muted">自訂人數，支援12、24、36、48，最後三人循環賽等特殊賽事</div></div>
+    <div id="choiceSingle" class="choiceCard" onclick="selectHomeMode('single')"><div class="choiceIcon">🏆</div><h3>單淘汰賽</h3><div class="muted">標準單淘汰賽，人數自動安排直到冠軍</div></div>
+   </div>
+  </div>
+
+  <div class="homeSection">
+   <div class="homeSectionTitle">② 選擇建立方式</div>
+   <div class="homeChoices">
+    <div id="choiceCloud" class="choiceCard" onclick="selectStorageMode('cloud')"><div class="choiceIcon">☁️</div><h3>雲端賽事</h3><div class="muted">可 QR 分享、主辦管理、跨手機同步比分與裁判狀態。</div></div>
+    <div id="choiceTest" class="choiceCard" onclick="selectStorageMode('test')"><div class="choiceIcon">🧪</div><h3>測試賽事</h3><div class="muted">只存在這支手機，適合測試版面與比賽流程。</div></div>
+   </div>
+  </div>
+
+  <button class="homeNext" onclick="proceedCreate()">下一步：設定賽事</button>
+  <div id="homeSelectionSummary" class="homeSelectionSummary"></div>
+ </div>
+
+ <div class="card savedCard"><div class="row"><h3 style="margin:0">📌 本機保留的賽事</h3><span id="savedCount" class="badge">0 場</span></div><div id="savedEvents" class="savedList"></div></div>
+</section>
+
+<section id="create" class="hidden">
+ <div class="card"><h2 id="createTitle">建立賽事</h2>
+  <label>賽事名稱</label><input id="eventName" placeholder="例如：Beyblade X 秋季盃">
+  <label>配對方式</label><select id="pairMode"><option value="ordered">依序配對</option><option value="random">隨機抽籤</option><option value="manual">手動編排（建立後可交換）</option></select>
+  <div id="freeOpts" class="hidden"><label>自由編排目標</label><select id="freeFinal"><option value="rr3">一路兩兩淘汰，剩 3 人後三人循環</option><option value="champ">一路兩兩淘汰至冠軍</option></select></div>
+  <label>參賽名單（每行一位）</label><textarea id="bulkNames" rows="10" placeholder="王小明&#10;陳小華&#10;選手 C"></textarea>
+  <div class="row"><button class="secondary" onclick="makeDemo()">產生測試名單</button><input id="demoCount" type="number" min="2" value="24" style="max-width:95px"></div>
+ </div>
+ <div class="card"><div class="row"><h3 style="margin:0">選手名單</h3><span id="countBadge" class="badge">0 人</span></div><div id="rosterPreview" class="muted">輸入名單後會顯示在這裡。</div>
+  <div class="toolbar" style="margin-top:12px"><button onclick="createTournament()">建立對戰表</button></div>
+ </div>
+</section>
+
+<section id="admin" class="hidden">
+ <div class="adminTabs"><button onclick="showTab('bracket')">🏆 對戰表</button><button id="rosterTopBtn" class="secondary" onclick="showTab('roster')">👥 參賽名單</button><button id="organizerTopBtn" class="secondary" onclick="showTab('organizer')">🛡 主辦</button><button class="secondary" onclick="showTab('share')">🔗 QR／分享</button></div>
+ <div id="bracketTab"></div>
+ <div id="rosterTab" class="hidden"></div>
+ <div id="refereeTab" class="hidden"></div>
+ <div id="organizerTab" class="hidden"></div>
+ <div id="shareTab" class="hidden"></div>
+</section>
+<div id="matchModal" class="matchModal hidden" onclick="if(event.target===this)closeMatchEditor()"><div id="matchSheet" class="matchSheet"></div></div>
+<div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore('')">清除比分</button></div></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyD2PsTKnlcFbHQvkZCYeaM_DIoJcl1c5zk",
+  authDomain: "ljt-beyblade-x.firebaseapp.com",
+  databaseURL: "https://ljt-beyblade-x-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "ljt-beyblade-x",
+  storageBucket: "ljt-beyblade-x.firebasestorage.app",
+  messagingSenderId: "811309004070",
+  appId: "1:811309004070:web:2e246f0a0ac7dae2e8fde7",
+  measurementId: "G-CPL47L0CV5"
+};
+const STORE='bx_events_v2', CURRENT='bx_current_v2', SAVED='bx_saved_events_v1', KEEP='bx_test_event_v1'; let draftMode='free', draftStorage='cloud', ev=null;
+let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false;
+const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
+function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
+function setSavedEventIds(ids){localStorage.setItem(SAVED,JSON.stringify([...new Set(ids)]))}
+function keepLocalEnabled(){return localStorage.getItem(KEEP)==='1'}
+function markEventSaved(id){
+  if(!id)return;
+  const ids=savedEventIds().filter(x=>x!==id);ids.unshift(id);setSavedEventIds(ids.slice(0,30));
+}
+function unmarkEventSaved(id){
+  setSavedEventIds(savedEventIds().filter(x=>x!==id));
+}
+function formatSavedTime(ts){
+  if(!ts)return '';
+  try{return new Date(ts).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return ''}
+}
+function renderSavedEvents(){
+  const box=$('savedEvents'),count=$('savedCount');if(!box||!count)return;
+  const all=events(),ids=savedEventIds().filter(id=>all[id]);
+  if(ids.length!==savedEventIds().length)setSavedEventIds(ids);
+  count.textContent=ids.length+' 場';
+  if(!ids.length){box.innerHTML='<div class=savedEmpty>目前沒有保留的賽事。建立新賽事後會顯示在這裡。</div>';return}
+  box.innerHTML=ids.map(id=>{
+    const e=all[id],mode=e.mode==='free'?'自由編排':'單淘汰',when=formatSavedTime(e.created),isTest=!!e.testOnly;
+    const typeHtml=isTest?'<span class="savedType test">🧪 測試賽事</span>':'<span class="savedType cloud">☁️ 雲端賽事</span>';
+    const delLabel=isTest?'刪除本機':'刪除雲端';
+    return `<div class="savedEvent ${isTest?'test':'cloud'}"><div><div class=savedEventName>${typeHtml}${esc(e.name||'Beyblade X Tournament')}</div><div class=savedEventMeta>${e.roster?.length||0} 人・${mode}${when?'・'+when:''}</div></div><div class=savedEventActions><button onclick="openSavedEvent('${id}')">繼續</button><button class="danger" onclick="deleteSavedEvent('${id}')">${delLabel}</button></div></div>`;
+  }).join('');
+}
+async function openSavedEvent(id){
+  const cached=events()[id];if(!cached)return alert('找不到這場賽事的本機快取。');
+  $('home').classList.add('hidden');
+  if(cached.testOnly){
+    ev=cached;isAdmin=true;
+    $('create').classList.add('hidden');$('admin').classList.remove('hidden');
+    history.replaceState(null,'',location.pathname);
+    renderAdmin();return;
+  }
+  const ok=await loadCloudEvent(id);
+  if(ok){history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);return}
+  ev=cached;isAdmin=localStorage.getItem(adminFlagKey(id))==='1';
+  $('create').classList.add('hidden');$('admin').classList.remove('hidden');renderAdmin();
+  alert('目前無法讀取雲端，先開啟這支手機最後保留的版本。');
+}
+async function deleteSavedEvent(id){
+  const all=events(),cached=all[id];
+  if(!cached)return;
+  if(cached.testOnly){
+    if(!confirm('刪除這支手機上的測試賽事？\n\n這場沒有雲端資料。'))return;
+    unmarkEventSaved(id);delete all[id];localStorage.setItem(STORE,JSON.stringify(all));
+    if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
+    renderSavedEvents();return;
+  }
+
+  if(!confirm('永久刪除這場雲端賽事？\n\n這會同時刪除 Firebase 上的賽程、管理員與驗證碼資料，而且無法復原。'))return;
+
+  if(!(await initCloud()))return alert('目前無法連上 Firebase，請稍後再試。');
+  try{
+    const adminSnap=await fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value');
+    if(!adminSnap.exists())return alert('只有這場賽事的主辦管理員可以刪除雲端賽事。');
+
+    await fbDb.ref().update({
+      [`events/${id}`]: null,
+      [`admins/${id}`]: null,
+      [`secrets/${id}`]: null
+    });
+
+    unmarkEventSaved(id);
+    delete all[id];
+    localStorage.setItem(STORE,JSON.stringify(all));
+    localStorage.removeItem(adminFlagKey(id));
+    localStorage.removeItem(adminCodeKey(id));
+    if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
+    renderSavedEvents();
+    alert('雲端賽事與這支手機的保留紀錄都已刪除。');
+  }catch(e){
+    console.error(e);
+    alert('刪除雲端賽事失敗：'+e.message);
+  }
+}
+
+function firebaseConfigured(){return !Object.values(FIREBASE_CONFIG).some(v=>String(v).includes('PASTE_'))}
+async function initCloud(){
+  if(cloudReady)return true;
+  if(!firebaseConfigured())return false;
+  try{
+    fbApp=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth=firebase.auth();fbDb=firebase.database();
+    await fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    if(!fbAuth.currentUser)await fbAuth.signInAnonymously();
+    fbUser=fbAuth.currentUser;cloudReady=true;return true;
+  }catch(e){console.error(e);alert('Firebase 連線失敗：'+e.message);return false}
+}
+function localEventSave(){
+  let x=events();x[ev.id]=ev;localStorage.setItem(STORE,JSON.stringify(x));localStorage.setItem(CURRENT,ev.id);
+  if((ev&&ev.testOnly) || savedEventIds().includes(ev.id))markEventSaved(ev.id);
+}
+function put(){
+  localEventSave();renderAdmin();
+  if(ev?.testOnly)return;
+  if(cloudReady&&ev?.id&&isAdmin){
+    fbDb.ref(`events/${ev.id}`).set(ev).catch(e=>alert('雲端同步失敗：'+e.message));
+  }
+}
+function adminFlagKey(id){return `bx_cloud_admin_${id}`}
+function adminCodeKey(id){return `bx_cloud_admin_code_${id}`}
+async function refreshAdminState(id){
+  isAdmin=false;
+  if(!cloudReady||!fbUser)return false;
+  try{
+    const s=await fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value');
+    isAdmin=s.exists();
+    if(isAdmin)localStorage.setItem(adminFlagKey(id),'1'); else localStorage.removeItem(adminFlagKey(id));
+  }catch(e){console.warn(e)}
+  return isAdmin;
+}
+function listenCloudEvent(id){
+  if(!cloudReady)return;
+  if(cloudUnsub)cloudUnsub();
+  const ref=fbDb.ref(`events/${id}`);
+  const cb=s=>{
+    if(!s.exists())return;
+    ev=s.val();localEventSave();
+    $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');
+    renderAdmin();
+  };
+  ref.on('value',cb);
+  cloudUnsub=()=>ref.off('value',cb);
+}
+async function loadCloudEvent(id){
+  if(!(await initCloud()))return false;
+  const s=await fbDb.ref(`events/${id}`).once('value');
+  if(!s.exists())return false;
+  ev=s.val();await refreshAdminState(id);listenCloudEvent(id);
+  $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');
+  renderAdmin();
+  if(new URLSearchParams(location.search).get('admin')==='1')showTab('organizer');
+  return true;
+}
+function goHome(){
+  ev=null;if(cloudUnsub){cloudUnsub();cloudUnsub=null}
+  ['create','admin'].forEach(x=>$(x).classList.add('hidden'));$('home').classList.remove('hidden');
+  history.replaceState(null,'',location.pathname);
+  renderHomeSelections();renderSavedEvents();
+}
+function startCreate(m){selectHomeMode(m);proceedCreate()}
+$('bulkNames').addEventListener('input',updatePreview);
+function rosterFromText(){return $('bulkNames').value.split(/\n|,/).map(x=>x.trim()).filter(Boolean)}
+function updatePreview(){
+ let a=rosterFromText();
+ $('countBadge').textContent=a.length+' 人';
+ $('rosterPreview').innerHTML=a.length
+   ?a.map((n,i)=>`<div class="player"><span class="num">${i+1}</span><input value="${esc(n)}" oninput="editPreviewName(${i},this.value)" aria-label="選手 ${i+1} 名稱"></div>`).join('')
+   :'輸入名單後會顯示在這裡。';
+}
+function editPreviewName(i,v){
+ let a=rosterFromText();
+ if(i<0||i>=a.length)return;
+ a[i]=String(v).replace(/\n/g,' ');
+ $('bulkNames').value=a.join('\n');
+ $('countBadge').textContent=a.length+' 人';
+}
+function makeDemo(){let n=Math.max(2,+$('demoCount').value||24);$('bulkNames').value=Array.from({length:n},(_,i)=>`選手 ${i+1}`).join('\n');updatePreview()}
+function shuffle(a){a=[...a];for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function uid(){return Math.random().toString(36).slice(2,9).toUpperCase()}
+async function createTournament(){
+ let r=rosterFromText(); if(r.length<2)return alert('至少需要 2 位參賽者。');
+ const testOnly=draftStorage==='test';
+ let pairing=$('pairMode').value; if(pairing==='random')r=shuffle(r);
+
+ if(testOnly){
+   ev={id:'TEST-'+uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),testOnly:true,cloudVersion:0};
+   buildFirst();
+   isAdmin=true;
+   localEventSave();
+   markEventSaved(ev.id);
+   $('create').classList.add('hidden');$('admin').classList.remove('hidden');
+   history.replaceState(null,'',location.pathname);
+   renderAdmin();
+   return;
+ }
+
+ if(!(await initCloud()))return alert('Firebase 尚未連線成功。請確認匿名登入與 Realtime Database 已啟用。');
+ ev={id:uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),cloudVersion:2,ownerUid:fbUser.uid,testOnly:false};
+ buildFirst();
+ const code=String(Math.floor(100000+Math.random()*900000));
+ try{
+   await fbDb.ref(`events/${ev.id}`).set(ev);
+   await fbDb.ref(`secrets/${ev.id}/adminCode`).set(code);
+   await fbDb.ref(`admins/${ev.id}/${fbUser.uid}`).set(code);
+   isAdmin=true;
+   localStorage.setItem(adminFlagKey(ev.id),'1');
+   localStorage.setItem(adminCodeKey(ev.id),code);
+   listenCloudEvent(ev.id);
+   history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(ev.id)}`);
+   $('create').classList.add('hidden');$('admin').classList.remove('hidden');
+   localEventSave();renderAdmin();
+ }catch(e){
+   console.error('createTournament cloud bootstrap failed',e);
+   alert('建立雲端賽事失敗：'+e.message+'\n\n請確認 Firebase「規則」已發布。');
+ }
+}
+function nextPow2(n){let p=1;while(p<n)p*=2;return p}
+function buildFirst(){
+ let r=[...ev.roster], slots=[];
+ if(ev.mode==='single'){
+   let p=nextPow2(r.length), byes=p-r.length;
+   // distribute BYEs by pairing a player with BYE first, then normal pairs
+   let idx=0; for(let i=0;i<byes;i++)slots.push(match(r[idx++],'BYE'));
+   while(idx<r.length){slots.push(match(r[idx++],r[idx++]||'BYE'))}
+ } else {
+   for(let i=0;i<r.length;i+=2)slots.push(match(r[i],r[i+1]||'BYE'));
+ }
+ autoByes(slots); ev.rounds=[{name:'第 1 輪',matches:slots}]
+}
+function match(a,b){return {a:a||'BYE',b:b||'BYE',sa:'',sb:'',winner:null,referee:'',refereeActive:false}}
+function autoByes(ms){ms.forEach(m=>{if(m.a==='BYE'&&m.b!=='BYE')m.winner=m.b;if(m.b==='BYE'&&m.a!=='BYE')m.winner=m.a})}
+function winners(r){return r.matches.map(m=>m.winner).filter(Boolean)}
+function complete(r){return r.matches.every(m=>m.winner)}
+function ensureNext(){
+ let last=ev.rounds.at(-1); if(!complete(last)||ev.finalRR)return;
+ let w=winners(last);
+ if(ev.mode==='free'&&ev.freeFinal==='rr3'&&w.length===3){ev.finalRR={players:w,matches:[match(w[0],w[1]),match(w[1],w[2]),match(w[0],w[2])]};return}
+ if(w.length===1)return;
+ let ms=[];for(let i=0;i<w.length;i+=2)ms.push(match(w[i],w[i+1]||'BYE'));autoByes(ms);ev.rounds.push({name:`第 ${ev.rounds.length+1} 輪`,matches:ms});
+ if(complete(ev.rounds.at(-1)))ensureNext()
+}
+function pick(ri,mi,side){
+ let m=ev.rounds[ri].matches[mi],v=side==='a'?m.a:m.b;if(v==='BYE')return;m.winner=v;m.refereeActive=false;m.referee='';put();ensureNext();put()
+}
+function score(ri,mi){
+ let m=ev.rounds[ri].matches[mi],a=$(`s${ri}-${mi}a`).value,b=$(`s${ri}-${mi}b`).value;
+ if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
+ m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;m.refereeActive=false;m.referee='';
+ put();ensureNext();put();
+ closeMatchEditor();showTab('bracket');
+ requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+}
+function resetMatch(ri,mi){
+ ev.rounds=ev.rounds.slice(0,ri+1);ev.finalRR=null;let m=ev.rounds[ri].matches[mi];m.winner=null;m.sa='';m.sb='';m.refereeActive=false;m.referee='';put()
+}
+function swapPlayers(ri,i,j){
+ if(i<0||j<0)return;let r=ev.rounds[ri]; if(r.matches.some(m=>m.winner))return alert('本輪已有結果，請先重設再調整。');
+ let flat=r.matches.flatMap(m=>[m.a,m.b]);[flat[i],flat[j]]=[flat[j],flat[i]];r.matches=Array.from({length:Math.ceil(flat.length/2)},(_,k)=>match(flat[k*2],flat[k*2+1]));autoByes(r.matches);put()
+}
+function rrScore(i){
+ let m=ev.finalRR.matches[i],a=$(`rr${i}a`).value,b=$(`rr${i}b`).value;
+ if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
+ m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;m.refereeActive=false;m.referee='';
+ put();closeMatchEditor();showTab('bracket');
+ requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+}
+function stageLabel(ri,r){
+  if(ev.mode==='free'&&ev.freeFinal==='rr3'){
+    if(ri===0)return '第一輪（'+ev.roster.length+'強）';
+    let n=r.matches.length*2; return n+'強';
+  }
+  return r.name;
+}
+function roundLayout(ri){
+  const cardH=112,pitch=128, mult=Math.pow(2,ri);
+  return {top:Math.round((pitch/2)*(mult-1)),gap:Math.max(16,Math.round(pitch*mult-cardH))};
+}
+function renderBracketMatch(m,ri,mi){
+  const scoreA=m.sa===''?'–':m.sa, scoreB=m.sb===''?'–':m.sb;
+  return `<button type="button" class="bracketMatch ${m.winner?'done':''} ${m.refereeActive?'judging':''}" data-ri="${ri}" data-mi="${mi}" onclick="openMatchEditor(${ri},${mi})"><span class=tapEdit>點擊編輯</span><div class=matchNo>第 ${mi+1} 場</div>
+    <div class="bSide ${m.winner===m.a?'winner':''}"><span class=bName>${m.winner===m.a?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.a)}</span></span><span class=bScore>${esc(scoreA)}</span></div>
+    <div class="bSide ${m.winner===m.b?'winner':''}"><span class=bName>${m.winner===m.b?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.b)}</span></span><span class=bScore>${esc(scoreB)}</span></div>${m.refereeActive?`<span class="refTag live">⚖ 執裁中：${esc(m.referee)}</span>`:''}</button>`;
+}
+function refereeIdentityKey(){return `bx_ref_identity_${ev?.id||'default'}`}
+function getMyReferee(){return localStorage.getItem(refereeIdentityKey())||''}
+function setMyReferee(name){
+  if(name)localStorage.setItem(refereeIdentityKey(),name);
+  else localStorage.removeItem(refereeIdentityKey());
+  renderReferee();
+}
+function saveRefereeNames(){
+  normalizeEvent();
+  ev.refereeNames=Array.from({length:ev.refereeCount},(_,i)=>{
+    const v=$(`refName${i}`)?.value.trim();
+    return v||`裁判 ${i+1}`;
+  });
+  put();showTab('referee');
+}
+function refereeOptionsHtml(kind,ri,mi){
+  normalizeEvent();
+  const me=getMyReferee();
+  if(!me)return `<div class=pickTitle>尚未設定本機裁判身分</div><button type=button class=secondary onclick="closeMatchEditor();showTab('referee')">先到裁判設定選擇我是誰</button>`;
+  const action=kind==='rr'?`claimRRMatchAs(${mi},${JSON.stringify(me)})`:`claimMatchAs(${ri},${mi},${JSON.stringify(me)})`;
+  return `<div class=pickTitle>本機身分：<b>${esc(me)}</b></div><button type=button onclick='${action}'>⚖ 開始執裁</button>`;
+}
+function refereeStatusHtml(m,kind,ri,mi){
+  if(m.refereeActive){
+    const rel=kind==='rr'?`releaseRRMatchAny(${mi})`:`releaseMatchAny(${ri},${mi})`;
+    return `<div class=sheetRefRow><div class=status>⚖ ${esc(m.referee)} 執裁中</div><button type=button class="danger releaseBtn" onclick="${rel}">釋放</button></div>`;
+  }
+  return `<div>尚未有人執裁</div>${refereeOptionsHtml(kind,ri,mi)}`;
+}
+let activeScoreTarget=null;
+function openScorePicker(inputId,buttonId){
+  activeScoreTarget={inputId,buttonId};
+  $('scorePicker').classList.remove('hidden');
+}
+function closeScorePicker(){
+  $('scorePicker').classList.add('hidden');
+  activeScoreTarget=null;
+}
+function chooseScore(v){
+  if(!activeScoreTarget)return;
+  const input=$(activeScoreTarget.inputId),btn=$(activeScoreTarget.buttonId);
+  if(input)input.value=v;
+  if(btn){btn.textContent=v===''?'比分':v;btn.classList.toggle('hasValue',v!=='');}
+  closeScorePicker();
+}
+function openMatchEditor(ri,mi){
+  let m=ev.rounds[ri].matches[mi];
+  $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
+    <div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="s${ri}-${mi}a" value="${m.sa}"><button type=button id="sb${ri}-${mi}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" onclick="openScorePicker('s${ri}-${mi}a','sb${ri}-${mi}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div>
+    <div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="s${ri}-${mi}b" value="${m.sb}"><button type=button id="sb${ri}-${mi}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" onclick="openScorePicker('s${ri}-${mi}b','sb${ri}-${mi}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div>
+    <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
+    <div class=sheetFooter><button class=secondary onclick="score(${ri},${mi})">記錄比分</button><button class=danger onclick="resetMatch(${ri},${mi})">重設</button></div>`;
+  $('matchModal').classList.remove('hidden');
+}
+function closeMatchEditor(){$('matchModal').classList.add('hidden');closeScorePicker()}
+let bracketScale=1;
+function setBracketScale(v){
+  bracketScale=Math.max(.32,Math.min(1.25,v));
+  const c=document.querySelector('.bracketCanvas'),st=document.querySelector('.bracketStage');
+  if(!c||!st)return;
+  c.style.transform=`scale(${bracketScale})`;
+  st.style.width=Math.ceil(c.scrollWidth*bracketScale)+'px';
+  st.style.height=Math.ceil(c.scrollHeight*bracketScale)+'px';
+  const lab=document.querySelector('.zoomLabel');if(lab)lab.textContent=Math.round(bracketScale*100)+'%';
+}
+function zoomBracket(d){setBracketScale(bracketScale+d)}
+function fitBracket(){
+  const sc=document.querySelector('.bracketScroll'),c=document.querySelector('.bracketCanvas');if(!sc||!c)return;
+  const scale=Math.min(.92,(sc.clientWidth-16)/c.scrollWidth);
+  setBracketScale(Math.max(.32,scale));sc.scrollTo({left:0,top:0,behavior:'smooth'});
+}
+function drawBracketLinks(){
+  const canvas=document.querySelector('.bracketCanvas'),svg=document.querySelector('.bracketLinks');if(!canvas||!svg)return;
+  const cr=canvas.getBoundingClientRect();
+  svg.setAttribute('width',canvas.scrollWidth);svg.setAttribute('height',canvas.scrollHeight);svg.setAttribute('viewBox',`0 0 ${canvas.scrollWidth} ${canvas.scrollHeight}`);
+  let paths=[];
+  for(let ri=0;ri<ev.rounds.length-1;ri++){
+    const src=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${ri}"]`)];
+    const dst=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${ri+1}"]`)];
+    dst.forEach((d,j)=>{
+      const dr=d.getBoundingClientRect(), tx=(dr.left-cr.left)/bracketScale, ty=(dr.top-cr.top+dr.height/2)/bracketScale;
+      [src[j*2],src[j*2+1]].filter(Boolean).forEach(a=>{
+        const ar=a.getBoundingClientRect(), sx=(ar.right-cr.left)/bracketScale, sy=(ar.top-cr.top+ar.height/2)/bracketScale, mx=(sx+tx)/2;
+        const live=a.classList.contains('done')?' live':'';
+        paths.push(`<path class="${live.trim()}" d="M ${sx} ${sy} H ${mx} V ${ty} H ${tx}"/>`);
+      });
+    });
+  }
+  if(ev.finalRR){
+    const last=ev.rounds.length-1, src=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${last}"]`)], target=canvas.querySelector('.rrPanel');
+    if(target){const tr=target.getBoundingClientRect(),tx=(tr.left-cr.left)/bracketScale,ty=(tr.top-cr.top+60)/bracketScale;src.forEach((a,k)=>{const ar=a.getBoundingClientRect(),sx=(ar.right-cr.left)/bracketScale,sy=(ar.top-cr.top+ar.height/2)/bracketScale,mx=(sx+tx)/2;paths.push(`<path d="M ${sx} ${sy} H ${mx} V ${ty+k*12} H ${tx}"/>`)})}
+  }
+  svg.innerHTML=paths.join('');
+}
+function normalizeEvent(){
+  if(!Number.isInteger(ev.refereeCount)||ev.refereeCount<1){
+    ev.refereeCount=Array.isArray(ev.referees)&&ev.referees.length?ev.referees.length:2;
+  }
+  if(!Array.isArray(ev.refereeNames))ev.refereeNames=[];
+  ev.refereeNames=Array.from({length:ev.refereeCount},(_,i)=>{
+    const v=String(ev.refereeNames[i]??ev.referees?.[i]??`裁判 ${i+1}`).trim();
+    return v||`裁判 ${i+1}`;
+  });
+  ev.rounds.forEach(r=>r.matches.forEach(m=>{if(typeof m.referee!=='string')m.referee='';if(typeof m.refereeActive!=='boolean')m.refereeActive=false}));
+  if(ev.finalRR)ev.finalRR.matches.forEach(m=>{if(typeof m.referee!=='string')m.referee='';if(typeof m.refereeActive!=='boolean')m.refereeActive=false});
+}
+function renderAdmin(){
+  normalizeEvent();
+  let flow=ev.mode==='free'&&ev.freeFinal==='rr3'?`${ev.roster.length} → ${Math.ceil(ev.roster.length/2)} → ${Math.ceil(ev.roster.length/4)} → 3 ＋ 最後三人循環`:'標準單淘汰';
+  let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2></div></div><div class=adminActions><button class=secondary onclick="showTab('organizer')">🛡 主辦</button><button class=secondary onclick="alert('分台功能下一版加入')">⚙ 分台</button><button class=secondary onclick="showTab('referee')">⚖ 裁判</button><button class=shareBtn onclick="showTab('share')">🔗 分享連結</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
+  let cols=ev.rounds.map((r,ri)=>{let l=roundLayout(ri);return `<section class=roundCol data-round="${ri}"><div class=roundHead><h3>${stageLabel(ri,r)}</h3><div class=roundSub>${r.matches.length} 場對戰</div></div><div class=roundMatches style="--top:${l.top}px;--gap:${l.gap}px">${r.matches.map((m,mi)=>renderBracketMatch(m,ri,mi)).join('')}</div></section>`}).join('');
+  if(ev.finalRR)cols+=renderRR();
+  $('bracketTab').innerHTML=top+`<div class=bracketShell><div class=bracketTools><div class=zoomGroup><button onclick="zoomBracket(-.1)">−</button><span class=zoomLabel>100%</span><button onclick="zoomBracket(.1)">＋</button><button onclick=fitBracket()>全覽</button></div><div class=bracketHint>拖曳查看・點比賽卡編輯</div><button class=viewToggle onclick=toggleBracketFull()>⛶</button></div><div class=bracketScroll><div class=bracketStage><div class=bracketCanvas><svg class=bracketLinks></svg>${cols}</div></div></div></div>`;
+  renderRoster();renderReferee();renderOrganizer();renderShare();applyAccessUI();
+  requestAnimationFrame(()=>{bracketScale=window.innerWidth<=640?.72:.9;setBracketScale(bracketScale);requestAnimationFrame(drawBracketLinks)});
+}
+function renderRR(){
+  let f=ev.finalRR;
+  let rows=f.players.map(p=>({p,w:f.matches.filter(m=>m.winner===p).length,l:f.matches.filter(m=>m.winner&&m.winner!==p&&(m.a===p||m.b===p)).length})).sort((a,b)=>b.w-a.w);
+  let games=f.matches.map((m,i)=>`<div class="rrMini ${m.refereeActive?'judging':''}" onclick="openRRMatch(${i})"><b>${esc(m.a)} vs ${esc(m.b)}</b><span>${m.sa===''?'–':m.sa} : ${m.sb===''?'–':m.sb}</span></div>`).join('');
+  return `<section class=rrCol><div class=roundHead><h3 style="color:#ff9b4a">👑 最後三人循環</h3><div class=roundSub>決定最終名次</div></div><div class=rrPanel><div class=rrPlayers>${rows.map((x,i)=>`<div class=rrRow><span class=rrRank>${i+1}</span><b>${esc(x.p)}</b><span>${x.w}-${x.l}</span></div>`).join('')}</div><div class=rrGames>${games}</div></div></section>`;
+}
+function openRRMatch(i){
+  let m=ev.finalRR.matches[i];
+  $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>最後三人循環・第 ${i+1} 場</div><h3>${esc(m.a)} vs ${esc(m.b)}</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div><div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="rr${i}a" value="${m.sa}"><button type=button id="rrb${i}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" onclick="openScorePicker('rr${i}a','rrb${i}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div><div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="rr${i}b" value="${m.sb}"><button type=button id="rrb${i}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" onclick="openScorePicker('rr${i}b','rrb${i}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div><div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'rr',0,i)}</div><div class=sheetFooter style="grid-template-columns:1fr"><button onclick="rrScore(${i})">記錄比分</button></div>`;
+  $('matchModal').classList.remove('hidden');
+}
+function toggleBracketFull(){document.body.classList.toggle('bracketFullscreen');setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},80)}
+function setRefereeCount(){
+  let n=Math.round(Number($('refereeCountInput')?.value||2));
+  n=Math.max(1,Math.min(12,n));
+  normalizeEvent();
+  ev.refereeCount=n;
+  ev.refereeNames=Array.from({length:n},(_,i)=>ev.refereeNames[i]||`裁判 ${i+1}`);
+  put();showTab('referee');
+}
+function claimMatchAs(ri,mi,who){
+  let m=ev.rounds[ri].matches[mi];
+  if(m.winner)return alert('這場已完成。');
+  if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
+  releaseMyOtherMatches(who);m.referee=who;m.refereeActive=true;put();openMatchEditor(ri,mi);
+}
+function releaseMatchAny(ri,mi){let m=ev.rounds[ri].matches[mi];m.referee='';m.refereeActive=false;put();openMatchEditor(ri,mi)}
+function claimRRMatchAs(i,who){
+  let m=ev.finalRR.matches[i];
+  if(m.winner)return alert('這場已完成。');
+  if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
+  releaseMyOtherMatches(who);m.referee=who;m.refereeActive=true;put();openRRMatch(i);
+}
+function releaseRRMatchAny(i){let m=ev.finalRR.matches[i];m.referee='';m.refereeActive=false;put();openRRMatch(i)}
+function releaseMyOtherMatches(who){ev.rounds.forEach(r=>r.matches.forEach(m=>{if(m.refereeActive&&m.referee===who){m.referee='';m.refereeActive=false}}));if(ev.finalRR)ev.finalRR.matches.forEach(m=>{if(m.refereeActive&&m.referee===who){m.referee='';m.refereeActive=false}})}
+function renderReferee(){
+  normalizeEvent();
+  const n=ev.refereeCount||2,me=getMyReferee();
+  const names=ev.refereeNames.map((name,i)=>`<div class=player><span class=num>${i+1}</span><input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}"></div>`).join('');
+  const identityButtons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
+  $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 裁判設定</h3>
+  <div class=muted>主辦方設定裁判人數與名稱；每支手機只要先選一次「我是誰」，之後點比賽就能直接開始執裁。</div>
+  <div class=refCountRow style="margin-top:14px"><div><label>裁判人數</label><input id=refereeCountInput type=number min=1 max=12 value="${n}" inputmode=numeric></div><div><span class=refCountBadge>目前 ${n} 位</span></div><button onclick=setRefereeCount()>套用人數</button></div>
+  <div style="margin-top:14px"><label>裁判名稱</label>${names}<button style="width:100%;margin-top:8px" onclick=saveRefereeNames()>儲存裁判名稱</button></div>
+  <div style="margin-top:18px"><label>這支手機的裁判身分</label><div class=judgePick>${identityButtons}</div>${me?`<div class=refHint>目前本機：<b>${esc(me)}</b>。之後在對戰表點比賽，不會再問你是哪位裁判。</div>`:`<div class=refHint>尚未選擇。請點上方其中一位裁判。</div>`}</div>
+  <div style="margin-top:12px"><button class=secondary onclick="showTab('bracket')">返回對戰表</button></div></div>`;
+}
+
+
+function applyAccessUI(){
+  const r=$('rosterTopBtn'),o=$('organizerTopBtn');
+  if(r)r.classList.toggle('hidden',!isAdmin);
+  if(o)o.classList.remove('hidden');
+  document.querySelectorAll('.adminActions button').forEach(b=>{
+    const txt=b.textContent||'';
+    if(!isAdmin && !txt.includes('分享') && !txt.includes('主辦'))b.classList.add('hidden');
+  });
+}
+function organizerUrl(){return location.origin+location.pathname+`?event=${encodeURIComponent(ev.id)}&admin=1`}
+function publicUrl(){return location.origin+location.pathname+`?event=${encodeURIComponent(ev.id)}`}
+async function claimAdmin(){
+  if(!(await initCloud()))return;
+  const code=$('joinAdminCode')?.value.trim();
+  if(!/^\d{6}$/.test(code))return alert('請輸入 6 位數驗證碼。');
+  try{
+    await fbDb.ref(`admins/${ev.id}/${fbUser.uid}`).set(code);
+    await refreshAdminState(ev.id);
+    if(!isAdmin)return alert('驗證碼不正確。');
+    localStorage.setItem(adminCodeKey(ev.id),code);
+    renderAdmin();showTab('organizer');alert('這支手機已取得管理權。');
+  }catch(e){alert('加入管理失敗：驗證碼可能不正確。')}
+}
+function renderOrganizer(){
+  if(!$('organizerTab'))return;
+  if(ev?.testOnly){
+    $('organizerTab').innerHTML=`<div class=card><h3>🧪 測試賽事</h3><div class=notice>這場賽事是「本機測試模式」，不會上傳 Firebase，也無法讓第二支手機共同管理。</div><div class=cloudNote style="margin-top:12px">如果要正式多人同步，請回首頁取消勾選「測試新增賽事」，再建立一場正式雲端賽事。</div></div>`;
+    return;
+  }
+  const code=localStorage.getItem(adminCodeKey(ev.id))||'';
+  if(!isAdmin){
+    $('organizerTab').innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入 6 位驗證碼。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
+    return;
+  }
+  $('organizerTab').innerHTML=`<div class=card><h3>🛡 主辦管理</h3><div class="cloudBadge on">● 雲端同步中</div><div class=organizerGrid style="margin-top:14px"><div><div class=muted>管理驗證碼</div><div class=organizerCode>${code||'已驗證'}</div><div class=cloudNote>第二支手機：掃右側 QR → 輸入這組驗證碼 → 即可共同管理。</div></div><div><div class=muted>管理 QR</div><div id=adminQr class=adminQr></div></div></div><label>管理連結</label><input readonly value="${esc(organizerUrl())}"><div class=notice style="margin-top:12px">管理 QR 不要公開貼在群組；一般觀眾請使用「QR／分享」裡的公開觀看連結。</div></div>`;
+  setTimeout(()=>{let q=$('adminQr');if(q&&window.QRCode){q.innerHTML='';new QRCode(q,{text:organizerUrl(),width:180,height:180})}},0);
+}
+
+function renderRoster(){
+ $('rosterTab').innerHTML=`<div class=card><h3>編輯參賽名單</h3><div class=notice>對戰表建立後修改姓名會同步改名；新增／刪除選手會影響籤表，因此目前只允許在尚未有比賽結果時重建。</div><div id=editRoster>${ev.roster.map((n,i)=>`<div class=player><span class=num>${i+1}</span><input value="${esc(n)}" onchange="rename(${i},this.value)"><button class="mini danger" onclick="delPlayer(${i})">刪</button></div>`).join('')}</div><div class=row><input id=newPlayer placeholder="新增選手"><button onclick=addPlayer()>＋新增</button></div><div class=toolbar style="margin-top:10px"><button class=secondary onclick=rebuild()>依目前名單重建籤表</button><button class=secondary onclick=randomRebuild()>🎲 抽籤重建</button></div></div>`
+}
+function noResults(){return ev.rounds.every(r=>r.matches.every(m=>!m.winner||m.a==='BYE'||m.b==='BYE'))&&!ev.finalRR}
+function rename(i,v){let old=ev.roster[i],nv=v.trim()||old;ev.roster[i]=nv;ev.rounds.forEach(r=>r.matches.forEach(m=>{if(m.a===old)m.a=nv;if(m.b===old)m.b=nv;if(m.winner===old)m.winner=nv}));if(ev.finalRR){ev.finalRR.players=ev.finalRR.players.map(x=>x===old?nv:x);ev.finalRR.matches.forEach(m=>{if(m.a===old)m.a=nv;if(m.b===old)m.b=nv;if(m.winner===old)m.winner=nv})}put()}
+function delPlayer(i){if(!noResults())return alert('已有比賽結果，請先重設／重建後再刪除。');ev.roster.splice(i,1);rebuild()}
+function addPlayer(){let v=$('newPlayer').value.trim();if(!v)return; if(!noResults())return alert('已有比賽結果，請先重設／重建後再新增。');ev.roster.push(v);rebuild()}
+function rebuild(){ev.rounds=[];ev.finalRR=null;buildFirst();put()}
+function randomRebuild(){ev.roster=shuffle(ev.roster);ev.pairing='random';rebuild()}
+function showTab(t){['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))}
+function renderShare(){
+ if(ev?.testOnly){
+   $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這場是本機測試賽事，沒有雲端網址，因此不提供 QR 分享或跨手機同步。</div></div>`;
+   return;
+ }
+ $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這是公開觀看連結。觀眾可以即時看到比分與晉級，但沒有管理權。</div><label>公開觀看網址</label><input id=pubUrl readonly value="${esc(publicUrl())}"><div id=qr class=qrbox></div><div class=toolbar><button onclick=copyPublic()>複製連結</button><button class=secondary onclick=nativeShare()>分享到 LINE／其他 App</button></div></div>`;
+ setTimeout(()=>{let q=$('qr');q.innerHTML='';if(window.QRCode)new QRCode(q,{text:publicUrl(),width:180,height:180})},0)
+}
+async function copyPublic(){await navigator.clipboard.writeText(publicUrl());alert('已複製連結')}
+async function nativeShare(){if(navigator.share)await navigator.share({title:ev.name,text:'查看即時對戰表',url:publicUrl()});else copyPublic()}
+function showTab(t){['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))}
+
+window.addEventListener('resize',()=>{clearTimeout(window.__bxResize);window.__bxResize=setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},120)});
+
+(async function bootstrapCloud(){
+  draftStorage=localStorage.getItem(KEEP)==='1'?'test':'cloud';
+  renderHomeSelections();renderSavedEvents();
+  const p=new URLSearchParams(location.search),id=p.get('event');
+  if(id){
+    const ok=await loadCloudEvent(id);
+    if(!ok){
+      const cached=events()[id];
+      if(cached){
+        ev=cached;isAdmin=localStorage.getItem(adminFlagKey(id))==='1';
+        $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');renderAdmin();
+        alert('雲端暫時無法讀取，已開啟本機最後保留版本。');
+      }else alert('找不到這個雲端賽事，或目前沒有讀取權限。');
+    }
+  }
+})();
+</script>
+</body></html>
