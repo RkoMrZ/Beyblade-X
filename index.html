@@ -108,7 +108,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   <div class="row"><button class="secondary" onclick="makeDemo()">產生測試名單</button><input id="demoCount" type="number" min="2" value="24" style="max-width:95px"></div>
  </div>
  <div class="card"><div class="row"><h3 style="margin:0">選手名單</h3><span id="countBadge" class="badge">0 人</span></div><div id="rosterPreview" class="muted">輸入名單後會顯示在這裡。</div>
-  <div class="toolbar" style="margin-top:12px"><button onclick="createTournament()">建立對戰表</button></div>
+  <div class="toolbar" style="margin-top:12px"><button data-create-tournament="1" onclick="createTournament()">建立對戰表</button></div>
  </div>
 </section>
 
@@ -499,46 +499,94 @@ function editPreviewName(i,v){
 function makeDemo(){let n=Math.max(2,+$('demoCount').value||24);$('bulkNames').value=Array.from({length:n},(_,i)=>`選手 ${i+1}`).join('\n');updatePreview()}
 function shuffle(a){a=[...a];for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function uid(){return Math.random().toString(36).slice(2,9).toUpperCase()}
+function withTimeout(promise,ms=12000,label='Firebase'){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+'逾時，請檢查網路或 Firebase 規則。')),ms))
+  ]);
+}
 async function createTournament(){
- let r=rosterFromText(); if(r.length<2)return alert('至少需要 2 位參賽者。');
- const testOnly=draftStorage==='test';
- let pairing=$('pairMode').value; if(pairing==='random')r=shuffle(r);
+  const createBtn=document.querySelector('[data-create-tournament="1"]');
+  const oldText=createBtn?.textContent||'建立賽程表';
+  if(createBtn){createBtn.disabled=true;createBtn.textContent='建立中…'}
 
- if(testOnly){
-   ev={id:'TEST-'+uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),testOnly:true,cloudVersion:0};
-   buildFirst();
-   isAdmin=true;
-   localEventSave();
-   markEventSaved(ev.id);
-   $('create').classList.add('hidden');$('admin').classList.remove('hidden');
-   history.replaceState(null,'',location.pathname);
-   renderAdmin();
-   return;
- }
+  try{
+    let r=rosterFromText();
+    if(r.length<2){alert('至少需要 2 位參賽者。');return}
 
- if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
- if(!isGoogleUser())return alert('建立雲端賽事前，必須先使用 Google 帳號登入。');
- fbUser=fbAuth.currentUser;
- ev={id:uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),cloudVersion:3,ownerUid:fbUser.uid,ownerEmail:fbUser.email||'',ownerName:fbUser.displayName||'',testOnly:false};
- buildFirst();
- const code=String(Math.floor(100000+Math.random()*900000));
- try{
-   await fbDb.ref(`events/${ev.id}`).set(ev);
-   await fbDb.ref(`secrets/${ev.id}`).set({adminCode:code,expiresAt:Date.now()+30000});
-   await fbDb.ref(`admins/${ev.id}/${fbUser.uid}`).set(code);
-   isAdmin=true;
-   localStorage.setItem(adminFlagKey(ev.id),'1');
-   localStorage.setItem(adminCodeKey(ev.id),code);
-   listenCloudEvent(ev.id);
-   history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(ev.id)}`);
-   $('create').classList.add('hidden');$('admin').classList.remove('hidden');
-   localEventSave();
-   markEventSaved(ev.id);
-   renderAdmin();
- }catch(e){
-   console.error('createTournament cloud bootstrap failed',e);
-   alert('建立雲端賽事失敗：'+e.message+'\n\n請確認 Firebase「規則」已發布。');
- }
+    const testOnly=draftStorage==='test';
+    let pairing=$('pairMode').value;
+    if(pairing==='random')r=shuffle(r);
+
+    if(testOnly){
+      ev={id:'TEST-'+uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),testOnly:true,cloudVersion:0};
+      buildFirst();
+      isAdmin=true;
+      localEventSave();
+      markEventSaved(ev.id);
+      $('create').classList.add('hidden');
+      $('admin').classList.remove('hidden');
+      history.replaceState(null,'',location.pathname);
+      renderAdmin();
+      return;
+    }
+
+    if(!(await initCloud())){
+      alert('Firebase 尚未連線成功。');
+      return;
+    }
+    if(!isGoogleUser()){
+      alert('建立雲端賽事前，必須先使用 Google 帳號登入。');
+      return;
+    }
+
+    fbUser=fbAuth.currentUser;
+    ev={
+      id:uid(),
+      name:$('eventName').value.trim()||'Beyblade X Tournament',
+      mode:draftMode,
+      pairing,
+      freeFinal:$('freeFinal').value,
+      roster:r,
+      rounds:[],
+      finalRR:null,
+      created:Date.now(),
+      cloudVersion:4,
+      ownerUid:fbUser.uid,
+      ownerEmail:fbUser.email||'',
+      ownerName:fbUser.displayName||'',
+      testOnly:false
+    };
+    buildFirst();
+
+    const code=String(Math.floor(100000+Math.random()*900000));
+    const expiresAt=Date.now()+30000;
+
+    await withTimeout(fbDb.ref(`events/${ev.id}`).set(ev),12000,'建立雲端賽事');
+    await withTimeout(fbDb.ref(`secrets/${ev.id}`).set({adminCode:code,expiresAt}),12000,'建立管理驗證碼');
+    await withTimeout(fbDb.ref(`admins/${ev.id}/${fbUser.uid}`).set(code),12000,'建立主辦權限');
+
+    isAdmin=true;
+    localStorage.setItem(adminFlagKey(ev.id),'1');
+    localStorage.setItem(adminCodeKey(ev.id),code);
+    localEventSave();
+    markEventSaved(ev.id);
+
+    listenCloudEvent(ev.id);
+    history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(ev.id)}`);
+    $('create').classList.add('hidden');
+    $('admin').classList.remove('hidden');
+    renderAdmin();
+
+  }catch(e){
+    console.error('createTournament failed',e);
+    alert('建立雲端賽事失敗：'+(e?.message||e));
+  }finally{
+    if(createBtn){
+      createBtn.disabled=false;
+      createBtn.textContent=oldText;
+    }
+  }
 }
 function nextPow2(n){let p=1;while(p<n)p*=2;return p}
 function buildFirst(){
