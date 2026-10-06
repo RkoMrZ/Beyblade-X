@@ -2303,9 +2303,12 @@ function listenCloudEvent(id){
       localEventSave();
 
       if($('admin')&&!$('admin').classList.contains('hidden')){
-        renderAdmin();
+        // 比賽編輯彈窗開著時，不要因 listener echo 把整個賽事 DOM 重建。
+        // 關閉/完成後 renderAdmin 會一次更新。
+        const editing=$('matchModal') && !$('matchModal').classList.contains('hidden');
+        if(!editing)renderAdmin();
       }
-    },70);
+    },180);
   };
 
   const onValue=(path,cb)=>{
@@ -3147,12 +3150,10 @@ function ensureNext(){
 function pick(ri,mi,side){
  let m=ev.rounds[ri].matches[mi],v=side==='a'?m.a:m.b;if(v==='BYE')return;m.winner=v;m.refereeActive=false;m.referee='';put();ensureNext();put()
 }
-async function score(ri,mi){
+function score(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.rounds[ri].matches[mi];
-
-  // 正常 UI 在條件不符時按鈕會是灰色；這裡只是第二層防呆。
   if(!canEditMatchScore(m) || !canCompleteMatch(m))return;
 
   const a=Number(m.sa ?? 0);
@@ -3166,16 +3167,18 @@ async function score(ri,mi){
   m.winner=newWinner;
   delete m._previousWinner;
 
-  // 只有真正完成場次時，才釋放這場裁判。
   m.refereeActive=false;
   m.referee='';
 
   const rebuilt=rebuildDownstreamIfWinnerChanged(ri,oldWinner,newWinner);
   if(!rebuilt)ensureNext();
 
-  await saveEventCloudNow();
-
+  localEventSave();
+  renderAdmin();
   backToBracketFromMatch();
+
+  // 不再讓使用者等整份 event PUT 完才返回畫面。
+  queueWholeEventCloud(50);
 
   if(rebuilt){
     alert('比分已修改。因勝者改變，後續賽程已依新的勝者重新產生。');
@@ -3313,7 +3316,7 @@ async function claimRRMatchAs(i){
   }
 }
 
-async function rrScore(i){
+function rrScore(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.finalRR.matches[i];
@@ -3331,9 +3334,11 @@ async function rrScore(i){
   m.refereeActive=false;
   m.referee='';
 
-  await saveEventCloudNow();
-
+  localEventSave();
+  renderAdmin();
   backToBracketFromMatch();
+
+  queueWholeEventCloud(50);
 }
 function stageLabel(ri,r){
   if(ev.mode==='free'&&ev.freeFinal==='rr3'){
@@ -3685,10 +3690,106 @@ function matchCloudPath(kind,ri,mi){
     : `events/${ev.id}/rounds/${ri}/matches/${mi}`;
 }
 
+
+const matchSyncTimers=new Map();
+const matchSyncRetry=new Map();
+let eventSyncTimer=null;
+let lastBackgroundSyncAlert=0;
+
+function cloneJson(v){
+  return JSON.parse(JSON.stringify(v));
+}
+
+function backgroundSyncAlert(message){
+  const now=Date.now();
+  if(now-lastBackgroundSyncAlert<8000)return;
+  lastBackgroundSyncAlert=now;
+  alert(message);
+}
+
+function queueSingleMatchCloud(kind,ri,mi,delay=120){
+  if(!ev)return;
+
+  localEventSave();
+
+  if(ev.testOnly)return;
+
+  const m=kind==='rr'
+    ? ev.finalRR?.matches?.[mi]
+    : ev.rounds?.[ri]?.matches?.[mi];
+
+  if(!m)return;
+
+  const key=`${kind}:${ri}:${mi}`;
+  const path=matchCloudPath(kind,ri,mi);
+  const snapshot=cloneJson(m);
+
+  if(matchSyncTimers.has(key)){
+    clearTimeout(matchSyncTimers.get(key));
+  }
+
+  matchSyncTimers.set(key,setTimeout(async()=>{
+    matchSyncTimers.delete(key);
+
+    try{
+      // 高頻比分不再先等 Firebase SDK 3 秒。
+      // 直接走 REST，讓操作介面完全不等待網路。
+      await rtdbRestPut(path,snapshot,3500);
+      matchSyncRetry.delete(key);
+    }catch(e){
+      console.warn('background match sync failed',key,e);
+
+      const retry=(matchSyncRetry.get(key)||0)+1;
+      matchSyncRetry.set(key,retry);
+
+      if(retry<=1){
+        setTimeout(()=>queueSingleMatchCloud(kind,ri,mi,0),500);
+      }else{
+        matchSyncRetry.delete(key);
+        backgroundSyncAlert('比分已保存在這支手機，但雲端同步暫時失敗。請確認網路連線後再操作一次。');
+      }
+    }
+  },delay));
+}
+
+function queueWholeEventCloud(delay=80){
+  if(!ev)return;
+
+  if(!ev.testOnly)ev.syncVersion=Date.now();
+
+  localEventSave();
+
+  if(ev.testOnly)return;
+
+  if(eventSyncTimer)clearTimeout(eventSyncTimer);
+
+  const eventId=ev.id;
+  const snapshot=cloneJson(ev);
+
+  eventSyncTimer=setTimeout(async()=>{
+    eventSyncTimer=null;
+
+    try{
+      // 結構更新也直接走 REST，不阻塞畫面。
+      await rtdbRestPut(`events/${eventId}`,snapshot,5000);
+    }catch(e){
+      console.warn('background event sync failed',e);
+
+      setTimeout(async()=>{
+        try{
+          await rtdbRestPut(`events/${eventId}`,snapshot,5000);
+        }catch(e2){
+          console.warn('background event sync retry failed',e2);
+          backgroundSyncAlert('賽程已保存在這支手機，但雲端同步暫時失敗。請確認網路後再試。');
+        }
+      },700);
+    }
+  },delay);
+}
+
 async function saveSingleMatchCloud(kind,ri,mi){
   if(ev?.testOnly){
     localEventSave();
-    renderAdmin();
     return true;
   }
 
@@ -3701,11 +3802,10 @@ async function saveSingleMatchCloud(kind,ri,mi){
   localEventSave();
 
   try{
-    await cloudSet(matchCloudPath(kind,ri,mi),m);
+    await rtdbRestPut(matchCloudPath(kind,ri,mi),cloneJson(m),3500);
     return true;
   }catch(e){
     console.error('single match sync failed',e);
-    alert('比分同步失敗：'+(e?.message||e));
     return false;
   }
 }
@@ -3798,7 +3898,7 @@ function closeScorePicker(){
   $('scorePicker').classList.add('hidden');
   activeScoreTarget=null;
 }
-async function chooseScore(v){
+function chooseScore(v){
   if(!activeScoreTarget)return;
 
   const scoreValue=(v===''?0:+v);
@@ -3824,8 +3924,8 @@ async function chooseScore(v){
   closeScorePicker();
 
   if(matchInfo){
-    const ok=await saveSingleMatchCloud(matchInfo.kind,matchInfo.ri,matchInfo.mi);
-    if(!ok)return;
+    localEventSave();
+    queueSingleMatchCloud(matchInfo.kind,matchInfo.ri,matchInfo.mi,80);
 
     if(matchInfo.kind==='rr')openRRMatch(matchInfo.mi);
     else openMatchEditor(matchInfo.ri,matchInfo.mi);
@@ -3926,7 +4026,7 @@ function syncQuickScoreDisplay(kind,ri,mi,m){
   if(b)b.textContent=m.sb===''?0:m.sb;
 }
 
-async function quickAddMatchScore(ri,mi,side,points,reason){
+function quickAddMatchScore(ri,mi,side,points,reason){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.rounds?.[ri]?.matches?.[mi];
@@ -3946,14 +4046,17 @@ async function quickAddMatchScore(ri,mi,side,points,reason){
   if(m[other]==='')m[other]=0;
   m[key]=current+points;
 
+  localEventSave();
   syncQuickScoreDisplay('round',ri,mi,m);
 
-  // 高頻操作只寫目前這一場，不再 PUT 整份 event。
-  const ok=await saveSingleMatchCloud('round',ri,mi);
-  if(ok)openMatchEditor(ri,mi);
+  // UI 立即更新；雲端在背景合併同步。
+  queueSingleMatchCloud('round',ri,mi,120);
+
+  // 立刻重畫編輯器，讓「達 4 分鎖定 / 此場完成」狀態馬上生效。
+  openMatchEditor(ri,mi);
 }
 
-async function quickAddRRScore(i,side,points,reason){
+function quickAddRRScore(i,side,points,reason){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.finalRR?.matches?.[i];
@@ -3973,10 +4076,11 @@ async function quickAddRRScore(i,side,points,reason){
   if(m[other]==='')m[other]=0;
   m[key]=current+points;
 
+  localEventSave();
   syncQuickScoreDisplay('rr',0,i,m);
 
-  const ok=await saveSingleMatchCloud('rr',0,i);
-  if(ok)openRRMatch(i);
+  queueSingleMatchCloud('rr',0,i,120);
+  openRRMatch(i);
 }
 
 
@@ -4741,7 +4845,7 @@ async function claimMatchAs(ri,mi){
     }
   }
 }
-async function releaseMatchAny(ri,mi){
+function releaseMatchAny(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.rounds[ri].matches[mi];
@@ -4754,10 +4858,11 @@ async function releaseMatchAny(ri,mi){
   m.referee='';
   m.refereeActive=false;
 
-  const ok=await saveSingleMatchCloud('round',ri,mi);
-  if(ok)openMatchEditor(ri,mi);
+  localEventSave();
+  queueSingleMatchCloud('round',ri,mi,0);
+  openMatchEditor(ri,mi);
 }
-async function releaseRRMatchAny(i){
+function releaseRRMatchAny(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.finalRR.matches[i];
@@ -4770,8 +4875,9 @@ async function releaseRRMatchAny(i){
   m.referee='';
   m.refereeActive=false;
 
-  const ok=await saveSingleMatchCloud('rr',0,i);
-  if(ok)openRRMatch(i);
+  localEventSave();
+  queueSingleMatchCloud('rr',0,i,0);
+  openRRMatch(i);
 }
 
 
