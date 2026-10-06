@@ -2,8 +2,20 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v10：上方分台改為抽籤、獨立抽籤預覽與套用功能、分頁反橘 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v12：修復抽籤空白、公開時間更新後主辦功能消失、分頁反橘狀態 -->
 <title>Beyblade X Tournament</title>
+
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem('bx_theme')||'dark';
+    document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');
+  }catch(e){
+    document.documentElement.setAttribute('data-theme','dark');
+  }
+})();
+</script>
+
 <style>
 :root{--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--blue:#56a8ff;--warn:#f4c84b}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif}
@@ -812,11 +824,327 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+/* ===== 使用者外觀：淺色模式 ===== */
+:root[data-theme="light"]{
+  --bg:#f5f7fa;
+  --panel:#ffffff;
+  --panel2:#f1f4f8;
+  --line:#d7dde7;
+  --text:#18212f;
+  --muted:#687386;
+  --accent:#ff5a3c;
+  --green:#15965a;
+  --blue:#2877cf;
+  --warn:#a87400;
+}
+
+:root[data-theme="light"] body{
+  background:var(--bg);
+  color:var(--text);
+}
+
+:root[data-theme="light"] header{
+  background:rgba(255,255,255,.93);
+  border-bottom-color:var(--line);
+}
+
+:root[data-theme="light"] .themeBtn{
+  color:#273244;
+  background:#f3f5f8;
+}
+
+:root[data-theme="light"] .ghost,
+:root[data-theme="light"] .secondary{
+  background:#f3f5f8;
+  color:#273244;
+  border-color:#d7dde7;
+}
+
+:root[data-theme="light"] button:not(.danger):not(.loginBtn):not(.secondary):not(.ghost){
+  color:#fff;
+}
+
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea{
+  background:#fff;
+  color:#1d2735;
+  border-color:#cfd6e1;
+}
+
+:root[data-theme="light"] input::placeholder,
+:root[data-theme="light"] textarea::placeholder{
+  color:#98a2b3;
+}
+
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .adminHero,
+:root[data-theme="light"] .bracketShell,
+:root[data-theme="light"] .refCard,
+:root[data-theme="light"] .organizerCard,
+:root[data-theme="light"] .savedEvent,
+:root[data-theme="light"] .choiceCard,
+:root[data-theme="light"] .mode{
+  background:#fff;
+  border-color:#d7dde7;
+  box-shadow:0 1px 2px rgba(20,30,45,.04);
+}
+
+:root[data-theme="light"] .choiceCard.selected,
+:root[data-theme="light"] .mode.selected{
+  border-color:#ff795e;
+  background:#fff7f4;
+}
+
+:root[data-theme="light"] .adminTabs{
+  background:#f5f7fa;
+}
+
+:root[data-theme="light"] .adminTabs button.secondary{
+  background:#eef2f7;
+  color:#283548;
+  border-color:#d3dae5;
+}
+
+:root[data-theme="light"] [data-tab-btn].tabActive{
+  background:var(--accent)!important;
+  border-color:var(--accent)!important;
+  color:#fff!important;
+}
+
+:root[data-theme="light"] .metaChip,
+:root[data-theme="light"] .badge,
+:root[data-theme="light"] .refCountBadge{
+  background:#eef2f7;
+  color:#4e5c70;
+  border-color:#d8dee7;
+}
+
+:root[data-theme="light"] .player,
+:root[data-theme="light"] .drawChip,
+:root[data-theme="light"] .drawMatch,
+:root[data-theme="light"] .quickScoreSide{
+  background:#f7f9fc;
+  border-color:#d7dde7;
+}
+
+:root[data-theme="light"] .bracketTools,
+:root[data-theme="light"] .roundCol{
+  background:#fbfcfe;
+  border-color:#d7dde7;
+}
+
+:root[data-theme="light"] .roundHead{
+  background:#f7f9fc;
+}
+
+:root[data-theme="light"] .bMatch,
+:root[data-theme="light"] .rrMatch{
+  background:#fff;
+  border-color:#d5dce7;
+  box-shadow:0 1px 2px rgba(20,30,45,.04);
+}
+
+:root[data-theme="light"] .bMatch:hover,
+:root[data-theme="light"] .rrMatch:hover{
+  border-color:#aeb9c8;
+}
+
+:root[data-theme="light"] .bSide,
+:root[data-theme="light"] .rrSide{
+  color:#253247;
+}
+
+:root[data-theme="light"] .bSide.winner,
+:root[data-theme="light"] .rrSide.winner{
+  background:#fff1e9;
+  color:#a73f20;
+}
+
+:root[data-theme="light"] .bracketLinks{
+  color:#aab4c2;
+}
+
+:root[data-theme="light"] .matchModal,
+:root[data-theme="light"] .scorePickerPop{
+  background:rgba(35,43,55,.34);
+}
+
+:root[data-theme="light"] .matchSheet,
+:root[data-theme="light"] .scorePickerCard{
+  background:#fff;
+  color:#1c2736;
+  border-color:#cfd7e3;
+  box-shadow:0 -12px 40px rgba(30,40,55,.16);
+}
+
+:root[data-theme="light"] .sheetTitle,
+:root[data-theme="light"] .sheetRef{
+  border-color:#dce2eb;
+}
+
+:root[data-theme="light"] .sheetClose{
+  background:#eef2f7;
+  color:#344054;
+  border-color:#d3dae5;
+}
+
+:root[data-theme="light"] .quickScoreBox{
+  background:#f9fbfd;
+  border-color:#ccd5e1;
+}
+
+:root[data-theme="light"] .quickScoreTotal{
+  background:#fff7f3;
+  color:#d9522f;
+  border-color:#ff805f;
+}
+
+:root[data-theme="light"] .quickScoreBtns button{
+  color:#fff;
+}
+
+:root[data-theme="light"] .sheetFooter .secondary{
+  background:#f0f3f8;
+  color:#273244;
+}
+
+:root[data-theme="light"] .danger{
+  background:#fff0ed;
+  color:#b6442d;
+  border-color:#efb4a8;
+}
+
+:root[data-theme="light"] .notice{
+  background:#fff9df;
+  color:#6d5715;
+  border-color:#e4cc6b;
+}
+
+:root[data-theme="light"] .cloudNote,
+:root[data-theme="light"] .refHint,
+:root[data-theme="light"] .muted{
+  color:#6c7789;
+}
+
+:root[data-theme="light"] .cloudBadge.on,
+:root[data-theme="light"] .loginBtn.logged{
+  background:#e9f8ef;
+  color:#187347;
+  border-color:#9fd8b7;
+}
+
+:root[data-theme="light"] .loginBtn{
+  background:#eaf2ff;
+  color:#245a9e;
+  border-color:#a9c5eb;
+}
+
+:root[data-theme="light"] .savedType.cloud{
+  background:#eaf4ff;
+  color:#2b649e;
+  border-color:#a7c7e7;
+}
+
+:root[data-theme="light"] .savedType.test{
+  background:#f3ecff;
+  color:#7451a2;
+  border-color:#c9b8e4;
+}
+
+:root[data-theme="light"] .savedPublicStatus.on{
+  color:#187347;
+}
+
+:root[data-theme="light"] .savedPublicStatus.off{
+  color:#8a5a50;
+}
+
+:root[data-theme="light"] .sharePublicControl{
+  background:#fbfcfe;
+  border-color:#d7dde7;
+}
+
+:root[data-theme="light"] .drawNotice{
+  background:#fff7f3;
+  color:#6e493b;
+  border-color:#f2c2b4;
+}
+
+:root[data-theme="light"] .drawNo,
+:root[data-theme="light"] .drawSlot{
+  background:#fff0e9;
+  color:#b44729;
+  border-color:#f1b6a5;
+}
+
+:root[data-theme="light"] .qrbox{
+  background:#fff;
+}
+
+:root[data-theme="light"] .organizerCode{
+  background:#f7f9fc;
+  color:#18212f;
+  border-color:#cfd7e3;
+}
+
+:root[data-theme="light"] .refInviteBox{
+  background:#f8fafc;
+  border-color:#d7dde7;
+}
+
+:root[data-theme="light"] .homeSelectionSummary{
+  color:#667085;
+}
+
+:root[data-theme="light"] .homeNext:disabled,
+:root[data-theme="light"] button:disabled{
+  opacity:.52;
+}
+
+@media(max-width:520px){
+  .themeBtn{
+    min-width:44px;
+    padding:10px 9px!important;
+    font-size:0;
+  }
+  .themeBtn:before{
+    content:'☀️';
+    font-size:18px;
+  }
+  :root[data-theme="light"] .themeBtn:before{
+    content:'🌙';
+  }
+}
+</style>
+
+
+<style>
+/* 目前分頁一定使用橘色，不再依 secondary class 或主題判斷 */
+[data-tab-btn].tabActive,
+.adminTabs [data-tab-btn].tabActive,
+.adminActions [data-tab-btn].tabActive{
+  background:var(--accent)!important;
+  border-color:var(--accent)!important;
+  color:#fff!important;
+  opacity:1!important;
+}
+
+/* 抽籤頁即使內容較少，也保持正常卡片區域，不出現整頁黑空白 */
+#drawTab:not(.hidden){
+  display:block;
+  min-height:220px;
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
   <div><h1>⚔️ Beyblade X Tournament</h1><small id="headSub">戰鬥陀螺賽程表</small></div>
   <div class="headActions">
+    <button class="themeBtn secondary" id="themeToggleBtn" type="button" onclick="toggleTheme()">☀️ 淺色</button>
     <button class="loginBtn" id="googleLoginBtn" type="button" onclick="handleHeaderLogin()">Google 登入</button>
     <button class="ghost homeBtnText" id="homeBtn" type="button" onclick="goHome()">首頁</button>
   </div>
@@ -1187,7 +1515,9 @@ async function closePublicEvent(id){
       ev.publicOpen=false;
       ev.publicUntil=now;
       localEventSave();
+      const keepTab=currentAdminTab;
       renderAdmin();
+      if(keepTab)showTab(keepTab);
     }
 
     renderSavedEvents();
@@ -1242,7 +1572,9 @@ async function extendPublicEvent(id){
       ev.publicOpen=true;
       ev.publicUntil=nextUntil;
       localEventSave();
+      const keepTab=currentAdminTab;
       renderAdmin();
+      if(keepTab)showTab(keepTab);
     }
 
     renderSavedEvents();
@@ -1390,6 +1722,7 @@ async function openCachedOwnerEvent(cached){
   if(cached.ownerUid!==fbAuth.currentUser.uid)return false;
 
   ev=cached;
+  currentAdminTab='bracket';
   isAdmin=true;
   isReferee=false;
 
@@ -3101,10 +3434,21 @@ function renderDraw(){
   const tab=$('drawTab');
   if(!tab||!ev)return;
 
+  if(!Array.isArray(ev.roster))ev.roster=[];
+  if(!Array.isArray(ev.rounds))ev.rounds=[];
+
   ensureDrawDraft();
 
-  const editable=isAdmin||ev?.testOnly;
-  const canApply=editable&&noResults();
+  const editable=hasOrganizerAccess();
+
+  let canApply=false;
+  try{
+    canApply=editable&&noResults();
+  }catch(e){
+    console.warn('noResults failed in renderDraw',e);
+    canApply=false;
+  }
+
   const pairs=drawPairRows(drawDraft);
 
   const participantHtml=drawDraft.map((name,i)=>`
@@ -3134,8 +3478,8 @@ function renderDraw(){
       </div>
 
       <div class=drawNotice>
-        參考 BattleTree 的「先抽籤、再套用對戰表」概念，這裡改成我們自己的深色＋橘色介面。
-        按「重新抽籤」只會預覽，不會立刻改動正式對戰表。
+        先抽籤預覽，再決定是否套用到正式對戰表。
+        「重新抽籤」只改預覽，不會立刻影響目前賽程。
       </div>
 
       <div class=drawActions>
@@ -3150,25 +3494,23 @@ function renderDraw(){
       `:''}
 
       <div class=drawSectionTitle>抽籤順序</div>
-      <div class=drawGrid>${participantHtml}</div>
+      <div class=drawGrid>${participantHtml || '<div class=muted>目前沒有參賽者。</div>'}</div>
 
       <div class=drawSectionTitle>第一輪配對預覽</div>
-      <div class=drawPairList>${pairHtml}</div>
+      <div class=drawPairList>${pairHtml || '<div class=muted>目前沒有可預覽的配對。</div>'}</div>
     </div>
   `;
 }
 
 function shuffleDraw(){
-  if(!isAdmin&&!ev?.testOnly)return;
+  if(!hasOrganizerAccess())return;
   ensureDrawDraft();
-
-  // Fisher-Yates；只動暫存預覽，不碰正式賽事。
   drawDraft=shuffle(drawDraft);
   renderDraw();
 }
 
 function applyDrawResult(){
-  if(!isAdmin&&!ev?.testOnly)return;
+  if(!hasOrganizerAccess())return;
   if(!noResults())return alert('已有比賽結果，不能重新套用抽籤。');
 
   ensureDrawDraft();
@@ -3183,6 +3525,32 @@ function applyDrawResult(){
   showTab('bracket');
 }
 
+
+let currentAdminTab='bracket';
+
+function isEventOwner(){
+  return !!(
+    ev &&
+    !ev.testOnly &&
+    isGoogleUser() &&
+    ev.ownerUid &&
+    fbAuth?.currentUser?.uid===ev.ownerUid
+  );
+}
+
+function hasOrganizerAccess(){
+  return !!(isAdmin || ev?.testOnly || isEventOwner());
+}
+
+function syncTabButtons(t=currentAdminTab){
+  document.querySelectorAll('[data-tab-btn]').forEach(btn=>{
+    const active=btn.dataset.tabBtn===t;
+    btn.classList.toggle('secondary',!active);
+    btn.classList.toggle('tabActive',active);
+    btn.setAttribute('aria-current',active?'page':'false');
+  });
+}
+
 function renderAdmin(){
   if(!ev){$('admin').classList.add('hidden');$('home').classList.remove('hidden');return;}
   normalizeEvent();
@@ -3192,6 +3560,15 @@ function renderAdmin(){
   if(ev.finalRR)cols+=renderRR();
   $('bracketTab').innerHTML=top+`<div class=bracketShell><div class=bracketTools><div class=zoomGroup><button onclick="zoomBracket(-.1)">−</button><span class=zoomLabel>100%</span><button onclick="zoomBracket(.1)">＋</button><button onclick=fitBracket()>全覽</button></div><div class=bracketHint>${isReferee&&!isAdmin?'點比賽卡開始執裁':'拖曳查看・點比賽卡編輯'}</div><button class=viewToggle onclick=toggleBracketFull()>⛶</button></div><div class=bracketScroll><div class=bracketStage><div class=bracketCanvas><svg class=bracketLinks></svg>${cols}</div></div></div></div>`;
   renderDraw();renderRoster();renderReferee();renderOrganizer();renderShare();applyAccessUI();
+
+  // Firebase listener 或公開時間更新造成重繪時，保留使用者目前所在分頁。
+  const tab=currentAdminTab||'bracket';
+  ['bracket','draw','roster','referee','organizer','share'].forEach(x=>{
+    const el=$(x+'Tab');
+    if(el)el.classList.toggle('hidden',x!==tab);
+  });
+  syncTabButtons(tab);
+
   requestAnimationFrame(()=>{bracketScale=window.innerWidth<=640?.72:.9;setBracketScale(bracketScale);requestAnimationFrame(drawBracketLinks)});
 }
 function renderRR(){
@@ -3567,20 +3944,23 @@ function applyAccessUI(){
 
   const p=new URLSearchParams(location.search);
   const adminInvite=p.get('admin')==='1';
+  const organizerAccess=hasOrganizerAccess();
 
-  if(r)r.classList.toggle('hidden',!isAdmin&&!ev?.testOnly);
-  if(d)d.classList.toggle('hidden',!isAdmin&&!ev?.testOnly);
-  if(o)o.classList.toggle('hidden',!(isAdmin||adminInvite||ev?.testOnly));
+  if(r)r.classList.toggle('hidden',!organizerAccess);
+  if(d)d.classList.toggle('hidden',!organizerAccess);
+  if(o)o.classList.toggle('hidden',!(organizerAccess||adminInvite));
 
   document.querySelectorAll('.adminActions button').forEach(b=>{
     const isRefBtn=(b.textContent||'').includes('裁判');
 
     if(isRefBtn){
-      b.classList.toggle('hidden',!(isAdmin||isReferee||ev?.testOnly));
+      b.classList.toggle('hidden',!(organizerAccess||isReferee));
     }else{
-      b.classList.toggle('hidden',!isAdmin&&!ev?.testOnly);
+      b.classList.toggle('hidden',!organizerAccess);
     }
   });
+
+  syncTabButtons(currentAdminTab);
 }
 
 function stopAdminCodeRotation(){
@@ -3815,22 +4195,38 @@ function addPlayer(){if(!isAdmin&&!ev?.testOnly)return;let v=$('newPlayer').valu
 function rebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.rounds=[];ev.finalRR=null;buildFirst();put()}
 function randomRebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.roster=shuffle(ev.roster);ev.pairing='random';rebuild()}
 function showTab(t){
-  if(isReferee&&!isAdmin&&t==='roster')t='bracket';
-  if(isReferee&&!isAdmin&&t==='organizer')t='bracket';
-  if(isReferee&&!isAdmin&&t==='draw')t='bracket';
+  if(!ev)return;
+
+  const organizerAccess=hasOrganizerAccess();
+
+  if(isReferee&&!organizerAccess&&t==='roster')t='bracket';
+  if(isReferee&&!organizerAccess&&t==='organizer')t='bracket';
+  if(isReferee&&!organizerAccess&&t==='draw')t='bracket';
+
+  if(!organizerAccess && (t==='draw'||t==='roster'||t==='organizer')){
+    t='bracket';
+  }
+
+  currentAdminTab=t;
 
   ['bracket','draw','roster','referee','organizer','share'].forEach(x=>{
-    $(x+'Tab').classList.toggle('hidden',x!==t);
+    const el=$(x+'Tab');
+    if(el)el.classList.toggle('hidden',x!==t);
   });
 
-  document.querySelectorAll('[data-tab-btn]').forEach(btn=>{
-    const active=btn.dataset.tabBtn===t;
-    btn.classList.toggle('secondary',!active);
-    btn.classList.toggle('tabActive',active);
-    btn.setAttribute('aria-current',active?'page':'false');
-  });
+  syncTabButtons(t);
 
-  if(t==='draw')renderDraw();
+  if(t==='draw'){
+    try{
+      renderDraw();
+    }catch(e){
+      console.error('renderDraw failed',e);
+      const tab=$('drawTab');
+      if(tab){
+        tab.innerHTML=`<div class=card><h3>🎲 抽籤</h3><div class=notice>抽籤頁載入失敗，請回到對戰表後再重新進入。</div></div>`;
+      }
+    }
+  }
 
   if(t==='organizer')renderOrganizer();
   else stopAdminCodeRotation();
@@ -3983,6 +4379,54 @@ function renderShare(){
 async function copyPublic(){await navigator.clipboard.writeText(publicUrl());alert('已複製連結')}
 async function nativeShare(){if(navigator.share)await navigator.share({title:ev.name,text:'查看即時對戰表',url:publicUrl()});else copyPublic()}
 function showTab(t){['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))}
+
+
+const THEME_KEY='bx_theme';
+
+function currentTheme(){
+  return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark';
+}
+
+function updateThemeButton(){
+  const btn=$('themeToggleBtn');
+  if(!btn)return;
+
+  if(currentTheme()==='light'){
+    btn.textContent='🌙 深色';
+    btn.setAttribute('aria-label','切換成深色模式');
+  }else{
+    btn.textContent='☀️ 淺色';
+    btn.setAttribute('aria-label','切換成淺色模式');
+  }
+}
+
+function applyTheme(theme,save=true){
+  const next=theme==='light'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+
+  if(save){
+    try{localStorage.setItem(THEME_KEY,next)}catch(e){}
+  }
+
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.setAttribute('content',next==='light'?'#f5f7fa':'#0b0d12');
+
+  updateThemeButton();
+
+  // 對戰表 SVG/尺寸在切換主題後重新畫一次。
+  requestAnimationFrame(()=>{
+    try{
+      setBracketScale(bracketScale);
+      drawBracketLinks();
+    }catch(e){}
+  });
+}
+
+function toggleTheme(){
+  applyTheme(currentTheme()==='light'?'dark':'light');
+}
+
+updateThemeButton();
 
 window.addEventListener('resize',()=>{clearTimeout(window.__bxResize);window.__bxResize=setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},120)});
 
