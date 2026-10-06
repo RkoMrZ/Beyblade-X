@@ -324,26 +324,55 @@ async function syncMyCloudEvents(){
   if(!isGoogleUser())return 0;
 
   try{
-    // Safari 與「加入主畫面 Web App」的 localStorage 是不同容器。
-    // 因此登入同一 Google 帳號時，直接從 Firebase 把此帳號建立的雲端賽事同步回目前容器。
-    const allCloud=(await rtdbRestGet('events',12000))||{};
     const uid=fbAuth.currentUser.uid;
-    const mine=Object.values(allCloud).filter(e=>e && !e.testOnly && e.ownerUid===uid && e.id);
+
+    // 只讀取自己的雲端賽事索引，不再讀整個 /events（Firebase Rules 不允許父層列出全部賽事）
+    const index=(await rtdbRestGet(`userEvents/${uid}`,10000))||{};
+    const ids=Object.keys(index).filter(id=>index[id]);
 
     const local=events();
-    const ids=new Set(savedEventIds());
+    const saved=new Set(savedEventIds());
+    let count=0;
 
-    for(const e of mine){
-      local[e.id]=e;
-      ids.add(e.id);
+    for(const id of ids){
+      try{
+        const e=await rtdbRestGet(`events/${id}`,10000);
+        if(e && e.id){
+          local[e.id]=e;
+          saved.add(e.id);
+          count++;
+        }else{
+          // 索引殘留但賽事已不存在，清掉索引
+          try{await rtdbRestDelete(`userEvents/${uid}/${id}`,8000)}catch{}
+        }
+      }catch(e){
+        console.warn('sync event failed',id,e);
+      }
     }
 
     localStorage.setItem(STORE,JSON.stringify(local));
-    setSavedEventIds([...ids]);
-    return mine.length;
+    setSavedEventIds([...saved]);
+    return count;
   }catch(e){
     console.warn('syncMyCloudEvents failed',e);
     return 0;
+  }
+}
+
+
+async function backfillMyCloudEventIndex(){
+  if(!isGoogleUser())return;
+  const uid=fbAuth.currentUser.uid;
+  const all=events();
+
+  for(const e of Object.values(all)){
+    if(!e || e.testOnly || !e.id)continue;
+    if(e.ownerUid!==uid)continue;
+    try{
+      await rtdbRestPut(`userEvents/${uid}/${e.id}`,true,8000);
+    }catch(err){
+      console.warn('backfill userEvents failed',e.id,err);
+    }
   }
 }
 
@@ -471,6 +500,8 @@ async function deleteSavedEvent(id){
     updates[`events/${id}`]=null;
     updates[`secrets/${id}`]=null;
     updates[`admins/${id}`]=null;
+    const ownerUid=cached.ownerUid||fbUser.uid;
+    updates[`userEvents/${ownerUid}/${id}`]=null;
     await rtdbRestPatchRoot(updates,12000);
 
     purgeLocalEvent(id);
@@ -523,6 +554,7 @@ async function initCloud(){
       if($('home')&&!$('home').classList.contains('hidden')){
         renderHomeSelections();
         if(isGoogleUser()){
+          await backfillMyCloudEventIndex();
           await syncMyCloudEvents();
           renderSavedEvents();
         }
@@ -925,6 +957,7 @@ async function createTournament(){
     await rtdbRestPut(`events/${ev.id}`,ev,12000);
     await rtdbRestPut(`secrets/${ev.id}`,{adminCode:code,expiresAt},12000);
     await rtdbRestPut(`admins/${ev.id}/${fbUser.uid}`,code,12000);
+    await rtdbRestPut(`userEvents/${fbUser.uid}/${ev.id}`,true,12000);
 
     isAdmin=true;
     localStorage.setItem(adminFlagKey(ev.id),'1');
@@ -1463,6 +1496,7 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
   renderHomeSelections();
 
   if(isGoogleUser()){
+    await backfillMyCloudEventIndex();
     await syncMyCloudEvents();
   }
   renderSavedEvents();
