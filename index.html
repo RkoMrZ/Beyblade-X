@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v14：修復建立賽事下一步被Firebase計數讀取卡住 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v16：修復雲端建立賽事在iOS Safari永久卡建立中 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1139,6 +1139,59 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+.raffleCard{overflow:hidden}
+.raffleStage{
+  margin-top:16px;
+  padding:18px 14px;
+  text-align:center;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:rgba(255,255,255,.025);
+}
+.raffleLabel{
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:8px;
+}
+.raffleWinner{
+  min-height:64px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px;
+  border-radius:14px;
+  border:1px dashed var(--line);
+  font-size:24px;
+  font-weight:900;
+  letter-spacing:.02em;
+}
+.raffleWinner.hasWinner{
+  background:rgba(255,90,60,.10);
+  border-style:solid;
+  border-color:rgba(255,90,60,.50);
+}
+.raffleRolling{
+  margin-top:8px;
+  font-size:12px;
+  color:var(--muted);
+}
+:root[data-theme="light"] .raffleStage{
+  background:#f8fafc;
+  border-color:#d7dde7;
+}
+:root[data-theme="light"] .raffleWinner{
+  background:#fff;
+  border-color:#cfd7e3;
+}
+:root[data-theme="light"] .raffleWinner.hasWinner{
+  background:#fff3ef;
+  border-color:#ff9e88;
+  color:#a63e25;
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -1192,7 +1245,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 </section>
 
 <section id="admin" class="hidden">
- <div class="adminTabs"><button class="secondary" data-tab-btn="bracket" onclick="showTab('bracket')">🏆 對戰表</button><button id="drawTopBtn" class="secondary" data-tab-btn="draw" onclick="showTab('draw')">🎲 抽籤</button><button class="secondary" data-tab-btn="share" onclick="showTab('share')">🔗 QR／分享</button><button id="rosterTopBtn" class="secondary" data-tab-btn="roster" onclick="showTab('roster')">👥 參賽名單</button></div>
+ <div class="adminTabs"><button class="secondary" data-tab-btn="bracket" onclick="showTab('bracket')">🏆 對戰表</button><button id="drawTopBtn" class="secondary" data-tab-btn="draw" onclick="showTab('draw')">🎁 抽籤</button><button class="secondary" data-tab-btn="share" onclick="showTab('share')">🔗 QR／分享</button><button id="rosterTopBtn" class="secondary" data-tab-btn="roster" onclick="showTab('roster')">👥 參賽名單</button></div>
  <div id="bracketTab"></div>
  <div id="drawTab" class="hidden"></div>
  <div id="rosterTab" class="hidden"></div>
@@ -2597,39 +2650,66 @@ async function rtdbRestGet(path,timeoutMs=12000){
 async function createTournament(){
   const createBtn=document.querySelector('[data-create-tournament="1"]');
   const oldText=createBtn?.textContent||'建立賽程表';
-  if(createBtn){createBtn.disabled=true;createBtn.textContent='建立中…'}
+
+  if(createBtn){
+    createBtn.disabled=true;
+    createBtn.textContent='建立中…';
+  }
 
   try{
     let r=rosterFromText();
-    if(r.length<2){alert('至少需要 2 位參賽者。');return}
+    if(r.length<2){
+      alert('至少需要 2 位參賽者。');
+      return;
+    }
 
     const testOnly=draftStorage==='test';
     let pairing=$('pairMode').value;
     if(pairing==='random')r=shuffle(r);
 
     if(testOnly){
-      ev={id:'TEST-'+uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),testOnly:true,cloudVersion:0};
+      ev={
+        id:'TEST-'+uid(),
+        name:$('eventName').value.trim()||'Beyblade X Tournament',
+        mode:draftMode,
+        pairing,
+        freeFinal:$('freeFinal').value,
+        roster:r,
+        rounds:[],
+        finalRR:null,
+        created:Date.now(),
+        testOnly:true,
+        cloudVersion:0
+      };
+
       buildFirst();
       isAdmin=true;
       localEventSave();
       markEventSaved(ev.id);
+
       $('create').classList.add('hidden');
       $('admin').classList.remove('hidden');
       history.replaceState(null,'',location.pathname);
+
       renderAdmin();
+      showTab('bracket');
       return;
     }
+
+    if(createBtn)createBtn.textContent='確認雲端狀態…';
 
     if(!(await initCloud())){
       alert('Firebase 尚未連線成功。');
       return;
     }
+
     if(!isGoogleUser()){
       alert('建立雲端賽事前，必須先使用 Google 帳號登入。');
       return;
     }
 
-    const existingCount=await getCloudEventCountFromServer();
+    const existingCount=await getCloudEventCountFromServer(2500);
+
     if(existingCount>=CLOUD_EVENT_LIMIT){
       alert(`這個 Google 帳號已達 ${CLOUD_EVENT_LIMIT} 場雲端賽事上限，請先刪除一場舊賽事。`);
       goHome();
@@ -2657,22 +2737,24 @@ async function createTournament(){
       publicUntil:now+PUBLIC_WINDOW_MS,
       testOnly:false
     };
+
     buildFirst();
 
     const code=String(Math.floor(100000+Math.random()*900000));
     const expiresAt=Date.now()+30000;
 
-    await rtdbRestProbe(10000);
+    if(createBtn)createBtn.textContent='寫入雲端…';
 
-    // 原子建立：events / secret / admin / userEvents 一次完成。
-    // Rules 也會再次檢查每個 Google 帳號最多 3 場。
+    // 不再先做額外 probe；直接執行真正建立。
+    // SDK 超過 8 秒沒回應會自動 fallback 到 REST PATCH，
+    // REST 再有 10 秒 timeout，因此不會無限卡在「建立中…」。
     await cloudUpdate({
       [`events/${ev.id}`]:ev,
       [`secrets/${ev.id}`]:{adminCode:code,expiresAt},
       [`admins/${ev.id}/${fbUser.uid}`]:code,
       [`userEvents/${fbUser.uid}/${ev.id}`]:true,
       [`userEventCounts/${fbUser.uid}`]:existingCount+1
-    });
+    },8000);
 
     isAdmin=true;
     localStorage.setItem(adminFlagKey(ev.id),'1');
@@ -2680,25 +2762,37 @@ async function createTournament(){
     localEventSave();
     markEventSaved(ev.id);
 
+    currentAdminTab='bracket';
+
     listenCloudEvent(ev.id);
     history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(ev.id)}`);
+
     $('create').classList.add('hidden');
     $('admin').classList.remove('hidden');
+
     renderAdmin();
     showTab('bracket');
 
   }catch(e){
     console.error('createTournament failed',e);
+
     const code=e?.code?`\n錯誤代碼：${e.code}`:'';
     const msg=e?.message||String(e);
 
-    if(String(msg).includes('PERMISSION_DENIED')){
-      alert(`建立雲端賽事失敗：可能已達 ${CLOUD_EVENT_LIMIT} 場上限，或 Firebase Rules 尚未更新。`);
+    if(
+      String(msg).includes('PERMISSION_DENIED') ||
+      String(msg).includes('Permission denied') ||
+      String(msg).includes('401') ||
+      String(msg).includes('403')
+    ){
+      alert(`建立雲端賽事失敗：Firebase 權限拒絕寫入。請確認已發布最新 Rules，且此 Google 帳號未達 ${CLOUD_EVENT_LIMIT} 場上限。`);
+    }else if(String(msg).includes('逾時')){
+      alert('建立雲端賽事逾時。網路或 Firebase 暫時沒有回應，請再按一次建立；不會重複建立已完成的賽事。');
     }else{
       alert('建立雲端賽事失敗：'+msg+code);
     }
   }finally{
-    if(createBtn){
+    if(createBtn && document.body.contains(createBtn)){
       createBtn.disabled=false;
       createBtn.textContent=oldText;
     }
@@ -3024,12 +3118,23 @@ async function cloudSet(path,value){
   return true;
 }
 
-async function cloudUpdate(updates){
+async function cloudUpdate(updates,timeoutMs=8000){
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
   if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
 
-  await fbDb.ref().update(updates);
-  return true;
+  try{
+    await Promise.race([
+      fbDb.ref().update(updates),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase SDK 寫入逾時')),timeoutMs))
+    ]);
+    return true;
+  }catch(e){
+    console.warn('cloudUpdate SDK failed/timeout, fallback REST PATCH',e);
+
+    // 建立賽事、裁判設定等低頻操作若 SDK 在 iOS Safari 卡住，
+    // 自動改用已有 timeout 的 REST PATCH，避免畫面永久停在「建立中…」。
+    return await rtdbRestPatchRoot(updates,10000);
+  }
 }
 
 function matchCloudPath(kind,ri,mi){
@@ -3457,27 +3562,41 @@ function freeFlowLabel(n){
 }
 
 
-let drawDraft=[];
-let drawDraftEventId='';
 
-function ensureDrawDraft(){
-  if(!ev)return;
-  if(drawDraftEventId!==ev.id || drawDraft.length!==ev.roster.length){
-    drawDraftEventId=ev.id;
-    drawDraft=[...ev.roster];
-  }
+let raffleTimer=null;
+let raffleSpinning=false;
+
+function raffleStorageKey(){
+  return `bx_raffle_result_${ev?.id||'default'}`;
 }
 
-function drawPairRows(list){
-  const rows=[];
-  for(let i=0;i<list.length;i+=2){
-    rows.push({
-      n:(i/2)+1,
-      a:list[i]||'BYE',
-      b:list[i+1]||'BYE'
-    });
+function getSavedRaffleWinner(){
+  try{return localStorage.getItem(raffleStorageKey())||''}catch(e){return ''}
+}
+
+function saveRaffleWinner(name){
+  try{
+    if(name)localStorage.setItem(raffleStorageKey(),name);
+    else localStorage.removeItem(raffleStorageKey());
+  }catch(e){}
+}
+
+function secureRandomIndex(max){
+  if(max<=1)return 0;
+
+  if(window.crypto?.getRandomValues){
+    const maxUint=0x100000000;
+    const limit=maxUint-(maxUint%max);
+    const a=new Uint32Array(1);
+    let x;
+    do{
+      crypto.getRandomValues(a);
+      x=a[0];
+    }while(x>=limit);
+    return x%max;
   }
-  return rows;
+
+  return Math.floor(Math.random()*max);
 }
 
 function renderDraw(){
@@ -3485,94 +3604,63 @@ function renderDraw(){
   if(!tab||!ev)return;
 
   if(!Array.isArray(ev.roster))ev.roster=[];
-  if(!Array.isArray(ev.rounds))ev.rounds=[];
-
-  ensureDrawDraft();
 
   const editable=hasOrganizerAccess();
+  const roster=[...ev.roster].filter(Boolean);
+  const savedWinner=getSavedRaffleWinner();
+  const winnerValid=savedWinner && roster.includes(savedWinner);
 
-  let canApply=false;
-  try{
-    canApply=editable&&noResults();
-  }catch(e){
-    console.warn('noResults failed in renderDraw',e);
-    canApply=false;
-  }
-
-  const pairs=drawPairRows(drawDraft);
-
-  const participantHtml=drawDraft.map((name,i)=>`
+  const participantHtml=roster.map((name,i)=>`
     <div class=drawChip>
       <span class=drawNo>${i+1}</span>
       <span class=drawName>${esc(name)}</span>
     </div>
   `).join('');
 
-  const pairHtml=pairs.map(p=>`
-    <div class=drawMatch>
-      <div class=drawMatchTitle>第 ${p.n} 場</div>
-      <div class=drawSide><span class=drawSlot>A</span><b>${esc(p.a)}</b></div>
-      <div class=drawVs>VS</div>
-      <div class=drawSide><span class=drawSlot>B</span><b>${esc(p.b)}</b></div>
-    </div>
-  `).join('');
-
   tab.innerHTML=`
-    <div class="card drawCard">
+    <div class="card drawCard raffleCard">
       <div class=drawHead>
         <div>
-          <div class=muted>🎲 隨機配對</div>
-          <h3 style="margin:4px 0 0">抽籤</h3>
+          <div class=muted>🎁 參賽者獎品抽籤</div>
+          <h3 style="margin:4px 0 0">抽一位幸運得主</h3>
         </div>
-        <span class=refCountBadge>${drawDraft.length} 人</span>
+        <span class=refCountBadge>${roster.length} 人</span>
       </div>
 
       <div class=drawNotice>
-        先抽籤預覽，再決定是否套用到正式對戰表。
-        「重新抽籤」只改預覽，不會立刻影響目前賽程。
+        會從目前「參賽名單」的所有人中隨機抽出 1 位得主。
+        這個功能只用來抽獎，<b>不會改變參賽順序、第一輪配對或任何比賽結果。</b>
+      </div>
+
+      <div class=raffleStage>
+        <div class=raffleLabel>中獎者</div>
+        <div id=raffleWinner class="raffleWinner ${winnerValid?'hasWinner':''}">
+          ${winnerValid?`🎉 ${esc(savedWinner)}`:'等待抽籤'}
+        </div>
+        <div id=raffleRolling class=raffleRolling>${roster.length?`共有 ${roster.length} 位參賽者`:'目前沒有參賽者'}</div>
       </div>
 
       <div class=drawActions>
-        <button type=button ${editable?'':'disabled'} onclick=shuffleDraw()>🎲 重新抽籤</button>
-        <button type=button class="${canApply?'':'secondary'}" ${canApply?'':'disabled'} onclick=applyDrawResult()>套用抽籤結果</button>
+        <button id=raffleStartBtn type=button ${editable&&roster.length?'':'disabled'} onclick=startPrizeRaffle()>
+          ${winnerValid?'🎁 再抽一次':'🎁 開始抽籤'}
+        </button>
+        <button type=button class=secondary ${editable&&winnerValid?'':'disabled'} onclick=clearPrizeRaffle()>清除結果</button>
       </div>
 
-      ${!canApply?`
-        <div class=refHint style="margin-top:10px">
-          ${editable?'目前已有比賽結果，為避免破壞晉級資料，不能重新套用抽籤結果。':'只有主辦可以操作抽籤。'}
-        </div>
-      `:''}
+      ${!editable?`<div class=refHint style="margin-top:10px">只有主辦可以操作抽獎。</div>`:''}
 
-      <div class=drawSectionTitle>抽籤順序</div>
+      <div class=drawSectionTitle>本次抽籤名單</div>
       <div class=drawGrid>${participantHtml || '<div class=muted>目前沒有參賽者。</div>'}</div>
-
-      <div class=drawSectionTitle>第一輪配對預覽</div>
-      <div class=drawPairList>${pairHtml || '<div class=muted>目前沒有可預覽的配對。</div>'}</div>
     </div>
   `;
 }
 
 function shuffleDraw(){
-  if(!hasOrganizerAccess())return;
-  ensureDrawDraft();
-  drawDraft=shuffle(drawDraft);
-  renderDraw();
+  startPrizeRaffle();
 }
 
 function applyDrawResult(){
-  if(!hasOrganizerAccess())return;
-  if(!noResults())return alert('已有比賽結果，不能重新套用抽籤。');
-
-  ensureDrawDraft();
-
-  ev.roster=[...drawDraft];
-  ev.pairing='random';
-  ev.rounds=[];
-  ev.finalRR=null;
-  buildFirst();
-  put();
-
-  showTab('bracket');
+  startPrizeRaffle();
 }
 
 
@@ -4264,6 +4352,74 @@ function delPlayer(i){if(!isAdmin&&!ev?.testOnly)return;if(!noResults())return a
 function addPlayer(){if(!isAdmin&&!ev?.testOnly)return;let v=$('newPlayer').value.trim();if(!v)return; if(!noResults())return alert('已有比賽結果，請先重設／重建後再新增。');ev.roster.push(v);rebuild()}
 function rebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.rounds=[];ev.finalRR=null;buildFirst();put()}
 function randomRebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.roster=shuffle(ev.roster);ev.pairing='random';rebuild()}
+
+function startPrizeRaffle(){
+  if(!hasOrganizerAccess()||raffleSpinning||!ev)return;
+
+  const roster=[...(ev.roster||[])].filter(Boolean);
+  if(!roster.length)return alert('目前沒有參賽者可以抽籤。');
+
+  raffleSpinning=true;
+
+  const winnerEl=$('raffleWinner');
+  const rollingEl=$('raffleRolling');
+  const btn=$('raffleStartBtn');
+
+  if(btn){
+    btn.disabled=true;
+    btn.textContent='抽籤中…';
+  }
+
+  if(winnerEl){
+    winnerEl.classList.remove('hasWinner');
+    winnerEl.textContent='抽籤中…';
+  }
+
+  let ticks=0;
+  const totalTicks=24;
+
+  clearInterval(raffleTimer);
+  raffleTimer=setInterval(()=>{
+    ticks++;
+    const preview=roster[secureRandomIndex(roster.length)];
+
+    if(winnerEl)winnerEl.textContent=preview;
+    if(rollingEl)rollingEl.textContent=`抽籤中 ${'•'.repeat((ticks%3)+1)}`;
+
+    if(ticks>=totalTicks){
+      clearInterval(raffleTimer);
+      raffleTimer=null;
+
+      const winner=roster[secureRandomIndex(roster.length)];
+      saveRaffleWinner(winner);
+
+      if(winnerEl){
+        winnerEl.textContent=`🎉 ${winner}`;
+        winnerEl.classList.add('hasWinner');
+      }
+      if(rollingEl)rollingEl.textContent='恭喜中獎！';
+
+      if(btn){
+        btn.disabled=false;
+        btn.textContent='🎁 再抽一次';
+      }
+
+      raffleSpinning=false;
+      renderDraw();
+    }
+  },70);
+}
+
+function clearPrizeRaffle(){
+  if(!hasOrganizerAccess()||raffleSpinning)return;
+
+  clearInterval(raffleTimer);
+  raffleTimer=null;
+  raffleSpinning=false;
+  saveRaffleWinner('');
+  renderDraw();
+}
+
 function showTab(t){
   if(!ev)return;
 
