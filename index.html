@@ -32,7 +32,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .roundMatches{display:flex;flex-direction:column;gap:var(--gap,16px);padding-top:var(--top,0px)}
 .bracketMatch{position:relative;width:100%;height:112px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:13px;padding:8px 9px;text-align:left;color:var(--text);box-shadow:0 8px 22px #0004;cursor:pointer}.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 8px 22px #0004}.bracketMatch:hover{border-color:#62718b}.bracketMatch.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite;box-shadow:0 0 0 1px #ffd45a55 inset,0 0 22px #ffd45a55,0 8px 22px #0005}@keyframes judgePulse{0%,100%{box-shadow:0 0 0 1px #ffd45a44 inset,0 0 8px #ffd45a22,0 8px 22px #0005}50%{box-shadow:0 0 0 2px #ffd45aaa inset,0 0 26px #ffd45a99,0 8px 22px #0005}}.bracketMatch .matchNo{height:18px;line-height:18px;margin:0 62px 4px 0}.bSide{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;align-items:center;height:34px;padding:4px 6px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:13px;line-height:1.15}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bScore{display:flex;align-items:center;justify-content:center;width:36px;height:24px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px;line-height:1}.bSide.winner .bScore{border-color:#a8672e;color:#ffb371}.winnerDot{flex:0 0 auto;font-size:10px;color:#ff9b54}.tapEdit{position:absolute;right:8px;top:7px;color:#7c879a;font-size:10px}.refTag{position:absolute;left:9px;right:9px;bottom:4px;display:block;max-width:calc(100% - 18px);padding:2px 6px;border:1px solid #334158;border-radius:999px;background:#0d131c;color:#9fb0c8;font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.refTag.on{border-color:#6c5630;color:#f0c27a;background:#211a11}.refTag.live{border-color:#ffd45a;color:#ffe9a6;background:#342b12;font-weight:800}.bracketMatch.judging .bSide:last-of-type{margin-bottom:17px}
 .rrCol{position:relative;width:236px;flex:0 0 236px;z-index:1}.rrPanel{background:linear-gradient(180deg,#281e14,#141820);border:1px solid #855521;border-radius:15px;padding:12px;box-shadow:0 0 25px #ff8a2a18}.rrPlayers{margin:0}.rrRow{display:grid;grid-template-columns:24px 1fr auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #4a3827;font-size:12px}.rrRank{font-weight:900;color:#ffb45f}.rrGames{display:grid;gap:8px;margin-top:10px}.rrMini{background:#141a24;border:1px solid #3c465a;border-radius:10px;padding:8px;font-size:11px;display:flex;justify-content:space-between;gap:8px}.rrMini b{font-weight:700}.rrMini span{color:var(--muted)}.rrMini.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}
-.matchModal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#0009;padding:16px}.matchSheet{width:min(520px,100%);background:#151a24;border:1px solid #3a465b;border-radius:20px 20px 16px 16px;padding:16px;box-shadow:0 20px 60px #000a}.sheetHandle{width:46px;height:5px;border-radius:999px;background:#3d4657;margin:0 auto 12px}.sheetTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.sheetTitle h3{margin:0}.sheetClose{background:#222a38;border:1px solid #3b4658;padding:8px 10px}.sheetPlayer{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;padding:10px 0}.sheetPlayer+.sheetPlayer{border-top:1px solid #2b3444}.sheetPlayer input{text-align:center}.sheetRef{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #2b3444}.sheetRef select{min-width:0}.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sheetActions button{min-width:0}.sheetFooter{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.scorePickBtn{width:72px;height:52px;border:1px solid #3b4658;background:#0f141d;color:#f7f8fa;border-radius:14px;font-size:15px;line-height:1;white-space:nowrap;font-weight:800;display:flex;align-items:center;justify-content:center}.scorePickBtn.hasValue{border-color:#ff7d45;background:#2b1c15;color:#ffb17e}.scorePickerPop{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:#0007;padding:16px}.scorePickerCard{width:min(420px,100%);background:#171d28;border:1px solid #3a465b;border-radius:18px;padding:14px;box-shadow:0 20px 60px #000b}.scorePickerTitle{font-size:13px;color:#aeb7c6;margin-bottom:10px;text-align:center}.scoreGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.scoreGrid button{min-height:54px;font-size:22px;border-radius:14px}.scoreClear{width:100%;margin-top:10px;background:#202838;border:1px solid #3a465b;color:#d5dbe5}
+.matchModal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#0009;padding:16px}.matchSheet{width:min(520px,100%);background:#151a24;border:1px solid #3a465b;border-radius:20px 20px 16px 16px;padding:16px;box-shadow:0 20px 60px #000a}.sheetHandle{width:46px;height:5px;border-radius:999px;background:#3d4657;margin:0 auto 12px}.sheetTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.sheetTitle h3{margin:0}.sheetClose{background:#222a38;border:1px solid #3b4658;padding:8px 10px}.sheetPlayer{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;padding:10px 0}.sheetPlayer+.sheetPlayer{border-top:1px solid #2b3444}.sheetPlayer input{text-align:center}.sheetRef{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #2b3444}.sheetRef select{min-width:0}.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sheetActions button{min-width:0}.sheetFooter{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.scorePickBtn{width:72px;height:52px;border:1px solid #3b4658;background:#0f141d;color:#f7f8fa;border-radius:14px;font-size:15px;line-height:1;white-space:nowrap;font-weight:800;display:flex;align-items:center;justify-content:center}.scorePickBtn.hasValue{border-color:#ff7d45;background:#2b1c15;color:#ffb17e}.scorePickerPop{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:#0007;padding:16px}.scorePickerCard{width:min(420px,100%);background:#171d28;border:1px solid #3a465b;border-radius:18px;padding:14px;box-shadow:0 20px 60px #000b}.scorePickerTitle{font-size:13px;color:#aeb7c6;margin-bottom:10px;text-align:center}.scoreGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.scoreGrid button{min-height:54px;font-size:22px;border-radius:14px}.scoreClear{width:100%;margin-top:10px;background:#202838;border:1px solid #3a465b;color:#d5dbe5}
 .refereeGrid{display:grid;grid-template-columns:300px 1fr;gap:12px}.refCard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}.refList{display:grid;gap:8px;margin-top:10px}.refPerson{display:flex;align-items:center;gap:8px;padding:9px 10px;background:#101620;border:1px solid #2d3748;border-radius:10px}.refPerson span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.refPerson button{padding:6px 9px}.judgeChooser{display:grid;gap:8px;margin:10px 0}.judgeChooser select{width:100%}.judgeStatus{padding:10px;border:1px solid #344158;border-radius:12px;background:#0f141d}.judgeStatus strong{color:#ffe39a}.liveMatchList{display:grid;gap:9px}.liveMatchRow{display:grid;grid-template-columns:92px 1fr auto;gap:8px;align-items:center;padding:10px;background:#101620;border:1px solid #2d3748;border-radius:12px}.liveMatchRow.busy{border-color:#7c6226;background:#191711}.liveMatchRow.mine{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}.liveMatchMeta{font-size:11px;color:#9aa6b8}.liveMatchPlayers{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.liveMatchAction{display:flex;gap:6px}.liveMatchAction button{padding:8px 10px;white-space:nowrap}.busyWho{font-size:11px;color:#f4d487;margin-top:3px}.refToolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.refToolbar button{flex:0 0 auto}@media(max-width:700px){.refereeGrid{grid-template-columns:1fr}.assignRow{grid-template-columns:72px 1fr}.assignRow select{grid-column:1/-1}.refCard{padding:12px}}
 body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{position:fixed;inset:0;z-index:40;border-radius:0;border:0;margin:0;background:#0b0d12}body.bracketFullscreen .bracketScroll{height:calc(100vh - 52px);min-height:0;padding-bottom:70px}body.bracketFullscreen header{display:none}
 @media(max-width:640px){header{padding:11px 10px}.brand h1{font-size:17px}main{padding:9px}.adminHero{padding:12px;border-radius:16px}.adminHero h2{font-size:21px}.adminActions{grid-template-columns:repeat(2,minmax(0,1fr))}.adminActions button{font-size:13px;padding:10px 7px}.metaChip{font-size:11px;padding:6px 8px}.bracketShell{border-radius:14px;margin-left:-2px;margin-right:-2px}.bracketTools{padding:7px 8px}.bracketHint{display:none}.bracketScroll{padding:10px 9px 22px;min-height:460px}.bracketCanvas{gap:38px;padding-left:4px}.roundCol{width:184px;flex-basis:184px}.rrCol{width:214px;flex-basis:214px}.roundHead{top:auto;min-height:50px}.roundHead h3{font-size:15px}.bracketMatch{height:104px;padding:7px}.bracketMatch .matchNo{height:16px;line-height:16px;margin-bottom:3px}.bSide{height:31px;padding:3px 6px}.bName{font-size:12px}.bScore{height:23px}.refTag{left:7px;right:7px;bottom:3px;max-width:calc(100% - 14px);line-height:13px}.bracketMatch.judging .bSide:last-of-type{margin-bottom:15px}.zoomGroup button,.viewToggle{padding:7px 9px}.zoomLabel{min-width:46px}.matchModal{padding:8px}.matchSheet{padding:14px;border-radius:18px 18px 12px 12px}}
@@ -176,7 +176,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
         <button id="deleteOkBtn" type="button" class="danger">確認刪除</button>
       </div>
     </div></div>
-    <div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore('')">清除比分</button></div></div>
+    <div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(0)">0</button><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore('')">清除比分</button></div></div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
@@ -1069,20 +1069,33 @@ async function score(ri,mi){
   let m=ev.rounds[ri].matches[mi];
 
   if(!canEditMatchScore(m)){
-    return alert('請先按「開始執裁」，取得這一場的執裁權限後才能記錄比分。');
+    return alert('請先按「開始執裁／修改比分」，取得這一場的執裁權限後才能記錄比分。');
   }
 
   let a=$(`s${ri}-${mi}a`).value,b=$(`s${ri}-${mi}b`).value;
   if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
 
-  m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;
-  m.refereeActive=false;m.referee='';
-  ensureNext();
+  const oldWinner=m.winner||null;
+  const newWinner=+a>+b?m.a:m.b;
+
+  m.sa=a;
+  m.sb=b;
+  m.winner=newWinner;
+  m.refereeActive=false;
+  m.referee='';
+
+  const rebuilt=rebuildDownstreamIfWinnerChanged(ri,oldWinner,newWinner);
+  if(!rebuilt)ensureNext();
+
   await saveEventCloudNow();
 
   closeMatchEditor();
   showTab('bracket');
   requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+
+  if(rebuilt){
+    alert('比分已修改。因勝者改變，後續賽程已依新的勝者重新產生。');
+  }
 }
 function resetMatch(ri,mi){
   if(!isAdmin&&!ev?.testOnly)return;
@@ -1101,7 +1114,6 @@ async function claimRRMatchAs(i){
 
   let m=ev.finalRR?.matches?.[i];
   if(!m)return alert('找不到這場循環賽資料。');
-  if(m.winner)return alert('這場已完成。');
 
   const btn=document.querySelector('.startRefBtn');
   const oldText=btn?.textContent||'⚖ 開始執裁';
@@ -1160,14 +1172,18 @@ async function rrScore(i){
   let m=ev.finalRR.matches[i];
 
   if(!canEditMatchScore(m)){
-    return alert('請先按「開始執裁」，取得這一場的執裁權限後才能記錄比分。');
+    return alert('請先按「開始執裁／修改比分」，取得這一場的執裁權限後才能記錄比分。');
   }
 
   let a=$(`rr${i}a`).value,b=$(`rr${i}b`).value;
   if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
 
-  m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;
-  m.refereeActive=false;m.referee='';
+  m.sa=a;
+  m.sb=b;
+  m.winner=+a>+b?m.a:m.b;
+  m.refereeActive=false;
+  m.referee='';
+
   await saveEventCloudNow();
 
   closeMatchEditor();
@@ -1277,7 +1293,7 @@ function refereeStatusHtml(m,kind,ri,mi){
 
   if(!me){
     return `<div class=sheetRefRow>
-      <div>尚未有人執裁</div>
+      <div>${m.winner?'此場已完成':'尚未有人執裁'}</div>
       <button type=button class=secondary disabled>請先選擇裁判身分</button>
     </div>`;
   }
@@ -1287,8 +1303,10 @@ function refereeStatusHtml(m,kind,ri,mi){
     :`claimMatchAs(${ri},${mi})`;
 
   return `<div class=sheetRefRow>
-    <div>尚未有人執裁</div>
-    <button type=button class=startRefBtn onclick="${start}">⚖ 開始執裁</button>
+    <div>${m.winner?'此場已完成':'尚未有人執裁'}</div>
+    <button type=button class=startRefBtn onclick="${start}">
+      ${m.winner?'✏️ 修改比分':'⚖ 開始執裁'}
+    </button>
   </div>`;
 }
 let activeScoreTarget=null;
@@ -1544,6 +1562,18 @@ function releaseMyOtherMatches(who){
   }
 }
 
+
+function rebuildDownstreamIfWinnerChanged(ri,oldWinner,newWinner){
+  if(!oldWinner || oldWinner===newWinner)return false;
+
+  // 勝者改變時，後續對戰配對已不再可信。
+  // 保留目前這一輪所有已完成結果，清掉後續輪次並重新依目前勝者產生。
+  ev.rounds=ev.rounds.slice(0,ri+1);
+  ev.finalRR=null;
+  ensureNext();
+  return true;
+}
+
 async function claimMatchAs(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有執裁權限。');
 
@@ -1552,7 +1582,6 @@ async function claimMatchAs(ri,mi){
 
   let m=ev.rounds?.[ri]?.matches?.[mi];
   if(!m)return alert('找不到這場比賽資料。');
-  if(m.winner)return alert('這場已完成。');
 
   const btn=document.querySelector('.startRefBtn');
   const oldText=btn?.textContent||'⚖ 開始執裁';
