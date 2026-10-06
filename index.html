@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v24：重整優先本機恢復原頁、雲端背景同步與公開讀取REST備援 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v25：新建完成進裁判頁時強制回頁面最上方 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1315,6 +1315,48 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   }
   .raffleWinnerModalName{
     font-size:clamp(38px,12vw,58px);
+  }
+}
+</style>
+
+
+<style>
+.refIdentityRow{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  width:100%;
+}
+.refIdentityBtn{
+  width:100%;
+}
+.refIdentityRow.claimed .refIdentityBtn,
+.refIdentityBtn:disabled{
+  opacity:.42!important;
+  filter:grayscale(.9);
+  cursor:not-allowed;
+}
+.refReleaseBtn{
+  min-width:72px;
+  padding-left:12px;
+  padding-right:12px;
+}
+.refereeNameEdit.claimed{
+  opacity:.62;
+}
+.refereeNameEdit.claimed input{
+  color:var(--muted);
+  cursor:not-allowed;
+}
+.refClaimState{
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+  color:var(--muted);
+}
+@media(max-width:520px){
+  .refIdentityRow{
+    grid-template-columns:minmax(0,1fr) 74px;
   }
 }
 </style>
@@ -2948,6 +2990,7 @@ async function createTournament(){
 
       // 只有「剛建立完成」時先帶主辦到裁判頁設定裁判資料。
       showTab('referee');
+      forcePageTopStable();
       return;
     }
 
@@ -3038,6 +3081,7 @@ async function createTournament(){
 
     // 只有「剛建立完成」時先帶主辦到裁判頁設定裁判資料。
     showTab('referee');
+    forcePageTopStable();
 
   }catch(e){
     console.error('createTournament failed',e);
@@ -3309,14 +3353,213 @@ function renderBracketMatch(m,ri,mi){
 }
 function refereeIdentityKey(){return `bx_ref_identity_${ev?.id||'default'}`}
 function getMyReferee(){return localStorage.getItem(refereeIdentityKey())||''}
-function setMyReferee(name){
+
+function normalizeRefereeClaims(){
+  if(!ev)return {};
+  if(!ev.refereeClaims || typeof ev.refereeClaims!=='object' || Array.isArray(ev.refereeClaims)){
+    ev.refereeClaims={};
+  }
+  return ev.refereeClaims;
+}
+
+function refereeClaimKey(index){
+  return String(index);
+}
+
+function currentRefereeUid(){
+  return fbAuth?.currentUser?.uid || (ev?.testOnly?'TEST_LOCAL':'');
+}
+
+function getRefereeClaim(index){
+  const claims=normalizeRefereeClaims();
+  return claims[refereeClaimKey(index)]||null;
+}
+
+function findRefereeIndexByName(name){
+  return Array.isArray(ev?.refereeNames)?ev.refereeNames.indexOf(name):-1;
+}
+
+function isMyRefereeClaim(index){
+  const claim=getRefereeClaim(index);
+  const uid=currentRefereeUid();
+  return !!(claim && uid && claim.uid===uid);
+}
+
+function refereeClaimLabel(index){
+  const claim=getRefereeClaim(index);
+  if(!claim)return '';
+  if(isMyRefereeClaim(index))return '你已領取';
+  return '已被領取';
+}
+
+async function claimRefereeSlot(index){
+  if(!ev || (!isAdmin&&!isReferee&&!ev?.testOnly))return false;
+
+  normalizeEvent();
+  normalizeRefereeClaims();
+
+  const name=ev.refereeNames[index];
+  if(!name)return false;
+
+  const uid=currentRefereeUid();
+  if(!uid)return false;
+
+  // 本機測試賽事：直接本機鎖定。
+  if(ev.testOnly){
+    const existing=getRefereeClaim(index);
+    if(existing && existing.uid!==uid)return false;
+
+    // 同一支手機一次只保留一個裁判身分。
+    Object.keys(ev.refereeClaims).forEach(k=>{
+      if(ev.refereeClaims[k]?.uid===uid)delete ev.refereeClaims[k];
+    });
+
+    ev.refereeClaims[refereeClaimKey(index)]={uid,name,claimedAt:Date.now()};
+    localEventSave();
+    return true;
+  }
+
+  // 先釋放自己先前領取的其他裁判名稱。
+  for(const [k,claim] of Object.entries(ev.refereeClaims||{})){
+    if(claim?.uid===uid && k!==refereeClaimKey(index)){
+      try{
+        await rtdbRestDelete(`events/${ev.id}/refereeClaims/${k}`,5000);
+      }catch(e){
+        console.warn('release previous referee claim failed',e);
+      }
+    }
+  }
+
+  // 用 Firebase REST ETag / If-Match 做真正的原子搶位。
+  // 兩支手機同時選同一位時，只會有一支成功。
+  const token=await getRestIdToken(false);
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  const path=`events/${encodeURIComponent(ev.id)}/refereeClaims/${encodeURIComponent(refereeClaimKey(index))}.json`;
+  const url=`${base}/${path}?auth=${encodeURIComponent(token)}`;
+
+  const ctrl1=new AbortController();
+  const timer1=setTimeout(()=>ctrl1.abort(),5000);
+
+  let etag='null_etag';
+  let current=null;
+
+  try{
+    const res=await fetch(url,{
+      method:'GET',
+      headers:{'X-Firebase-ETag':'true'},
+      signal:ctrl1.signal,
+      cache:'no-store'
+    });
+
+    if(!res.ok)throw new Error(`Firebase REST ${res.status}`);
+
+    etag=res.headers.get('ETag')||'null_etag';
+    current=await res.json();
+  }finally{
+    clearTimeout(timer1);
+  }
+
+  if(current && current.uid && current.uid!==uid){
+    return false;
+  }
+
+  const payload={uid,name,claimedAt:Date.now()};
+  const ctrl2=new AbortController();
+  const timer2=setTimeout(()=>ctrl2.abort(),5000);
+
+  try{
+    const res=await fetch(url,{
+      method:'PUT',
+      headers:{
+        'Content-Type':'application/json',
+        'if-match':etag
+      },
+      body:JSON.stringify(payload),
+      signal:ctrl2.signal,
+      cache:'no-store'
+    });
+
+    if(res.status===412)return false;
+    if(!res.ok)throw new Error(`Firebase REST ${res.status}: ${await res.text()}`);
+  }finally{
+    clearTimeout(timer2);
+  }
+
+  ev.refereeClaims=ev.refereeClaims||{};
+  ev.refereeClaims[refereeClaimKey(index)]=payload;
+  localEventSave();
+  return true;
+}
+
+async function releaseRefereeSlot(index){
+  if(!ev)return;
+
+  normalizeRefereeClaims();
+
+  const claim=getRefereeClaim(index);
+  if(!claim)return;
+
+  const uid=currentRefereeUid();
+  const organizer=hasOrganizerAccess();
+
+  // 只有該裁判本人或主辦可以釋放。
+  if(!organizer && (!uid || claim.uid!==uid)){
+    return alert('只有這位裁判本人或主辦可以釋放這個裁判身分。');
+  }
+
+  const name=ev.refereeNames?.[index]||claim.name||'';
+
+  if(ev.testOnly){
+    delete ev.refereeClaims[refereeClaimKey(index)];
+    if(getMyReferee()===name)localStorage.removeItem(refereeIdentityKey());
+    localEventSave();
+    renderAdmin();
+    showTab('referee');
+    return;
+  }
+
+  try{
+    await rtdbRestDelete(`events/${ev.id}/refereeClaims/${refereeClaimKey(index)}`,5000);
+
+    if(ev.refereeClaims)delete ev.refereeClaims[refereeClaimKey(index)];
+    if(getMyReferee()===name)localStorage.removeItem(refereeIdentityKey());
+
+    localEventSave();
+    renderAdmin();
+    showTab('referee');
+  }catch(e){
+    console.error('releaseRefereeSlot failed',e);
+    alert('釋放裁判身分失敗：'+(e?.message||e));
+  }
+}
+
+async function setMyReferee(name){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
-  if(name)localStorage.setItem(refereeIdentityKey(),name);
-  else localStorage.removeItem(refereeIdentityKey());
+  normalizeEvent();
 
-  // 選好裁判身分後，立即重建對戰表。
-  // 這很重要，因為取得裁判權限前的比賽卡是沒有 onclick 的觀看版。
+  const index=findRefereeIndexByName(name);
+  if(index<0)return;
+
+  const claim=getRefereeClaim(index);
+  const uid=currentRefereeUid();
+
+  if(claim && claim.uid!==uid){
+    renderAdmin();
+    showTab('referee');
+    return alert(`「${name}」已被其他裁判領取，請選擇其他裁判名稱。`);
+  }
+
+  const ok=await claimRefereeSlot(index);
+
+  if(!ok){
+    renderAdmin();
+    showTab('referee');
+    return alert(`「${name}」剛剛已被其他裁判領取，請選擇其他裁判名稱。`);
+  }
+
+  localStorage.setItem(refereeIdentityKey(),name);
+
   renderAdmin();
 
   if(isReferee&&!isAdmin&&!ev?.testOnly && name){
@@ -3329,12 +3572,20 @@ async function saveRefereeNames(){
   if(!isAdmin&&!ev?.testOnly)return;
 
   normalizeEvent();
+  normalizeRefereeClaims();
 
-  ev.refereeNames=Array.from({length:ev.refereeCount},(_,i)=>{
+  const nextNames=Array.from({length:ev.refereeCount},(_,i)=>{
+    const current=ev.refereeNames[i]||`裁判 ${i+1}`;
+    const claim=getRefereeClaim(i);
+
+    // 使用中的名稱鎖定，不允許改名。
+    if(claim)return current;
+
     const v=$(`refName${i}`)?.value.trim();
     return v||`裁判 ${i+1}`;
   });
 
+  ev.refereeNames=nextNames;
   localEventSave();
 
   if(!ev.testOnly){
@@ -3838,6 +4089,7 @@ function normalizeEvent(){
     ev.refereeCount=Array.isArray(ev.referees)&&ev.referees.length?ev.referees.length:2;
   }
   if(!Array.isArray(ev.refereeNames))ev.refereeNames=[];
+  if(!ev.refereeClaims || typeof ev.refereeClaims!=='object' || Array.isArray(ev.refereeClaims))ev.refereeClaims={};
   ev.refereeNames=Array.from({length:ev.refereeCount},(_,i)=>{
     const v=String(ev.refereeNames[i]??ev.referees?.[i]??`裁判 ${i+1}`).trim();
     return v||`裁判 ${i+1}`;
@@ -4876,6 +5128,22 @@ function scrollPageTop(){
   }
 }
 
+function forcePageTopStable(){
+  // iPhone Safari 切換建立頁 -> 裁判頁時，會沿用表單原本的 scroll 位置。
+  // 立即 + 多個 frame + 短延遲全部歸零，確保真正落在頁面最上方。
+  scrollPageTop();
+  requestAnimationFrame(()=>{
+    scrollPageTop();
+    requestAnimationFrame(()=>{
+      scrollPageTop();
+      requestAnimationFrame(scrollPageTop);
+    });
+  });
+  setTimeout(scrollPageTop,80);
+  setTimeout(scrollPageTop,220);
+}
+
+
 
 const ACTIVE_VIEW_KEY='bx_active_view';
 
@@ -4972,13 +5240,48 @@ function showTab(t){
 }
 function renderReferee(){
   normalizeEvent();
-  const invite=new URLSearchParams(location.search).get('ref')==='1';
+  normalizeRefereeClaims();
 
-  // 主辦方：保留原本完整設定，再加上裁判加入 QR + 動態驗證碼
+  const invite=new URLSearchParams(location.search).get('ref')==='1';
+  const myUid=currentRefereeUid();
+
+  const makeIdentityButton=(name,index)=>{
+    const claim=getRefereeClaim(index);
+    const mine=!!(claim && myUid && claim.uid===myUid);
+    const taken=!!claim && !mine;
+    const me=getMyReferee();
+    const selected=mine && me===name;
+
+    return `<div class="refIdentityRow ${taken?'claimed':''}">
+      <button
+        type=button
+        class="${selected?'':'secondary'} refIdentityBtn"
+        ${taken?'disabled':''}
+        onclick='setMyReferee(${JSON.stringify(name)})'
+      >
+        ${selected?'✓ ':''}⚖ ${esc(name)}
+        ${taken?'・已被領取':mine?'・你已領取':''}
+      </button>
+      ${(mine||hasOrganizerAccess())&&claim
+        ? `<button type=button class="danger refReleaseBtn" onclick="releaseRefereeSlot(${index})">釋放</button>`
+        : ''
+      }
+    </div>`;
+  };
+
   if(hasOrganizerAccess()){
     const n=ev.refereeCount||2,me=getMyReferee();
-    const names=ev.refereeNames.map((name,i)=>`<div class=player><span class=num>${i+1}</span><input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}"></div>`).join('');
-    const identityButtons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
+    const names=ev.refereeNames.map((name,i)=>{
+      const claim=getRefereeClaim(i);
+      const claimed=!!claim;
+      return `<div class="player refereeNameEdit ${claimed?'claimed':''}">
+        <span class=num>${i+1}</span>
+        <input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}" ${claimed?'disabled':''}>
+        ${claimed?`<span class=refClaimState>${isMyRefereeClaim(i)?'你已領取':'使用中'}</span>`:''}
+      </div>`;
+    }).join('');
+
+    const identityButtons=ev.refereeNames.map((name,i)=>makeIdentityButton(name,i)).join('');
 
     const inviteBlock=ev.testOnly?'':`
       <div class=refInviteBox style="margin-top:18px">
@@ -4998,7 +5301,10 @@ function renderReferee(){
       </div>`;
 
     $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 裁判設定</h3>
-      <div class=muted>直接管理裁判名單。按「增加裁判」後會立即新增一位，名稱可以直接在下方修改。裁判掃描下方 QR 取得執裁權限後，只要選一次自己的名稱即可。</div>
+      <div class=muted>
+        裁判名稱一旦被某支手機領取，其他裁判與主辦手機都不能再選同一個名稱。
+        使用中的裁判會變灰；只有該裁判本人或主辦可以按「釋放」恢復未使用狀態。
+      </div>
 
       <div class=refereeListHead style="margin-top:14px">
         <div>
@@ -5014,7 +5320,13 @@ function renderReferee(){
       </div>
 
       ${inviteBlock}
-      <div style="margin-top:18px"><label>這支手機的裁判身分</label><div class=judgePick>${identityButtons}</div>${me?`<div class=refHint>目前本機：<b>${esc(me)}</b></div>`:`<div class=refHint>尚未選擇。</div>`}</div>
+
+      <div style="margin-top:18px">
+        <label>這支手機的裁判身分</label>
+        <div class=judgePick>${identityButtons}</div>
+        ${me?`<div class=refHint>目前本機：<b>${esc(me)}</b></div>`:`<div class=refHint>尚未選擇。</div>`}
+      </div>
+
       <div style="margin-top:12px"><button class=secondary onclick="showTab('bracket')">返回對戰表</button></div>
     </div>`;
 
@@ -5028,20 +5340,28 @@ function renderReferee(){
     return;
   }
 
-  // 已取得裁判權限：只選主辦方預先設定的名字
   if(isReferee){
     const me=getMyReferee();
-    const buttons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
+    const buttons=ev.refereeNames.map((name,i)=>makeIdentityButton(name,i)).join('');
+
     $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 選擇裁判身分</h3>
-      <div class=muted>主辦方已設定好裁判名稱。請選擇你是哪一位，之後回對戰表直接點比賽即可開始執裁。</div>
+      <div class=muted>
+        灰色代表這個裁判名稱已經被其他手機領取，不能重複選擇。
+        你領取的名稱會顯示「你已領取」，需要更換時請先按「釋放」。
+      </div>
+
       <div class=judgePick style="margin-top:16px">${buttons}</div>
-      ${me?`<div class=refHint>目前身分：<b>${esc(me)}</b>。現在可以直接回對戰表執裁。</div>`:`<div class=refHint>尚未選擇裁判身分。</div>`}
+
+      ${me
+        ? `<div class=refHint>目前身分：<b>${esc(me)}</b>。現在可以直接回對戰表執裁。</div>`
+        : `<div class=refHint>尚未選擇裁判身分。</div>`
+      }
+
       <button style="width:100%;margin-top:14px" onclick="showTab('bracket')">返回對戰表</button>
     </div>`;
     return;
   }
 
-  // 裁判邀請連結：輸入動態驗證碼
   if(invite){
     $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 加入裁判</h3>
       <div class=muted>輸入主辦方目前顯示的 6 位裁判驗證碼。通過後只會取得執裁權限，不會取得主辦管理權。</div>
