@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v22：回對戰表重置內外捲動、抽獎勾選名單與同輪不重複中籤 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v23：新建賽事直達裁判設定、重整保留目前頁面、抽獎大型得主彈窗 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1253,6 +1253,72 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+.raffleWinnerModal{
+  position:fixed;
+  inset:0;
+  z-index:180;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(0,0,0,.78);
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+}
+.raffleWinnerModalCard{
+  width:min(620px,94vw);
+  padding:28px 22px 24px;
+  text-align:center;
+  border:2px solid var(--accent);
+  border-radius:26px;
+  background:var(--panel);
+  color:var(--text);
+  box-shadow:0 24px 80px rgba(0,0,0,.55);
+}
+.raffleWinnerModalIcon{
+  font-size:58px;
+  line-height:1;
+  margin-bottom:12px;
+}
+.raffleWinnerModalLabel{
+  color:var(--muted);
+  font-size:18px;
+  font-weight:800;
+}
+.raffleWinnerModalName{
+  margin:18px 0 12px;
+  font-size:clamp(40px,10vw,72px);
+  line-height:1.08;
+  font-weight:950;
+  color:var(--accent);
+  overflow-wrap:anywhere;
+}
+.raffleWinnerModalCongrats{
+  margin-bottom:22px;
+  font-size:22px;
+  font-weight:850;
+}
+.raffleWinnerModalClose{
+  width:100%;
+  min-height:58px;
+  font-size:20px;
+  font-weight:900;
+}
+:root[data-theme="light"] .raffleWinnerModal{
+  background:rgba(25,32,44,.55);
+}
+@media(max-width:520px){
+  .raffleWinnerModalCard{
+    padding:24px 16px 18px;
+  }
+  .raffleWinnerModalName{
+    font-size:clamp(38px,12vw,58px);
+  }
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -2389,9 +2455,18 @@ async function loadCloudEvent(id){
     listenCloudEvent(id);
 
     const params=new URLSearchParams(location.search);
-    if(params.get('admin')==='1')showTab('organizer');
-    else if(params.get('ref')==='1')showTab('referee');
-    else showTab('bracket');
+
+    // 管理/裁判邀請連結優先；一般重新整理則回到原本的 tab。
+    if(params.get('admin')==='1'){
+      showTab('organizer');
+    }else if(params.get('ref')==='1'){
+      showTab('referee');
+    }else{
+      const saved=readActiveView();
+      const wanted=params.get('tab') || (saved?.eventId===id?saved.tab:null) || 'bracket';
+      const allowed=['bracket','draw','roster','referee','organizer','share'];
+      showTab(allowed.includes(wanted)?wanted:'bracket');
+    }
 
     return 'ok';
   }catch(e){
@@ -2406,6 +2481,7 @@ async function loadCloudEvent(id){
 function goHome(){
   stopAdminCodeRotation();
 
+  clearActiveView();
   ev=null;
   draftMode=null;
   draftStorage=null;
@@ -2833,7 +2909,9 @@ async function createTournament(){
       history.replaceState(null,'',location.pathname);
 
       renderAdmin();
-      showTab('bracket');
+
+      // 只有「剛建立完成」時先帶主辦到裁判頁設定裁判資料。
+      showTab('referee');
       return;
     }
 
@@ -2921,7 +2999,9 @@ async function createTournament(){
     $('admin').classList.remove('hidden');
 
     renderAdmin();
-    showTab('bracket');
+
+    // 只有「剛建立完成」時先帶主辦到裁判頁設定裁判資料。
+    showTab('referee');
 
   }catch(e){
     console.error('createTournament failed',e);
@@ -4616,6 +4696,54 @@ function addPlayer(){if(!isAdmin&&!ev?.testOnly)return;let v=$('newPlayer').valu
 function rebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.rounds=[];ev.finalRR=null;buildFirst();put()}
 function randomRebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.roster=shuffle(ev.roster);ev.pairing='random';rebuild()}
 
+
+function closeRaffleWinnerModal(){
+  const el=document.getElementById('raffleWinnerModal');
+  if(el)el.remove();
+}
+
+function showRaffleWinnerModal(winner){
+  closeRaffleWinnerModal();
+
+  const overlay=document.createElement('div');
+  overlay.id='raffleWinnerModal';
+  overlay.className='raffleWinnerModal';
+
+  const card=document.createElement('div');
+  card.className='raffleWinnerModalCard';
+
+  const icon=document.createElement('div');
+  icon.className='raffleWinnerModalIcon';
+  icon.textContent='🎉';
+
+  const label=document.createElement('div');
+  label.className='raffleWinnerModalLabel';
+  label.textContent='本次中獎者';
+
+  const name=document.createElement('div');
+  name.className='raffleWinnerModalName';
+  name.textContent=winner;
+
+  const congrats=document.createElement('div');
+  congrats.className='raffleWinnerModalCongrats';
+  congrats.textContent='恭喜中獎！';
+
+  const btn=document.createElement('button');
+  btn.type='button';
+  btn.className='raffleWinnerModalClose';
+  btn.textContent='關閉';
+  btn.addEventListener('click',closeRaffleWinnerModal);
+
+  card.append(icon,label,name,congrats,btn);
+  overlay.appendChild(card);
+
+  overlay.addEventListener('click',e=>{
+    if(e.target===overlay)closeRaffleWinnerModal();
+  });
+
+  document.body.appendChild(overlay);
+}
+
 function startPrizeRaffle(){
   if(!hasOrganizerAccess()||raffleSpinning||!ev)return;
 
@@ -4678,8 +4806,11 @@ function startPrizeRaffle(){
 
       raffleSpinning=false;
 
-      // 重畫後，中籤者會自動變灰且 checkbox 鎖定。
-      setTimeout(renderDraw,350);
+      // 額外跳出大型中獎視窗，方便現場所有人看到。
+      showRaffleWinnerModal(winner);
+
+      // 背景名單同步重畫：中籤者變灰、取消勾選並鎖定。
+      setTimeout(renderDraw,180);
     }
   },70);
 }
@@ -4709,6 +4840,44 @@ function scrollPageTop(){
   }
 }
 
+
+const ACTIVE_VIEW_KEY='bx_active_view';
+
+function persistActiveView(tab){
+  if(!ev)return;
+
+  try{
+    sessionStorage.setItem(ACTIVE_VIEW_KEY,JSON.stringify({
+      eventId:ev.id,
+      tab:tab||'bracket',
+      testOnly:!!ev.testOnly
+    }));
+  }catch(e){}
+
+  // 雲端賽事把目前分頁寫進網址，重整時可直接回到同一頁。
+  if(!ev.testOnly){
+    try{
+      const u=new URL(location.href);
+      u.searchParams.set('event',ev.id);
+      u.searchParams.set('tab',tab||'bracket');
+      history.replaceState(null,'',u.pathname+u.search);
+    }catch(e){}
+  }
+}
+
+function clearActiveView(){
+  try{sessionStorage.removeItem(ACTIVE_VIEW_KEY)}catch(e){}
+}
+
+function readActiveView(){
+  try{
+    const raw=sessionStorage.getItem(ACTIVE_VIEW_KEY);
+    return raw?JSON.parse(raw):null;
+  }catch(e){
+    return null;
+  }
+}
+
 function showTab(t){
   if(!ev)return;
 
@@ -4723,6 +4892,7 @@ function showTab(t){
   }
 
   currentAdminTab=t;
+  persistActiveView(t);
 
   ['bracket','draw','roster','referee','organizer','share'].forEach(x=>{
     const el=$(x+'Tab');
@@ -5024,19 +5194,53 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
   }
   renderSavedEvents();
 
-  const p=new URLSearchParams(location.search),id=p.get('event');
+  const p=new URLSearchParams(location.search);
+  const id=p.get('event');
+
   if(id){
     const result=await loadCloudEvent(id);
+
     if(result==='missing'){
       purgeLocalEvent(id);
+      clearActiveView();
       history.replaceState(null,'',location.pathname);
       renderSavedEvents();
       alert('這個雲端賽事已被刪除或不存在，分享連結已失效。');
     }else if(result==='expired'){
+      clearActiveView();
       history.replaceState(null,'',location.pathname);
       alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
     }else if(result==='error'){
       alert('目前無法連上雲端，請稍後再試。');
+    }
+    return;
+  }
+
+  // 測試賽事沒有 event query，所以用 sessionStorage 在重新整理後恢復同一頁。
+  const saved=readActiveView();
+
+  if(saved?.eventId){
+    const cached=events()[saved.eventId];
+
+    if(cached){
+      ev=cached;
+
+      if(cached.testOnly){
+        isAdmin=true;
+        isReferee=false;
+
+        $('home').classList.add('hidden');
+        $('create').classList.add('hidden');
+        $('admin').classList.remove('hidden');
+
+        renderAdmin();
+
+        const allowed=['bracket','draw','roster','referee','organizer','share'];
+        showTab(allowed.includes(saved.tab)?saved.tab:'bracket');
+      }else if(isGoogleUser() && cached.ownerUid===fbAuth.currentUser.uid){
+        await openCachedOwnerEvent(cached);
+        showTab(saved.tab||'bracket');
+      }
     }
   }
 })();
