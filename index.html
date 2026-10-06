@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v20：修復cloudSet無timeout造成寫入賽事永久卡住 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v21：雲端寫入3秒轉REST、5秒逾時，回對戰表自動回頂部 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -2840,7 +2840,7 @@ async function createTournament(){
 
     // 第一步：先建立 event 本體。
     // Rules 只依 Google owner + 已保留的 count 判斷，不依賴尚未建立的 admins/secrets。
-    await cloudSet(`events/${ev.id}`,ev,7000);
+    await cloudSet(`events/${ev.id}`,ev,3000);
 
     if(createBtn)createBtn.textContent='建立管理權限…';
 
@@ -3218,7 +3218,7 @@ async function refreshEventBeforeCriticalAction(){
 }
 
 
-async function cloudSet(path,value,timeoutMs=7000){
+async function cloudSet(path,value,timeoutMs=3000){
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
   if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
 
@@ -3231,8 +3231,9 @@ async function cloudSet(path,value,timeoutMs=7000){
   }catch(e){
     console.warn('cloudSet SDK failed/timeout, fallback REST PUT',path,e);
 
-    // iOS Safari 若 Firebase SDK set() 卡住，直接改用有 AbortController timeout 的 REST PUT。
-    await rtdbRestPut(path,value,9000);
+    // iOS Safari 若 Firebase SDK set() 卡住，3 秒後改走 REST PUT。
+    // REST 最多再等 5 秒，避免現場操作等待過久。
+    await rtdbRestPut(path,value,5000);
     return true;
   }
 }
@@ -3576,9 +3577,22 @@ function canCompleteMatch(m){
 function backToBracketFromMatch(){
   closeMatchEditor();
   showTab('bracket');
+
+  // iPhone Safari 關閉底部編輯視窗後會保留原本的頁面 scroll 位置。
+  // 回到對戰表時直接回最上方，避免畫面停在賽程最底部。
   requestAnimationFrame(()=>{
+    window.scrollTo({top:0,left:0,behavior:'auto'});
+    document.documentElement.scrollTop=0;
+    document.body.scrollTop=0;
+
     setBracketScale(bracketScale);
     drawBracketLinks();
+
+    requestAnimationFrame(()=>{
+      window.scrollTo({top:0,left:0,behavior:'auto'});
+      document.documentElement.scrollTop=0;
+      document.body.scrollTop=0;
+    });
   });
 }
 
@@ -4539,6 +4553,13 @@ function clearPrizeRaffle(){
   renderDraw();
 }
 
+
+function scrollPageTop(){
+  window.scrollTo({top:0,left:0,behavior:'auto'});
+  document.documentElement.scrollTop=0;
+  document.body.scrollTop=0;
+}
+
 function showTab(t){
   if(!ev)return;
 
@@ -4560,6 +4581,13 @@ function showTab(t){
   });
 
   syncTabButtons(t);
+
+  if(t==='bracket'){
+    requestAnimationFrame(()=>{
+      scrollPageTop();
+      requestAnimationFrame(scrollPageTop);
+    });
+  }
 
   if(t==='draw'){
     try{
