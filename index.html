@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v13：修復重複showTab覆蓋、owner主辦權限持久、裁判頁空白與公開延長跳頁 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v14：修復建立賽事下一步被Firebase計數讀取卡住 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1382,31 +1382,55 @@ async function requireGoogleLogin(){
   }
 }
 async function proceedCreate(){
+  const next=$('homeNextBtn');
+
   if(!draftMode || !draftStorage){
     renderHomeSelections();
     return;
   }
 
-  if(draftStorage==='cloud' && !isGoogleUser()){
-    const ok=await requireGoogleLogin();
-    if(!ok)return;
+  if(next){
+    next.disabled=true;
+    next.textContent='準備中…';
   }
 
-  if(draftStorage==='cloud'){
-    const count=await getCloudEventCountFromServer();
+  try{
+    if(draftStorage==='cloud' && !isGoogleUser()){
+      const ok=await requireGoogleLogin();
+      if(!ok)return;
+    }
 
-    if(count>=CLOUD_EVENT_LIMIT){
-      return alert(`這個 Google 帳號目前已有 ${count} 場雲端賽事，已達 ${CLOUD_EVENT_LIMIT} 場上限。請先刪除一場舊賽事後再建立。`);
+    if(draftStorage==='cloud'){
+      // 先看本機已知數量；雲端數量只做短暫確認，不能因 Firebase 回應慢把「下一步」卡死。
+      const localCount=cloudEventCountForCurrentGoogle();
+
+      if(localCount>=CLOUD_EVENT_LIMIT){
+        return alert(`這個 Google 帳號目前已有 ${localCount} 場雲端賽事，已達 ${CLOUD_EVENT_LIMIT} 場上限。請先刪除一場舊賽事後再建立。`);
+      }
+
+      const serverCount=await getCloudEventCountFromServer(2500);
+
+      if(serverCount>=CLOUD_EVENT_LIMIT){
+        return alert(`這個 Google 帳號目前已有 ${serverCount} 場雲端賽事，已達 ${CLOUD_EVENT_LIMIT} 場上限。請先刪除一場舊賽事後再建立。`);
+      }
+    }
+
+    $('home').classList.add('hidden');
+    $('create').classList.remove('hidden');
+
+    $('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;
+    $('freeOpts').classList.toggle('hidden',draftMode!=='free');
+
+    updatePreview();
+  }catch(e){
+    console.error('proceedCreate failed',e);
+    alert('開啟賽事設定失敗：'+(e?.message||e));
+  }finally{
+    // 若仍停留首頁，就恢復按鈕狀態；已進入建立頁則不用管。
+    if($('home')&&!$('home').classList.contains('hidden')){
+      renderHomeSelections();
     }
   }
-
-  $('home').classList.add('hidden');
-  $('create').classList.remove('hidden');
-
-  $('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;
-  $('freeOpts').classList.toggle('hidden',draftMode!=='free');
-
-  updatePreview();
 }
 function markEventSaved(id){
   if(!id)return;
@@ -1435,16 +1459,23 @@ function formatSavedTime(ts){
 
 const CLOUD_EVENT_LIMIT=3;
 
-async function getCloudEventCountFromServer(){
+async function getCloudEventCountFromServer(timeoutMs=2500){
   if(!isGoogleUser())return 0;
+
   const uid=fbAuth.currentUser.uid;
+  const fallback=cloudEventCountForCurrentGoogle();
+
   try{
-    const snap=await fbDb.ref(`userEventCounts/${uid}`).once('value');
+    const snap=await Promise.race([
+      fbDb.ref(`userEventCounts/${uid}`).once('value'),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('讀取雲端賽事數量逾時')),timeoutMs))
+    ]);
+
     const n=Number(snap.exists()?snap.val():0);
-    return Number.isFinite(n)&&n>=0?n:0;
+    return Number.isFinite(n)&&n>=0?n:fallback;
   }catch(e){
-    console.warn('getCloudEventCountFromServer failed',e);
-    return cloudEventCountForCurrentGoogle();
+    console.warn('getCloudEventCountFromServer fallback',e);
+    return fallback;
   }
 }
 
@@ -4459,6 +4490,18 @@ function toggleTheme(){
 }
 
 updateThemeButton();
+
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=$('homeNextBtn');
+  if(btn && !btn.dataset.boundNext){
+    btn.dataset.boundNext='1';
+    btn.addEventListener('click',e=>{
+      if(btn.disabled)return;
+      // inline onclick 已存在時不重複執行；這裡只作 Safari fallback。
+    });
+  }
+});
 
 window.addEventListener('resize',()=>{clearTimeout(window.__bxResize);window.__bxResize=setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},120)});
 
