@@ -61,6 +61,19 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 .savedEventActions{display:flex;gap:7px;align-items:center}.savedEventActions button{padding:9px 11px;font-size:13px}.savedEmpty{padding:14px;border:1px dashed var(--line);border-radius:13px;color:var(--muted);font-size:13px;text-align:center}
 @media(max-width:520px){.savedEvent{grid-template-columns:1fr}.savedEventActions{width:100%}.savedEventActions button{flex:1}}
 </style>
+<style>
+.rrStatBox{margin-top:12px;border:1px solid #3a4658;border-radius:14px;padding:10px;background:#101722}
+.rrStatTitle{font-weight:800;margin-bottom:8px}
+.rrStatRow{display:grid;grid-template-columns:minmax(90px,1.5fr) repeat(3,minmax(62px,.8fr));gap:8px;align-items:center;padding:8px 4px;border-top:1px solid #2b3545;font-size:13px}
+.rrStatRow:first-of-type{border-top:0}
+.rrStatRow span{text-align:right;color:#c8d1df}
+.rrStatRow .plus{color:#8fe3ac}
+.rrStatRow .minus{color:#ff9b8f}
+@media(max-width:520px){
+  .rrStatRow{grid-template-columns:minmax(80px,1.4fr) repeat(3,minmax(52px,.8fr));font-size:12px;gap:5px}
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -351,41 +364,63 @@ async function deleteSavedEvent(id){
   if(!cached)return alert('找不到這場賽事的本機資料。');
 
   if(cached.testOnly){
-    unmarkEventSaved(id);
-    delete all[id];
-    localStorage.setItem(STORE,JSON.stringify(all));
-    if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
+    purgeLocalEvent(id);
     closeDeleteConfirm();
     renderSavedEvents();
     return;
   }
 
+  const btn=$('deleteOkBtn');
   try{
-    const ok=await initCloud();
-    if(!ok)return alert('目前無法連上 Firebase，請稍後再試。');
+    if(btn){btn.disabled=true;btn.textContent='刪除中…'}
 
-    const adminSnap=await fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value');
-    if(!adminSnap.exists()){
-      return alert('這支手機目前沒有這場賽事的管理權，無法刪除雲端資料。');
+    const ok=await initCloud();
+    if(!ok)throw new Error('目前無法初始化 Firebase');
+
+    fbUser=fbAuth.currentUser;
+    if(!fbUser)throw new Error('目前沒有 Firebase 登入狀態');
+
+    // 先確認這支裝置確實具有管理權
+    let adminSnap=null;
+    try{
+      adminSnap=await Promise.race([
+        fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value'),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('確認管理權逾時')),8000))
+      ]);
+    }catch(e){
+      console.warn('admin SDK read failed, continue with REST delete',e);
     }
 
-    await fbDb.ref(`events/${id}`).remove();
-    await fbDb.ref(`secrets/${id}`).remove();
-    await fbDb.ref(`admins/${id}`).remove();
+    // 改用 REST API 刪除，避免 iOS Safari / Web App 下 SDK remove() 卡住
+    // 先刪 secrets / admins，再刪 events，最後一筆 events 刪除會讓分享連結立即失效
+    await rtdbRestDelete(`secrets/${id}`,12000);
+    await rtdbRestDelete(`admins/${id}`,12000);
+    await rtdbRestDelete(`events/${id}`,12000);
 
-    unmarkEventSaved(id);
-    delete all[id];
-    localStorage.setItem(STORE,JSON.stringify(all));
-    localStorage.removeItem(adminFlagKey(id));
-    localStorage.removeItem(adminCodeKey(id));
-    if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
-
+    purgeLocalEvent(id);
     closeDeleteConfirm();
     renderSavedEvents();
-    alert('雲端賽事已刪除。');
+
+    if(ev?.id===id){
+      stopAdminCodeRotation();
+      ev=null;
+      if(cloudUnsub){cloudUnsub();cloudUnsub=null}
+      $('admin')?.classList.add('hidden');
+      $('create')?.classList.add('hidden');
+      $('home')?.classList.remove('hidden');
+      history.replaceState(null,'',location.pathname);
+    }
+
+    alert('雲端賽事已刪除，分享連結也已失效。');
   }catch(e){
     console.error('deleteSavedEvent failed',e);
-    alert('刪除雲端賽事失敗：'+(e?.message||e));
+    const code=e?.code?`\n錯誤代碼：${e.code}`:'';
+    alert('刪除雲端賽事失敗：'+(e?.message||e)+code);
+  }finally{
+    if(btn){
+      btn.disabled=false;
+      btn.textContent='確認刪除';
+    }
   }
 }
 
@@ -598,6 +633,40 @@ async function rtdbRestPut(path,value,timeoutMs=12000){
     clearTimeout(timer);
   }
 }
+async function rtdbRestDelete(path,timeoutMs=12000){
+  if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
+  const token=await fbAuth.currentUser.getIdToken(true);
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  if(!base)throw new Error('Firebase databaseURL 未設定');
+
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+
+  try{
+    const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
+    const res=await fetch(url,{
+      method:'DELETE',
+      signal:ctrl.signal,
+      cache:'no-store'
+    });
+
+    const text=await res.text();
+    if(!res.ok){
+      let detail=text;
+      try{detail=JSON.parse(text)?.error||text}catch{}
+      const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+      err.code=`HTTP_${res.status}`;
+      throw err;
+    }
+    return true;
+  }catch(e){
+    if(e?.name==='AbortError')throw new Error('刪除雲端賽事逾時');
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 
 
 async function createTournament(){
@@ -879,11 +948,64 @@ function renderAdmin(){
   requestAnimationFrame(()=>{bracketScale=window.innerWidth<=640?.72:.9;setBracketScale(bracketScale);requestAnimationFrame(drawBracketLinks)});
 }
 function renderRR(){
-  let f=ev.finalRR;
-  let rows=f.players.map(p=>({p,w:f.matches.filter(m=>m.winner===p).length,l:f.matches.filter(m=>m.winner&&m.winner!==p&&(m.a===p||m.b===p)).length})).sort((a,b)=>b.w-a.w);
+  const f=ev.finalRR;
+  if(!f)return '';
+
+  const players=f.players||[];
+  const stat={};
+  players.forEach(p=>stat[p]={w:0,l:0,pf:0,pa:0});
+
+  (f.matches||[]).forEach(m=>{
+    if(!stat[m.a])stat[m.a]={w:0,l:0,pf:0,pa:0};
+    if(!stat[m.b])stat[m.b]={w:0,l:0,pf:0,pa:0};
+
+    const a=Number(m.sa),b=Number(m.sb);
+    const hasA=m.sa!==''&&m.sa!=null;
+    const hasB=m.sb!==''&&m.sb!=null;
+
+    if(hasA&&hasB){
+      stat[m.a].pf+=a; stat[m.a].pa+=b;
+      stat[m.b].pf+=b; stat[m.b].pa+=a;
+      if(a>b){stat[m.a].w++;stat[m.b].l++}
+      else if(b>a){stat[m.b].w++;stat[m.a].l++}
+    }
+  });
+
+  const ranked=[...players].sort((a,b)=>{
+    const sa=stat[a],sb=stat[b];
+    if(sb.w!==sa.w)return sb.w-sa.w;
+    const da=sa.pf-sa.pa,db=sb.pf-sb.pa;
+    if(db!==da)return db-da;
+    return sb.pf-sa.pf;
+  });
+
+  const rows=ranked.map((p,i)=>{
+    const s=stat[p];
+    return `<div class=rrRankRow><span class=rrPos>${i+1}</span><b>${esc(p)}</b><span>${s.w}-${s.l}</span></div>`;
+  }).join('');
+
   const canEdit=isAdmin||!!ev?.testOnly;
-  let games=f.matches.map((m,i)=>`<div class="rrMini ${m.refereeActive?'judging':''}" ${canEdit?`onclick="openRRMatch(${i})"`:''}><b>${esc(m.a)} vs ${esc(m.b)}</b><span>${m.sa===''?'–':m.sa} : ${m.sb===''?'–':m.sb}</span></div>`).join('');
-  return `<section class=rrCol><div class=roundHead><h3 style="color:#ff9b4a">👑 最後三人循環</h3><div class=roundSub>決定最終名次</div></div><div class=rrPanel><div class=rrPlayers>${rows.map((x,i)=>`<div class=rrRow><span class=rrRank>${i+1}</span><b>${esc(x.p)}</b><span>${x.w}-${x.l}</span></div>`).join('')}</div><div class=rrGames>${games}</div></div></section>`;
+  const games=(f.matches||[]).map((m,i)=>`<div class="rrMini ${m.refereeActive?'judging':''}" ${canEdit?`onclick="openRRMatch(${i})"`:''}><b>${esc(m.a)} vs ${esc(m.b)}</b><span>${m.sa===''?'–':m.sa} : ${m.sb===''?'–':m.sb}</span></div>`).join('');
+
+  const statRows=ranked.map(p=>{
+    const s=stat[p],diff=s.pf-s.pa;
+    return `<div class=rrStatRow>
+      <b>${esc(p)}</b>
+      <span>得分 ${s.pf}</span>
+      <span>失分 ${s.pa}</span>
+      <span class="${diff>0?'plus':diff<0?'minus':''}">淨勝 ${diff>0?'+':''}${diff}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class=rrPanel>
+    <div class=rrHead><div><b>👑 最後三人循環</b><div class=muted>決定最終名次</div></div></div>
+    <div class=rrRanks>${rows}</div>
+    <div class=rrGames>${games}</div>
+    <div class=rrStatBox>
+      <div class=rrStatTitle>📊 循環賽得失分</div>
+      ${statRows}
+    </div>
+  </div>`;
 }
 function openRRMatch(i){
   if(!isAdmin&&!ev?.testOnly)return;
@@ -1020,31 +1142,88 @@ async function claimAdmin(){
   }
 }
 async function renderOrganizer(){
-  if(!$('organizerTab'))return;
+  const tab=$('organizerTab');
+  if(!tab)return;
+
   if(ev?.testOnly){
     stopAdminCodeRotation();
-    $('organizerTab').innerHTML=`<div class=card><h3>🧪 測試賽事</h3><div class=notice>這場賽事是「本機測試模式」，不會上傳 Firebase，也無法讓第二支手機共同管理。</div><div class=cloudNote style="margin-top:12px">如果要正式多人同步，請回首頁建立一場雲端賽事。</div></div>`;
+    tab.innerHTML=`<div class=card><h3>🧪 測試賽事</h3><div class=notice>這場賽事是「本機測試模式」，不會上傳 Firebase，也無法讓第二支手機共同管理。</div><div class=cloudNote style="margin-top:12px">如果要正式多人同步，請回首頁建立一場雲端賽事。</div></div>`;
     return;
   }
+
   if(!isAdmin){
     stopAdminCodeRotation();
-    $('organizerTab').innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入目前顯示的 6 位驗證碼。驗證碼每 30 秒失效。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
+    tab.innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入目前顯示的 6 位驗證碼。驗證碼每 30 秒失效。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
     return;
   }
 
-  if(!adminCodeTimer) setTimeout(startAdminCodeRotation,0);
-  const secret=await getCurrentAdminSecret();
-  if(!secret || Number(secret.expiresAt||0)<=Date.now()){
-    await rotateAdminCode(true);
-  }
-  const latest=(await getCurrentAdminSecret())||{};
-  const code=String(latest.adminCode||localStorage.getItem(adminCodeKey(ev.id))||'------');
-  const expiresAt=Number(latest.expiresAt||0);
-  localStorage.setItem(adminCodeKey(ev.id),code);
+  // 先把主辦頁骨架畫出來，避免等待 Firebase 時整頁空白
+  tab.innerHTML=`<div class=card><h3>🛡 主辦管理</h3>
+    <div class="cloudBadge on">● 雲端同步中</div>
+    <div class=organizerGrid style="margin-top:14px">
+      <div>
+        <div class=muted>動態管理驗證碼</div>
+        <div id=organizerCodeBox class=organizerCode>讀取中…</div>
+        <div id=adminCodeCountdown class=cloudNote data-expires-at="0" style="text-align:center;margin-top:6px">正在取得驗證碼</div>
+        <div class=cloudNote>驗證碼每 30 秒自動更換，舊碼到期後即無法加入管理。第二支手機：掃右側 QR → 輸入目前顯示的驗證碼。</div>
+      </div>
+      <div>
+        <div class=muted>管理 QR</div>
+        <div id=adminQr class=adminQr></div>
+      </div>
+    </div>
+    <label>管理連結</label>
+    <input readonly value="${esc(organizerUrl())}">
+    <div class=notice style="margin-top:12px">管理 QR 不要公開貼在群組；一般觀眾請使用「QR／分享」裡的公開觀看連結。</div>
+  </div>`;
 
-  $('organizerTab').innerHTML=`<div class=card><h3>🛡 主辦管理</h3><div class="cloudBadge on">● 雲端同步中</div><div class=organizerGrid style="margin-top:14px"><div><div class=muted>動態管理驗證碼</div><div class=organizerCode>${esc(code)}</div><div id=adminCodeCountdown class=cloudNote data-expires-at="${expiresAt}" style="text-align:center;margin-top:6px">30 秒後更換</div><div class=cloudNote>驗證碼每 30 秒自動更換，舊碼到期後即無法加入管理。第二支手機：掃右側 QR → 輸入目前顯示的驗證碼。</div></div><div><div class=muted>管理 QR</div><div id=adminQr class=adminQr></div></div></div><label>管理連結</label><input readonly value="${esc(organizerUrl())}"><div class=notice style="margin-top:12px">管理 QR 不要公開貼在群組；一般觀眾請使用「QR／分享」裡的公開觀看連結。</div></div>`;
-  updateAdminCodeCountdown();
-  setTimeout(()=>{let q=$('adminQr');if(q&&window.QRCode){q.innerHTML='';new QRCode(q,{text:organizerUrl(),width:180,height:180})}},0);
+  // QR 不需要等 Firebase，先顯示
+  setTimeout(()=>{
+    const q=$('adminQr');
+    if(q&&window.QRCode){
+      q.innerHTML='';
+      new QRCode(q,{text:organizerUrl(),width:180,height:180});
+    }
+  },0);
+
+  try{
+    // 先確保驗證碼存在，再讀取當前資料
+    await rotateAdminCode(false);
+    const latest=(await getCurrentAdminSecret())||{};
+    const code=String(latest.adminCode||localStorage.getItem(adminCodeKey(ev.id))||'------');
+    const expiresAt=Number(latest.expiresAt||0);
+    localStorage.setItem(adminCodeKey(ev.id),code);
+
+    const codeBox=$('organizerCodeBox');
+    if(codeBox)codeBox.textContent=code;
+    const countdown=$('adminCodeCountdown');
+    if(countdown){
+      countdown.dataset.expiresAt=String(expiresAt);
+      updateAdminCodeCountdown();
+    }
+
+    if(!adminCodeTimer){
+      adminCodeTimer=setInterval(async()=>{
+        if(!ev||!isAdmin||ev.testOnly)return stopAdminCodeRotation();
+        const ok=await rotateAdminCode(true);
+        if(!ok)return;
+        const s=(await getCurrentAdminSecret())||{};
+        const c=String(s.adminCode||'------');
+        const exp=Number(s.expiresAt||0);
+        const box=$('organizerCodeBox');
+        if(box)box.textContent=c;
+        const cd=$('adminCodeCountdown');
+        if(cd){cd.dataset.expiresAt=String(exp);updateAdminCodeCountdown()}
+      },30000);
+    }
+    if(!adminCodeCountdownTimer)adminCodeCountdownTimer=setInterval(updateAdminCodeCountdown,1000);
+  }catch(e){
+    console.error('renderOrganizer failed',e);
+    const codeBox=$('organizerCodeBox');
+    if(codeBox)codeBox.textContent='讀取失敗';
+    const countdown=$('adminCodeCountdown');
+    if(countdown)countdown.textContent='請重新整理或檢查 Firebase 規則';
+  }
 }
 
 function renderRoster(){
@@ -1084,12 +1263,7 @@ window.addEventListener('resize',()=>{clearTimeout(window.__bxResize);window.__b
 $('deleteCancelBtn')?.addEventListener('click',closeDeleteConfirm);
 $('deleteOkBtn')?.addEventListener('click',async()=>{
   if(!pendingDeleteId)return closeDeleteConfirm();
-  const btn=$('deleteOkBtn');
-  btn.disabled=true;
-  const old=btn.textContent;
-  btn.textContent='刪除中…';
-  try{await deleteSavedEvent(pendingDeleteId)}
-  finally{btn.disabled=false;btn.textContent=old}
+  await deleteSavedEvent(pendingDeleteId);
 });
 $('deleteConfirmModal')?.addEventListener('click',e=>{
   if(e.target===$('deleteConfirmModal'))closeDeleteConfirm();
