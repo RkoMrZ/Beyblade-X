@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v16：修復雲端建立賽事在iOS Safari永久卡建立中 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v18：修復雲端賽事建立權限順序，先保留名額再建立event -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1104,20 +1104,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   opacity:.52;
 }
 
-@media(max-width:520px){
-  .themeBtn{
-    min-width:44px;
-    padding:10px 9px!important;
-    font-size:0;
-  }
-  .themeBtn:before{
-    content:'☀️';
-    font-size:18px;
-  }
-  :root[data-theme="light"] .themeBtn:before{
-    content:'🌙';
-  }
-}
+
 </style>
 
 
@@ -1192,12 +1179,33 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+.themeBtn{
+  min-width:48px;
+  min-height:44px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  line-height:1;
+}
+@media(max-width:520px){
+  .themeBtn{
+    min-width:46px;
+    width:46px;
+    padding:9px!important;
+    font-size:20px!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
   <div><h1>⚔️ Beyblade X Tournament</h1><small id="headSub">戰鬥陀螺賽程表</small></div>
   <div class="headActions">
-    <button class="themeBtn secondary" id="themeToggleBtn" type="button" onclick="toggleTheme()">☀️ 淺色</button>
+    <button class="themeBtn secondary" id="themeToggleBtn" type="button" onclick="toggleTheme()" aria-label="切換深淺模式">🌙</button>
     <button class="loginBtn" id="googleLoginBtn" type="button" onclick="handleHeaderLogin()">Google 登入</button>
     <button class="ghost homeBtnText" id="homeBtn" type="button" onclick="goHome()">首頁</button>
   </div>
@@ -2647,9 +2655,61 @@ async function rtdbRestGet(path,timeoutMs=12000){
 
 
 
+
+async function reserveCloudEventSlot(){
+  if(!isGoogleUser())throw new Error('尚未登入 Google');
+
+  const uid=fbAuth.currentUser.uid;
+  const ref=fbDb.ref(`userEventCounts/${uid}`);
+
+  return await new Promise((resolve,reject)=>{
+    let settled=false;
+    const timer=setTimeout(()=>{
+      if(settled)return;
+      settled=true;
+      reject(new Error('雲端賽事名額確認逾時'));
+    },5000);
+
+    ref.transaction(current=>{
+      const n=Number(current||0);
+      if(n>=CLOUD_EVENT_LIMIT)return;
+      return n+1;
+    },(error,committed,snapshot)=>{
+      if(settled)return;
+      settled=true;
+      clearTimeout(timer);
+
+      if(error)return reject(error);
+      if(!committed)return resolve({ok:false,count:Number(snapshot?.val?.()||CLOUD_EVENT_LIMIT)});
+      resolve({ok:true,count:Number(snapshot.val()||1)});
+    },false);
+  });
+}
+
+async function releaseCloudEventSlot(){
+  if(!isGoogleUser())return;
+
+  const uid=fbAuth.currentUser.uid;
+  const ref=fbDb.ref(`userEventCounts/${uid}`);
+
+  try{
+    await new Promise((resolve,reject)=>{
+      ref.transaction(current=>{
+        const n=Number(current||0);
+        return Math.max(0,n-1);
+      },(error)=>error?reject(error):resolve(true),false);
+    });
+  }catch(e){
+    console.warn('releaseCloudEventSlot failed',e);
+  }
+}
+
 async function createTournament(){
   const createBtn=document.querySelector('[data-create-tournament="1"]');
   const oldText=createBtn?.textContent||'建立賽程表';
+
+  let slotReserved=false;
+  let createdEventId='';
 
   if(createBtn){
     createBtn.disabled=true;
@@ -2696,7 +2756,7 @@ async function createTournament(){
       return;
     }
 
-    if(createBtn)createBtn.textContent='確認雲端狀態…';
+    if(createBtn)createBtn.textContent='確認雲端名額…';
 
     if(!(await initCloud())){
       alert('Firebase 尚未連線成功。');
@@ -2708,13 +2768,17 @@ async function createTournament(){
       return;
     }
 
-    const existingCount=await getCloudEventCountFromServer(2500);
+    // 先用 transaction 原子保留 1 個名額。
+    // 這樣 Rules 在建立 events/$eventId 時已能看到 userEventCounts=1~3，
+    // 不會再因 null / 同步寫入順序而被 PERMISSION_DENIED。
+    const slot=await reserveCloudEventSlot();
 
-    if(existingCount>=CLOUD_EVENT_LIMIT){
+    if(!slot.ok){
       alert(`這個 Google 帳號已達 ${CLOUD_EVENT_LIMIT} 場雲端賽事上限，請先刪除一場舊賽事。`);
-      goHome();
       return;
     }
+
+    slotReserved=true;
 
     fbUser=fbAuth.currentUser;
     const now=Date.now();
@@ -2739,22 +2803,27 @@ async function createTournament(){
     };
 
     buildFirst();
+    createdEventId=ev.id;
 
     const code=String(Math.floor(100000+Math.random()*900000));
     const expiresAt=Date.now()+30000;
 
-    if(createBtn)createBtn.textContent='寫入雲端…';
+    if(createBtn)createBtn.textContent='寫入賽事…';
 
-    // 不再先做額外 probe；直接執行真正建立。
-    // SDK 超過 8 秒沒回應會自動 fallback 到 REST PATCH，
-    // REST 再有 10 秒 timeout，因此不會無限卡在「建立中…」。
+    // 第一步：先建立 event 本體。
+    // Rules 只依 Google owner + 已保留的 count 判斷，不依賴尚未建立的 admins/secrets。
+    await cloudSet(`events/${ev.id}`,ev);
+
+    if(createBtn)createBtn.textContent='建立管理權限…';
+
+    // 第二步：event 已存在後再建立這些相依節點。
     await cloudUpdate({
-      [`events/${ev.id}`]:ev,
       [`secrets/${ev.id}`]:{adminCode:code,expiresAt},
       [`admins/${ev.id}/${fbUser.uid}`]:code,
-      [`userEvents/${fbUser.uid}/${ev.id}`]:true,
-      [`userEventCounts/${fbUser.uid}`]:existingCount+1
+      [`userEvents/${fbUser.uid}/${ev.id}`]:true
     },8000);
+
+    slotReserved=false;
 
     isAdmin=true;
     localStorage.setItem(adminFlagKey(ev.id),'1');
@@ -2776,6 +2845,17 @@ async function createTournament(){
   }catch(e){
     console.error('createTournament failed',e);
 
+    // 如果 event 本體已建立但後續管理節點失敗，清掉半成品。
+    if(createdEventId){
+      try{ await rtdbRestDelete(`events/${createdEventId}`,8000); }catch(cleanErr){
+        console.warn('cleanup event failed',cleanErr);
+      }
+    }
+
+    if(slotReserved || createdEventId){
+      await releaseCloudEventSlot();
+    }
+
     const code=e?.code?`\n錯誤代碼：${e.code}`:'';
     const msg=e?.message||String(e);
 
@@ -2785,9 +2865,9 @@ async function createTournament(){
       String(msg).includes('401') ||
       String(msg).includes('403')
     ){
-      alert(`建立雲端賽事失敗：Firebase 權限拒絕寫入。請確認已發布最新 Rules，且此 Google 帳號未達 ${CLOUD_EVENT_LIMIT} 場上限。`);
+      alert('建立雲端賽事失敗：Firebase Rules 仍是舊版。請把我這次提供的新 Rules 發布後再建立。');
     }else if(String(msg).includes('逾時')){
-      alert('建立雲端賽事逾時。網路或 Firebase 暫時沒有回應，請再按一次建立；不會重複建立已完成的賽事。');
+      alert('建立雲端賽事逾時，已取消這次建立並歸還名額，請再試一次。');
     }else{
       alert('建立雲端賽事失敗：'+msg+code);
     }
@@ -4610,17 +4690,24 @@ function updateThemeButton(){
   const btn=$('themeToggleBtn');
   if(!btn)return;
 
-  if(currentTheme()==='light'){
-    btn.textContent='🌙 深色';
-    btn.setAttribute('aria-label','切換成深色模式');
+  const isLight=currentTheme()==='light';
+
+  // 顯示目前模式的圖示：
+  // 深色 = 月亮，淺色 = 太陽
+  if(isLight){
+    btn.textContent='☀️';
+    btn.setAttribute('aria-label','目前為淺色模式，點擊切換深色');
+    btn.title='淺色模式';
   }else{
-    btn.textContent='☀️ 淺色';
-    btn.setAttribute('aria-label','切換成淺色模式');
+    btn.textContent='🌙';
+    btn.setAttribute('aria-label','目前為深色模式，點擊切換淺色');
+    btn.title='深色模式';
   }
 }
 
 function applyTheme(theme,save=true){
   const next=theme==='light'?'light':'dark';
+
   document.documentElement.setAttribute('data-theme',next);
 
   if(save){
@@ -4632,20 +4719,26 @@ function applyTheme(theme,save=true){
 
   updateThemeButton();
 
-  // 對戰表 SVG/尺寸在切換主題後重新畫一次。
+  // 重新畫對戰表只做為附加動作，任何錯誤都不能影響主題切換本身。
   requestAnimationFrame(()=>{
     try{
-      setBracketScale(bracketScale);
-      drawBracketLinks();
-    }catch(e){}
+      if(typeof setBracketScale==='function' && typeof bracketScale!=='undefined'){
+        setBracketScale(bracketScale);
+      }
+      if(typeof drawBracketLinks==='function'){
+        drawBracketLinks();
+      }
+    }catch(e){
+      console.warn('theme redraw skipped',e);
+    }
   });
 }
 
 function toggleTheme(){
-  applyTheme(currentTheme()==='light'?'dark':'light');
+  const next=currentTheme()==='light'?'dark':'light';
+  applyTheme(next,true);
 }
 
-updateThemeButton();
 
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -4658,6 +4751,18 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   }
 });
+
+
+function initThemeUI(){
+  const saved=(()=>{try{return localStorage.getItem(THEME_KEY)||currentTheme()}catch(e){return currentTheme()}})();
+  applyTheme(saved,false);
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',initThemeUI,{once:true});
+}else{
+  initThemeUI();
+}
 
 window.addEventListener('resize',()=>{clearTimeout(window.__bxResize);window.__bxResize=setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},120)});
 
