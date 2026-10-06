@@ -459,7 +459,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
         <button id="deleteOkBtn" type="button" class="danger">確認刪除</button>
       </div>
     </div></div>
-    <div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(0)">0</button><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore('')">清除比分</button></div></div>
+    <div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(0)">0</button><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore(0)">比分歸零</button></div></div>
 <div id="resetChoiceModal" class="resetChoiceModal hidden" onclick="if(event.target===this)closeResetChoice()">
   <div class="resetChoiceCard">
     <h3>重設這場比賽</h3>
@@ -1861,36 +1861,58 @@ function closeScorePicker(){
   $('scorePicker').classList.add('hidden');
   activeScoreTarget=null;
 }
-function chooseScore(v){
+async function chooseScore(v){
   if(!activeScoreTarget)return;
+
+  // 「清除比分」在比賽流程裡視為真正的 0 分，而不是空字串。
+  const scoreValue=(v===''?0:+v);
 
   const input=$(activeScoreTarget.inputId);
   const btn=$(activeScoreTarget.buttonId);
 
-  if(input)input.value=v;
+  if(input)input.value=scoreValue;
+
   if(btn){
-    btn.textContent=v===''?'0':v;
-    btn.classList.toggle('hasValue',v!=='');
+    btn.textContent=scoreValue;
+    btn.classList.add('hasValue');
   }
 
-  // 直接修改數字時，同步回目前的比賽資料。
   const id=activeScoreTarget.inputId;
+
+  let matchInfo=null;
 
   let mm=id.match(/^s(\d+)-(\d+)([ab])$/);
   if(mm&&ev?.rounds?.[+mm[1]]?.matches?.[+mm[2]]){
-    const m=ev.rounds[+mm[1]].matches[+mm[2]];
-    m[mm[3]==='a'?'sa':'sb']=v===''?0:+v;
-    localEventSave();
+    const ri=+mm[1],mi=+mm[2],side=mm[3];
+    const m=ev.rounds[ri].matches[mi];
+
+    m[side==='a'?'sa':'sb']=scoreValue;
+    matchInfo={kind:'round',ri,mi};
   }
 
   mm=id.match(/^rr(\d+)([ab])$/);
   if(mm&&ev?.finalRR?.matches?.[+mm[1]]){
-    const m=ev.finalRR.matches[+mm[1]];
-    m[mm[2]==='a'?'sa':'sb']=v===''?0:+v;
-    localEventSave();
+    const mi=+mm[1],side=mm[2];
+    const m=ev.finalRR.matches[mi];
+
+    m[side==='a'?'sa':'sb']=scoreValue;
+    matchInfo={kind:'rr',ri:0,mi};
   }
 
   closeScorePicker();
+
+  // 直接同步，讓背景對戰表的比分也立刻變成同一個數字。
+  if(matchInfo){
+    await saveEventCloudNow();
+
+    // saveEventCloudNow() 會重畫對戰表；
+    // 再開回同一場編輯視窗，避免 UI 顯示舊資料。
+    if(matchInfo.kind==='rr'){
+      openRRMatch(matchInfo.mi);
+    }else{
+      openMatchEditor(matchInfo.ri,matchInfo.mi);
+    }
+  }
 }
 
 function scoreEventButtons(handler){
