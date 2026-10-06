@@ -1174,8 +1174,13 @@ function canEditMatchScore(m){
 async function saveEventCloudNow(){
   localEventSave();
   renderAdmin();
+
   if(ev?.testOnly)return true;
-  if(!cloudReady||!ev?.id)return false;
+  if(!cloudReady||!ev?.id){
+    alert('目前尚未連上雲端，無法同步執裁狀態。');
+    return false;
+  }
+
   try{
     await rtdbRestPut(`events/${ev.id}`,ev,10000);
     return true;
@@ -1215,12 +1220,12 @@ function refereeStatusHtml(m,kind,ri,mi){
   }
 
   const start=kind==='rr'
-    ?`claimRRMatchAs(${mi},${JSON.stringify(me)})`
-    :`claimMatchAs(${ri},${mi},${JSON.stringify(me)})`;
+    ?`claimRRMatchAs(${mi})`
+    :`claimMatchAs(${ri},${mi})`;
 
   return `<div class=sheetRefRow>
     <div>尚未有人執裁</div>
-    <button type=button onclick='${start}'>⚖ 開始執裁</button>
+    <button type=button class=startRefBtn onclick="${start}">⚖ 開始執裁</button>
   </div>`;
 }
 let activeScoreTarget=null;
@@ -1396,32 +1401,58 @@ function setRefereeCount(){
   ev.refereeNames=Array.from({length:n},(_,i)=>ev.refereeNames[i]||`裁判 ${i+1}`);
   put();showTab('referee');
 }
-async function claimMatchAs(ri,mi,who){
-  if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
-  let m=ev.rounds[ri].matches[mi];
+async function claimMatchAs(ri,mi){
+  if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有執裁權限。');
+
+  const who=currentRefereeName();
+  if(!who)return alert('請先到裁判頁選擇你的裁判名稱。');
+
+  let m=ev.rounds?.[ri]?.matches?.[mi];
+  if(!m)return alert('找不到這場比賽資料。');
   if(m.winner)return alert('這場已完成。');
 
-  // 再讀一次目前狀態，避免兩位裁判幾乎同時按開始。
-  if(!ev.testOnly){
-    try{
+  const btn=document.querySelector('.startRefBtn');
+  const oldText=btn?.textContent||'⚖ 開始執裁';
+  if(btn){btn.disabled=true;btn.textContent='接手中…'}
+
+  try{
+    // 開始前先讀最新雲端狀態，避免另一位裁判已經搶先接手。
+    if(!ev.testOnly){
       const latest=await rtdbRestGet(`events/${ev.id}`,8000);
-      const lm=latest?.rounds?.[ri]?.matches?.[mi];
-      if(lm?.refereeActive && lm.referee!==who){
-        ev=latest;localEventSave();renderAdmin();openMatchEditor(ri,mi);
-        return alert(`這場目前由 ${lm.referee} 執裁中。`);
+      if(latest){
+        const lm=latest?.rounds?.[ri]?.matches?.[mi];
+        if(lm?.refereeActive && lm.referee!==who){
+          ev=latest;
+          localEventSave();
+          renderAdmin();
+          openMatchEditor(ri,mi);
+          return alert(`這場目前由 ${lm.referee} 執裁中。`);
+        }
+        ev=latest;
       }
-    }catch(e){console.warn('pre-claim refresh failed',e)}
+    }
+
+    m=ev.rounds?.[ri]?.matches?.[mi];
+    if(!m)return alert('找不到這場比賽資料。');
+    if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
+
+    releaseMyOtherMatches(who);
+    m.referee=who;
+    m.refereeActive=true;
+
+    const ok=await saveEventCloudNow();
+    if(!ok)return;
+
+    openMatchEditor(ri,mi);
+  }catch(e){
+    console.error('claimMatchAs failed',e);
+    alert('開始執裁失敗：'+(e?.message||e));
+  }finally{
+    if(btn&&document.body.contains(btn)){
+      btn.disabled=false;
+      btn.textContent=oldText;
+    }
   }
-
-  m=ev.rounds[ri].matches[mi];
-  if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
-
-  releaseMyOtherMatches(who);
-  m.referee=who;
-  m.refereeActive=true;
-
-  const ok=await saveEventCloudNow();
-  if(ok)openMatchEditor(ri,mi);
 }
 async function releaseMatchAny(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
