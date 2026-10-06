@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v4：每帳號最多3場以計數節點強制限制、公開6小時自動到期、觀眾免Auth -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v6：公開2小時只限制觀眾，主辦可直接開啟已到期本機賽事 -->
 <title>Beyblade X Tournament</title>
 <style>
 :root{--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--blue:#56a8ff;--warn:#f4c84b}
@@ -950,7 +950,7 @@ async function getCloudEventCountFromServer(){
 }
 
 
-const PUBLIC_WINDOW_MS=6*60*60*1000;
+const PUBLIC_WINDOW_MS=2*60*60*1000;
 
 function cloudEventIdsForCurrentGoogle(){
   if(!isGoogleUser())return [];
@@ -1135,7 +1135,7 @@ function renderSavedEvents(){
       </div>
       <div class=savedEventActions>
         <button type="button" data-open-id="${id}">繼續</button>
-        ${ownerControls?`<button type="button" class="secondary" data-extend-id="${id}">延長 6 小時</button>
+        ${ownerControls?`<button type="button" class="secondary" data-extend-id="${id}">延長 2 小時</button>
         <button type="button" class="secondary" data-close-public-id="${id}" ${e.publicOpen===false?'disabled':''}>關閉公開連結</button>`:''}
         <button type="button" class="danger" data-delete-id="${id}">${delLabel}</button>
       </div>
@@ -1155,6 +1155,37 @@ function renderSavedEvents(){
     btn.addEventListener('click',()=>closePublicEvent(btn.dataset.closePublicId));
   });
 }
+
+async function openCachedOwnerEvent(cached){
+  if(!cached || cached.testOnly || !isGoogleUser())return false;
+  if(cached.ownerUid!==fbAuth.currentUser.uid)return false;
+
+  ev=cached;
+  isAdmin=true;
+  isReferee=false;
+
+  // 嘗試重新確認雲端權限，但不讓「公開觀看已到期」阻止主辦進入自己的賽事。
+  try{ await refreshAdminState(cached.id); }catch(e){ console.warn('refreshAdminState failed',e); }
+  try{ await refreshRefereeState(cached.id); }catch(e){ console.warn('refreshRefereeState failed',e); }
+
+  // ownerUid 相符時，本機主辦權仍成立；Firebase Rules 也允許 owner 在公開到期後讀取。
+  isAdmin=true;
+
+  $('home').classList.add('hidden');
+  $('create').classList.add('hidden');
+  $('admin').classList.remove('hidden');
+
+  history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(cached.id)}`);
+
+  renderAdmin();
+  showTab('bracket');
+
+  try{ listenCloudEvent(cached.id); }
+  catch(e){ console.warn('listenCloudEvent failed',e); }
+
+  return true;
+}
+
 async function openSavedEvent(id){
   const btn=document.querySelector(`[data-open-id="${CSS.escape(id)}"]`);
   const oldText=btn?.textContent||'繼續';
@@ -1162,13 +1193,20 @@ async function openSavedEvent(id){
 
   try{
     const cached=events()[id];
+
     if(!cached){
-      // 本機沒有快取時，也嘗試直接從雲端讀取
       const result=await loadCloudEvent(id);
+
       if(result==='ok'){
         history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
         return;
       }
+
+      if(result==='expired'){
+        alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
+        return;
+      }
+
       alert('目前找不到這場賽事。');
       return;
     }
@@ -1185,6 +1223,14 @@ async function openSavedEvent(id){
       return;
     }
 
+    // 主辦自己的本機保留賽事：直接先進入。
+    // 公開觀看是否到期只限制一般觀眾，不應把主辦本人擋在外面。
+    if(isGoogleUser() && cached.ownerUid===fbAuth.currentUser.uid){
+      const opened=await openCachedOwnerEvent(cached);
+      if(opened)return;
+    }
+
+    // 非主辦裝置才走一般雲端載入流程。
     const result=await loadCloudEvent(id);
 
     if(result==='ok'){
@@ -1204,7 +1250,7 @@ async function openSavedEvent(id){
     }
 
     if(result==='expired'){
-      alert('這場賽事的公開觀看已關閉或 6 小時有效時間已到期。主辦本人請先登入原本的 Google 帳號後再開啟。');
+      alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
       return;
     }
 
@@ -3582,7 +3628,7 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
       alert('這個雲端賽事已被刪除或不存在，分享連結已失效。');
     }else if(result==='expired'){
       history.replaceState(null,'',location.pathname);
-      alert('這場賽事的公開觀看已關閉或 6 小時有效時間已到期。');
+      alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
     }else if(result==='error'){
       alert('目前無法連上雲端，請稍後再試。');
     }
