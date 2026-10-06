@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v23：新建賽事直達裁判設定、重整保留目前頁面、抽獎大型得主彈窗 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v24：重整優先本機恢復原頁、雲端背景同步與公開讀取REST備援 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -2159,14 +2159,18 @@ async function initCloud(){
 
       renderHeaderAuth();
 
-      if($('home')&&!$('home').classList.contains('hidden')){
+      if($('home')&&!$('home').classList.contains('hidden') && !readActiveView()?.eventId){
         renderHomeSelections();
 
-        // 只有 Google 主辦帳號才同步自己的雲端賽事清單。
+        // 只有真的停在首頁時才同步清單，避免賽事頁重整時同時發出多組請求。
         if(isGoogleUser()){
-          await backfillMyCloudEventIndex();
-          await syncMyCloudEvents();
-          renderSavedEvents();
+          try{
+            await backfillMyCloudEventIndex();
+            await syncMyCloudEvents();
+            renderSavedEvents();
+          }catch(e){
+            console.warn('auth home sync skipped',e);
+          }
         }
       }
     });
@@ -2740,14 +2744,46 @@ async function getRestIdToken(force=false){
 async function publicCloudGet(path,timeoutMs=10000){
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
 
-  const ref=fbDb.ref(path);
+  const sdkWait=Math.min(4000,timeoutMs);
 
-  const snap=await Promise.race([
-    ref.once('value'),
-    new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase 公開讀取逾時')),timeoutMs))
-  ]);
+  try{
+    const ref=fbDb.ref(path);
+    const snap=await Promise.race([
+      ref.once('value'),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase SDK 公開讀取逾時')),sdkWait))
+    ]);
 
-  return snap.exists()?snap.val():null;
+    return snap.exists()?snap.val():null;
+  }catch(sdkErr){
+    console.warn('publicCloudGet SDK failed/timeout, fallback REST',sdkErr);
+
+    const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+    if(!base)throw sdkErr;
+
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),Math.max(4000,timeoutMs-sdkWait));
+
+    try{
+      const url=`${base}/${path}.json`;
+      const res=await fetch(url,{method:'GET',signal:ctrl.signal,cache:'no-store'});
+      const text=await res.text();
+
+      if(!res.ok){
+        let detail=text;
+        try{detail=JSON.parse(text)?.error||text}catch{}
+        const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+        err.code=`HTTP_${res.status}`;
+        throw err;
+      }
+
+      return text?JSON.parse(text):null;
+    }catch(e){
+      if(e?.name==='AbortError')throw new Error('Firebase 公開讀取逾時');
+      throw e;
+    }finally{
+      clearTimeout(timer);
+    }
+  }
 }
 
 async function rtdbRestGet(path,timeoutMs=12000){
@@ -4846,15 +4882,16 @@ const ACTIVE_VIEW_KEY='bx_active_view';
 function persistActiveView(tab){
   if(!ev)return;
 
-  try{
-    sessionStorage.setItem(ACTIVE_VIEW_KEY,JSON.stringify({
-      eventId:ev.id,
-      tab:tab||'bracket',
-      testOnly:!!ev.testOnly
-    }));
-  }catch(e){}
+  const payload={
+    eventId:ev.id,
+    tab:tab||'bracket',
+    testOnly:!!ev.testOnly,
+    ts:Date.now()
+  };
 
-  // 雲端賽事把目前分頁寫進網址，重整時可直接回到同一頁。
+  try{sessionStorage.setItem(ACTIVE_VIEW_KEY,JSON.stringify(payload))}catch(e){}
+  try{localStorage.setItem(ACTIVE_VIEW_KEY,JSON.stringify(payload))}catch(e){}
+
   if(!ev.testOnly){
     try{
       const u=new URL(location.href);
@@ -4867,15 +4904,20 @@ function persistActiveView(tab){
 
 function clearActiveView(){
   try{sessionStorage.removeItem(ACTIVE_VIEW_KEY)}catch(e){}
+  try{localStorage.removeItem(ACTIVE_VIEW_KEY)}catch(e){}
 }
 
 function readActiveView(){
-  try{
-    const raw=sessionStorage.getItem(ACTIVE_VIEW_KEY);
-    return raw?JSON.parse(raw):null;
-  }catch(e){
-    return null;
-  }
+  const parse=raw=>{
+    try{return raw?JSON.parse(raw):null}catch(e){return null}
+  };
+
+  let v=null;
+  try{v=parse(sessionStorage.getItem(ACTIVE_VIEW_KEY))}catch(e){}
+  if(v?.eventId)return v;
+
+  try{v=parse(localStorage.getItem(ACTIVE_VIEW_KEY))}catch(e){}
+  return v?.eventId?v:null;
 }
 
 function showTab(t){
@@ -5164,12 +5206,66 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
   if(e.target===$('deleteConfirmModal'))closeDeleteConfirm();
 });
 
-(async function bootstrapCloud(){
+function restoreCachedEventImmediately(id,tab){
+  const cached=events()[id];
+  if(!cached)return false;
+
+  ev=cached;
+
+  if(cached.testOnly){
+    isAdmin=true;
+    isReferee=false;
+  }else if(isGoogleUser() && cached.ownerUid===fbAuth?.currentUser?.uid){
+    isAdmin=true;
+    isReferee=false;
+  }
+
+  $('home').classList.add('hidden');
+  $('create').classList.add('hidden');
+  $('admin').classList.remove('hidden');
+
+  currentAdminTab=tab||'bracket';
+  renderAdmin();
+
+  const allowed=['bracket','draw','roster','referee','organizer','share'];
+  showTab(allowed.includes(currentAdminTab)?currentAdminTab:'bracket');
+
+  return true;
+}
+
+async function backgroundRefreshCurrentEvent(id){
+  try{
+    const data=await publicCloudGet(`events/${id}`,10000);
+    if(!data)return;
+
+    // 若使用者已切去別場，不覆蓋。
+    if(!ev || ev.id!==id)return;
+
+    const keepTab=currentAdminTab||'bracket';
+    ev=data;
+    localEventSave();
+
+    if(fbAuth?.currentUser){
+      try{await refreshAdminState(id)}catch(e){console.warn(e)}
+      try{await refreshRefereeState(id)}catch(e){console.warn(e)}
+    }
+
+    renderAdmin();
+    showTab(keepTab);
+
+    try{listenCloudEvent(id)}catch(e){console.warn('listenCloudEvent failed',e)}
+  }catch(e){
+    // 暫時連線失敗時留在本機快取畫面，不再把使用者踢回首頁或彈干擾訊息。
+    console.warn('backgroundRefreshCurrentEvent transient failure',e);
+  }
+}
+
+async function bootstrapCloud(){
   draftMode=null;
   draftStorage=null;
   await initCloud();
 
-  // Firebase persistence 恢復可能比頁面初始化晚一點，給它一個很短的時間恢復 Google 使用者
+  // 先恢復 Firebase 登入狀態，但不要先做任何大量同步。
   if(fbAuth && !fbAuth.currentUser){
     await new Promise(resolve=>{
       let finished=false;
@@ -5186,22 +5282,40 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
 
   fbUser=fbAuth?.currentUser||fbUser;
   renderHeaderAuth();
-  renderHomeSelections();
 
-  if(isGoogleUser()){
-    await backfillMyCloudEventIndex();
-    await syncMyCloudEvents();
+  const params=new URLSearchParams(location.search);
+  const saved=readActiveView();
+
+  const urlEvent=params.get('event');
+  const targetId=urlEvent || saved?.eventId || '';
+  const wantedTab=params.get('tab') || (saved?.eventId===targetId?saved?.tab:null) || 'bracket';
+
+  // 重新整理時「先顯示原本頁面」，完全不等待 Firebase。
+  if(targetId){
+    const restored=restoreCachedEventImmediately(targetId,wantedTab);
+
+    if(restored){
+      if(!ev.testOnly){
+        try{
+          const u=new URL(location.href);
+          u.searchParams.set('event',targetId);
+          u.searchParams.set('tab',wantedTab);
+          history.replaceState(null,'',u.pathname+u.search);
+        }catch(e){}
+
+        // 背景再更新最新雲端資料；失敗時保持目前畫面，不彈「無法連線」。
+        setTimeout(()=>backgroundRefreshCurrentEvent(targetId),0);
+      }
+      return;
+    }
   }
-  renderSavedEvents();
 
-  const p=new URLSearchParams(location.search);
-  const id=p.get('event');
-
-  if(id){
-    const result=await loadCloudEvent(id);
+  // 沒有本機快取時才真的需要從雲端載入。
+  if(urlEvent){
+    const result=await loadCloudEvent(urlEvent);
 
     if(result==='missing'){
-      purgeLocalEvent(id);
+      purgeLocalEvent(urlEvent);
       clearActiveView();
       history.replaceState(null,'',location.pathname);
       renderSavedEvents();
@@ -5211,38 +5325,30 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
       history.replaceState(null,'',location.pathname);
       alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
     }else if(result==='error'){
-      alert('目前無法連上雲端，請稍後再試。');
+      // 只有完全沒有任何快取、首次開啟雲端連結失敗時才提示。
+      alert('目前暫時無法載入這場雲端賽事，請稍後再試。');
     }
     return;
   }
 
-  // 測試賽事沒有 event query，所以用 sessionStorage 在重新整理後恢復同一頁。
-  const saved=readActiveView();
+  // 真正待在首頁時才同步自己的雲端賽事清單，避免每次重整賽事頁都額外打一堆請求。
+  renderHomeSelections();
 
-  if(saved?.eventId){
-    const cached=events()[saved.eventId];
-
-    if(cached){
-      ev=cached;
-
-      if(cached.testOnly){
-        isAdmin=true;
-        isReferee=false;
-
-        $('home').classList.add('hidden');
-        $('create').classList.add('hidden');
-        $('admin').classList.remove('hidden');
-
-        renderAdmin();
-
-        const allowed=['bracket','draw','roster','referee','organizer','share'];
-        showTab(allowed.includes(saved.tab)?saved.tab:'bracket');
-      }else if(isGoogleUser() && cached.ownerUid===fbAuth.currentUser.uid){
-        await openCachedOwnerEvent(cached);
-        showTab(saved.tab||'bracket');
+  if(isGoogleUser()){
+    Promise.resolve().then(async()=>{
+      try{
+        await backfillMyCloudEventIndex();
+        await syncMyCloudEvents();
+        renderSavedEvents();
+      }catch(e){
+        console.warn('home cloud list sync skipped',e);
       }
-    }
+    });
   }
-})();
+
+  renderSavedEvents();
+}
+
+bootstrapCloud();
 </script>
 </body></html>
