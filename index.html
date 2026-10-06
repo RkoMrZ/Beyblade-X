@@ -390,6 +390,166 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+@media(max-width:520px){
+  .sheetFooter button:disabled{
+    background:#2b3039!important;
+    border-color:#3a414d!important;
+    color:#737b89!important;
+    opacity:.75!important;
+    cursor:not-allowed!important;
+    box-shadow:none!important;
+  }
+}
+</style>
+
+
+<style>
+@media(max-width:520px){
+  .matchModal{
+    padding:6px;
+    align-items:flex-end;
+    padding-bottom:78px;
+  }
+
+  .matchSheet{
+    width:100%;
+    padding:9px;
+    border-radius:16px 16px 12px 12px;
+  }
+
+  .sheetHandle{
+    width:44px;
+    margin-bottom:5px;
+  }
+
+  .sheetTitle h3{
+    font-size:19px;
+  }
+
+  .sheetTitle .muted{
+    font-size:12px;
+  }
+
+  .sheetClose{
+    min-width:46px;
+    min-height:44px;
+    font-size:17px;
+  }
+
+  .sheetRef{
+    grid-template-columns:82px 1fr;
+    gap:7px;
+    padding:6px 0;
+    font-size:14px;
+  }
+
+  .sheetRefRow .releaseBtn,
+  .sheetRef button{
+    min-height:42px;
+    padding:6px 11px;
+    font-size:13px;
+  }
+
+  .quickScoreBox{
+    margin:7px 0;
+    padding:8px;
+  }
+
+  .quickScoreTitle{
+    font-size:13px;
+    margin-bottom:6px;
+  }
+
+  .quickScorePlayers{
+    gap:7px;
+  }
+
+  .quickScoreSide{
+    padding:7px;
+  }
+
+  .quickScoreName{
+    font-size:14px;
+  }
+
+  .quickScoreTotal{
+    min-width:44px;
+    min-height:40px;
+    font-size:19px;
+    padding:3px 7px;
+  }
+
+  .quickScoreBtns{
+    gap:5px;
+  }
+
+  .quickScoreBtns button{
+    min-height:34px;
+    padding:5px 5px;
+    font-size:12px;
+    line-height:1.1;
+  }
+
+  .quickScoreHint{
+    margin-top:6px;
+    font-size:10.5px;
+    line-height:1.35;
+  }
+
+  .sheetFooter{
+    gap:6px;
+    margin-top:6px;
+  }
+
+  .sheetFooter button{
+    min-height:44px;
+    padding:8px 7px;
+    font-size:13px;
+  }
+}
+
+/* iPhone / Safari 可視高度較矮時維持可一次看完 */
+@media(max-width:520px) and (max-height:760px){
+  .matchModal{
+    padding-bottom:70px;
+  }
+
+  .matchSheet{
+    padding:7px;
+  }
+
+  .sheetClose{
+    min-width:42px;
+    min-height:40px;
+  }
+
+  .sheetRef{
+    padding:4px 0;
+  }
+
+  .quickScoreBox{
+    margin:5px 0;
+    padding:6px;
+  }
+
+  .quickScoreSide{
+    padding:6px;
+  }
+
+  .quickScoreBtns button{
+    min-height:31px;
+    font-size:11px;
+  }
+
+  .sheetFooter button{
+    min-height:40px;
+    font-size:12px;
+  }
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -1435,50 +1595,21 @@ async function score(ri,mi){
 
   let m=ev.rounds[ri].matches[mi];
 
-  if(!canEditMatchScore(m)){
-    return alert('請先按「開始執裁／修改比分」，取得這一場的執裁權限後才能記錄比分。');
-  }
+  // 正常 UI 在條件不符時按鈕會是灰色；這裡只是第二層防呆。
+  if(!canEditMatchScore(m) || !canCompleteMatch(m))return;
 
-  let a=$(`s${ri}-${mi}a`).value;
-  let b=$(`s${ri}-${mi}b`).value;
-
-  if(a===''||b==='')return alert('請先輸入雙方比分。');
-
-  // 特例：0 : 0 = 取消／關閉這場目前的執裁結果。
-  // 用在點錯場次或要把已完成場次退回「尚未完成」。
-  if(+a===0 && +b===0){
-    const hadWinner=!!(m._previousWinner || m.winner);
-
-    m.sa=0;
-    m.sb=0;
-    m.winner=null;
-    delete m._previousWinner;
-    m.refereeActive=false;
-    m.referee='';
-
-    if(hadWinner)clearDownstreamAfterMatchReset(ri);
-
-    await saveEventCloudNow();
-
-    closeMatchEditor();
-    showTab('bracket');
-    requestAnimationFrame(()=>{
-      setBracketScale(bracketScale);
-      drawBracketLinks();
-    });
-    return;
-  }
-
-  if(+a===+b)return alert('雙方比分不能相同。');
-  if(Math.max(+a,+b)<4)return alert('至少一方必須達到 4 分，才能記錄此場完成。');
+  const a=Number(m.sa ?? 0);
+  const b=Number(m.sb ?? 0);
 
   const oldWinner=m._previousWinner || m.winner || null;
-  const newWinner=+a>+b?m.a:m.b;
+  const newWinner=a>b?m.a:m.b;
 
   m.sa=a;
   m.sb=b;
   m.winner=newWinner;
   delete m._previousWinner;
+
+  // 只有真正完成場次時，才釋放這場裁判。
   m.refereeActive=false;
   m.referee='';
 
@@ -1487,12 +1618,7 @@ async function score(ri,mi){
 
   await saveEventCloudNow();
 
-  closeMatchEditor();
-  showTab('bracket');
-  requestAnimationFrame(()=>{
-    setBracketScale(bracketScale);
-    drawBracketLinks();
-  });
+  backToBracketFromMatch();
 
   if(rebuilt){
     alert('比分已修改。因勝者改變，後續賽程已依新的勝者重新產生。');
@@ -1502,7 +1628,7 @@ async function score(ri,mi){
 let resetChoiceTarget=null;
 
 function openResetChoice(kind,ri,mi){
-  if(!isAdmin&&!ev?.testOnly)return alert('只有主辦可以重設場次。');
+  if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有重設權限。');
   resetChoiceTarget={kind,ri,mi};
   $('resetChoiceModal').classList.remove('hidden');
 }
@@ -1657,53 +1783,22 @@ async function rrScore(i){
 
   let m=ev.finalRR.matches[i];
 
-  if(!canEditMatchScore(m)){
-    return alert('請先按「開始執裁／修改比分」，取得這一場的執裁權限後才能記錄比分。');
-  }
+  if(!canEditMatchScore(m) || !canCompleteMatch(m))return;
 
-  let a=$(`rr${i}a`).value;
-  let b=$(`rr${i}b`).value;
-
-  if(a===''||b==='')return alert('請先輸入雙方比分。');
-
-  // 循環賽同樣支援 0 : 0 直接把該場退回未完成狀態。
-  if(+a===0 && +b===0){
-    m.sa=0;
-    m.sb=0;
-    m.winner=null;
-    delete m._previousWinner;
-    m.refereeActive=false;
-    m.referee='';
-
-    await saveEventCloudNow();
-
-    closeMatchEditor();
-    showTab('bracket');
-    requestAnimationFrame(()=>{
-      setBracketScale(bracketScale);
-      drawBracketLinks();
-    });
-    return;
-  }
-
-  if(+a===+b)return alert('雙方比分不能相同。');
-  if(Math.max(+a,+b)<4)return alert('至少一方必須達到 4 分，才能記錄此場完成。');
+  const a=Number(m.sa ?? 0);
+  const b=Number(m.sb ?? 0);
 
   m.sa=a;
   m.sb=b;
-  m.winner=+a>+b?m.a:m.b;
+  m.winner=a>b?m.a:m.b;
   delete m._previousWinner;
+
   m.refereeActive=false;
   m.referee='';
 
   await saveEventCloudNow();
 
-  closeMatchEditor();
-  showTab('bracket');
-  requestAnimationFrame(()=>{
-    setBracketScale(bracketScale);
-    drawBracketLinks();
-  });
+  backToBracketFromMatch();
 }
 function stageLabel(ri,r){
   if(ev.mode==='free'&&ev.freeFinal==='rr3'){
@@ -1996,7 +2091,7 @@ function quickScoreHtml(m,kind,ri,mi,enabled){
     </div>
 
     <div class=quickScoreHint>
-      點右側數字可直接修改比分；0：0 後按「記錄比分」可取消這場結果。至少一方達到 4 分後，再按「記錄比分」完成此場。
+      點右側數字可直接修改比分。至少一方達到 4 分且比分不同時，「此場完成」才會開放。
     </div>
   </div>`;
 }
@@ -2097,19 +2192,46 @@ async function quickAddRRScore(i,side,points,reason){
   openRRMatch(i);
 }
 
+
+function canCompleteMatch(m){
+  const a=Number(m?.sa ?? 0);
+  const b=Number(m?.sb ?? 0);
+
+  // 必須有明確勝者，而且至少一方已達 4 分。
+  // 0:0、未滿 4 分、同分都不能按「此場完成」。
+  return Math.max(a,b)>=4 && a!==b;
+}
+
+function backToBracketFromMatch(){
+  closeMatchEditor();
+  showTab('bracket');
+  requestAnimationFrame(()=>{
+    setBracketScale(bracketScale);
+    drawBracketLinks();
+  });
+}
+
 function openMatchEditor(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.rounds[ri].matches[mi];
   const scoreEnabled=canEditMatchScore(m);
   const scoreDisabled=scoreEnabled?'':'disabled';
+
+  const completeEnabled=scoreEnabled && canCompleteMatch(m);
+  const completeDisabled=completeEnabled?'':'disabled';
+
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
     <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
     ${quickScoreHtml(m,'round',ri,mi,scoreEnabled)}
-    ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分與記錄比分。</div>`:''}
-    <div class=sheetFooter style="${(!isAdmin&&!ev?.testOnly)?'grid-template-columns:1fr':''}">
-      <button class=secondary ${scoreDisabled} onclick="score(${ri},${mi})">記錄比分</button>
-      ${(isAdmin||ev?.testOnly)?`<button class=danger onclick="resetMatch(${ri},${mi})">重設</button>`:''}
+    ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分。</div>`:''}
+
+    <div class=sheetFooter style="grid-template-columns:1fr 1fr 1fr">
+      <button class=secondary onclick="backToBracketFromMatch()">回到對戰表</button>
+      <button class=secondary ${completeDisabled} onclick="score(${ri},${mi})">此場完成</button>
+      <button class=danger onclick="resetMatch(${ri},${mi})">重設</button>
     </div>`;
+
   $('matchModal').classList.remove('hidden');
 }
 function closeMatchEditor(){$('matchModal').classList.add('hidden');closeScorePicker()}
@@ -2264,7 +2386,8 @@ function openRRMatch(i){
 
   let m=ev.finalRR.matches[i];
   const scoreEnabled=canEditMatchScore(m);
-  const scoreDisabled=scoreEnabled?'':'disabled';
+  const completeEnabled=scoreEnabled && canCompleteMatch(m);
+  const completeDisabled=completeEnabled?'':'disabled';
 
   $('matchSheet').innerHTML=`
     <div class=sheetHandle></div>
@@ -2277,7 +2400,7 @@ function openRRMatch(i){
       <button class=sheetClose onclick=closeMatchEditor()>✕</button>
     </div>
 
-<div class=sheetRef>
+    <div class=sheetRef>
       <b>裁判狀態</b>
       ${refereeStatusHtml(m,'rr',0,i)}
     </div>
@@ -2286,13 +2409,14 @@ function openRRMatch(i){
 
     ${!scoreEnabled?`
       <div class=refHint style="margin:10px 0">
-        必須先按「開始執裁」，才能修改比分與記錄比分。
+        必須先按「開始執裁」，才能修改比分。
       </div>
     `:''}
 
-    <div class=sheetFooter style="${(isAdmin||ev?.testOnly)?'':'grid-template-columns:1fr'}">
-      <button class=secondary ${scoreDisabled} onclick="rrScore(${i})">記錄比分</button>
-      ${(isAdmin||ev?.testOnly)?`<button class=danger onclick="resetRRMatch(${i})">重設</button>`:''}
+    <div class=sheetFooter style="grid-template-columns:1fr 1fr 1fr">
+      <button class=secondary onclick="backToBracketFromMatch()">回到對戰表</button>
+      <button class=secondary ${completeDisabled} onclick="rrScore(${i})">此場完成</button>
+      <button class=danger onclick="resetRRMatch(${i})">重設</button>
     </div>`;
 
   $('matchModal').classList.remove('hidden');
