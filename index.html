@@ -74,6 +74,34 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+/* 最後三人循環：名次與選手名稱稍微拉開，避免 1選手5 看起來黏在一起 */
+.rrRankRow{
+  display:grid;
+  grid-template-columns:34px minmax(110px,1fr) auto;
+  align-items:center;
+  column-gap:10px;
+}
+.rrRankRow .rrPos{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:28px;
+  padding-right:2px;
+  font-weight:900;
+}
+.rrRankRow b{
+  padding-left:2px;
+}
+@media(max-width:520px){
+  .rrRankRow{
+    grid-template-columns:30px minmax(90px,1fr) auto;
+    column-gap:8px;
+  }
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -315,22 +343,34 @@ function renderSavedEvents(){
   });
 }
 async function openSavedEvent(id){
-  const cached=events()[id];if(!cached)return alert('找不到這場賽事的本機快取。');
-  $('home').classList.add('hidden');
+  const cached=events()[id];
+  if(!cached)return alert('找不到這場賽事的本機快取。');
+
+  // 測試賽事直接開本機版本
   if(cached.testOnly){
-    ev=cached;isAdmin=true;
-    $('create').classList.add('hidden');$('admin').classList.remove('hidden');
+    ev=cached;
+    isAdmin=true;
+    $('home').classList.add('hidden');
+    $('create').classList.add('hidden');
+    $('admin').classList.remove('hidden');
     history.replaceState(null,'',location.pathname);
-    renderAdmin();return;
+    renderAdmin();
+    return;
   }
 
+  // 雲端賽事：首頁先保持顯示，等雲端載入成功後再切畫面
   const result=await loadCloudEvent(id);
+
   if(result==='ok'){
     history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
     return;
   }
 
+  // 載入失敗時明確回首頁，避免黑畫面
+  $('create').classList.add('hidden');
+  $('admin').classList.add('hidden');
   $('home').classList.remove('hidden');
+
   if(result==='missing'){
     purgeLocalEvent(id);
     renderSavedEvents();
@@ -338,7 +378,7 @@ async function openSavedEvent(id){
     return;
   }
 
-  alert('目前無法連上雲端，請稍後再試。為避免開啟已刪除的舊資料，本機快取不會自動開啟。');
+  alert('目前無法載入這場雲端賽事，請稍後再試。');
 }
 let pendingDeleteId='';
 function requestDeleteSavedEvent(id){
@@ -486,14 +526,50 @@ function listenCloudEvent(id){
 }
 async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
+
   try{
-    const s=await fbDb.ref(`events/${id}`).once('value');
-    if(!s.exists())return 'missing';
-    ev=s.val();await refreshAdminState(id);listenCloudEvent(id);
-    $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');
-    renderAdmin();
+    let data=null;
+
+    // 優先使用 REST 讀取，避免 iOS Safari 下 RTDB SDK once() 偶發卡住
+    if(typeof rtdbRestGet==='function'){
+      data=await rtdbRestGet(`events/${id}`,10000);
+    }else{
+      const s=await Promise.race([
+        fbDb.ref(`events/${id}`).once('value'),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('讀取賽事逾時')),10000))
+      ]);
+      data=s.exists()?s.val():null;
+    }
+
+    if(!data)return 'missing';
+
+    ev=data;
+    localEventSave();
+
+    try{ await refreshAdminState(id); }
+    catch(e){ console.warn('refreshAdminState failed',e); }
+
+    // 先切換 UI，再啟動即時監聽，避免 listener 尚未回應時畫面全空
+    $('home').classList.add('hidden');
+    $('create').classList.add('hidden');
+    $('admin').classList.remove('hidden');
+
+    try{
+      renderAdmin();
+    }catch(e){
+      console.error('renderAdmin failed',e);
+      $('admin').classList.add('hidden');
+      $('home').classList.remove('hidden');
+      alert('賽程資料已讀取，但畫面顯示失敗：'+(e?.message||e));
+      return 'error';
+    }
+
+    try{ listenCloudEvent(id); }
+    catch(e){ console.warn('listenCloudEvent failed',e); }
+
     if(new URLSearchParams(location.search).get('admin')==='1')showTab('organizer');
     return 'ok';
+
   }catch(e){
     console.error('loadCloudEvent failed',e);
     return 'error';
@@ -691,6 +767,38 @@ async function rtdbRestPatchRoot(updates,timeoutMs=12000){
     clearTimeout(timer);
   }
 }
+async function rtdbRestGet(path,timeoutMs=12000){
+  if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
+  const token=await fbAuth.currentUser.getIdToken(true);
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  if(!base)throw new Error('Firebase databaseURL 未設定');
+
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
+    const res=await fetch(url,{
+      method:'GET',
+      signal:ctrl.signal,
+      cache:'no-store'
+    });
+    const text=await res.text();
+    if(!res.ok){
+      let detail=text;
+      try{detail=JSON.parse(text)?.error||text}catch{}
+      const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+      err.code=`HTTP_${res.status}`;
+      throw err;
+    }
+    return text?JSON.parse(text):null;
+  }catch(e){
+    if(e?.name==='AbortError')throw new Error('讀取動態驗證碼逾時');
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 
 
 
@@ -964,6 +1072,7 @@ function normalizeEvent(){
   if(ev.finalRR)ev.finalRR.matches.forEach(m=>{if(typeof m.referee!=='string')m.referee='';if(typeof m.refereeActive!=='boolean')m.refereeActive=false});
 }
 function renderAdmin(){
+  if(!ev){$('admin').classList.add('hidden');$('home').classList.remove('hidden');return;}
   normalizeEvent();
   let flow=ev.mode==='free'&&ev.freeFinal==='rr3'?`${ev.roster.length} → ${Math.ceil(ev.roster.length/2)} → ${Math.ceil(ev.roster.length/4)} → 3 ＋ 最後三人循環`:'標準單淘汰';
   let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2></div></div><div class=adminActions><button class=secondary onclick="alert('分台功能下一版加入')">⚙ 分台</button><button class=secondary onclick="showTab('referee')">⚖ 裁判</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
@@ -1100,19 +1209,19 @@ function stopAdminCodeRotation(){
   if(adminCodeCountdownTimer){clearInterval(adminCodeCountdownTimer);adminCodeCountdownTimer=null}
 }
 async function rotateAdminCode(force=false){
-  if(!ev||ev.testOnly||!isAdmin||!cloudReady||!fbUser)return false;
+  if(!ev||ev.testOnly||!isAdmin||!fbAuth?.currentUser)return false;
   try{
-    const secretRef=fbDb.ref(`secrets/${ev.id}`);
-    const snap=await secretRef.once('value');
-    const cur=snap.val()||{};
+    const cur=(await rtdbRestGet(`secrets/${ev.id}`,8000))||{};
     const now=Date.now();
+
     if(!force && cur.adminCode && Number(cur.expiresAt||0)>now+2500){
       localStorage.setItem(adminCodeKey(ev.id),String(cur.adminCode));
       return true;
     }
+
     const code=String(Math.floor(100000+Math.random()*900000));
     const expiresAt=now+30000;
-    await secretRef.set({adminCode:code,expiresAt});
+    await rtdbRestPut(`secrets/${ev.id}`,{adminCode:code,expiresAt},10000);
     localStorage.setItem(adminCodeKey(ev.id),code);
     return true;
   }catch(e){
@@ -1123,22 +1232,37 @@ async function rotateAdminCode(force=false){
 async function startAdminCodeRotation(){
   stopAdminCodeRotation();
   if(!isAdmin||ev?.testOnly)return;
-  await rotateAdminCode(false);
-  renderOrganizer();
-  adminCodeTimer=setInterval(async()=>{
-    if(!ev||!isAdmin||ev.testOnly)return stopAdminCodeRotation();
-    const ok=await rotateAdminCode(true);
-    if(ok)renderOrganizer();
-  },30000);
+
+  const refreshCodeUI=async(force=false)=>{
+    const ok=await rotateAdminCode(force);
+    if(!ok){
+      const box=$('organizerCodeBox');
+      if(box)box.textContent='取得失敗';
+      const cd=$('adminCodeCountdown');
+      if(cd)cd.textContent='請重新整理後再試';
+      return;
+    }
+    const latest=(await getCurrentAdminSecret())||{};
+    const code=String(latest.adminCode||localStorage.getItem(adminCodeKey(ev.id))||'------');
+    const expiresAt=Number(latest.expiresAt||0);
+    const box=$('organizerCodeBox');
+    if(box)box.textContent=code;
+    const cd=$('adminCodeCountdown');
+    if(cd){cd.dataset.expiresAt=String(expiresAt);updateAdminCodeCountdown()}
+  };
+
+  await refreshCodeUI(false);
+
+  adminCodeTimer=setInterval(()=>refreshCodeUI(true),30000);
   adminCodeCountdownTimer=setInterval(updateAdminCodeCountdown,1000);
 }
 async function getCurrentAdminSecret(){
-  if(!cloudReady||!ev||ev.testOnly)return null;
+  if(!ev||ev.testOnly||!fbAuth?.currentUser)return null;
   try{
-    const snap=await fbDb.ref(`secrets/${ev.id}`).once('value');
-    return snap.val()||null;
+    return await rtdbRestGet(`secrets/${ev.id}`,8000);
   }catch(e){
-    console.warn(e);return null;
+    console.warn('getCurrentAdminSecret failed',e);
+    return null;
   }
 }
 function updateAdminCodeCountdown(){
@@ -1183,7 +1307,6 @@ async function renderOrganizer(){
     return;
   }
 
-  // 先把主辦頁骨架畫出來，避免等待 Firebase 時整頁空白
   tab.innerHTML=`<div class=card><h3>🛡 主辦管理</h3>
     <div class="cloudBadge on">● 雲端同步中</div>
     <div class=organizerGrid style="margin-top:14px">
@@ -1203,7 +1326,6 @@ async function renderOrganizer(){
     <div class=notice style="margin-top:12px">管理 QR 不要公開貼在群組；一般觀眾請使用「QR／分享」裡的公開觀看連結。</div>
   </div>`;
 
-  // QR 不需要等 Firebase，先顯示
   setTimeout(()=>{
     const q=$('adminQr');
     if(q&&window.QRCode){
@@ -1212,44 +1334,7 @@ async function renderOrganizer(){
     }
   },0);
 
-  try{
-    // 先確保驗證碼存在，再讀取當前資料
-    await rotateAdminCode(false);
-    const latest=(await getCurrentAdminSecret())||{};
-    const code=String(latest.adminCode||localStorage.getItem(adminCodeKey(ev.id))||'------');
-    const expiresAt=Number(latest.expiresAt||0);
-    localStorage.setItem(adminCodeKey(ev.id),code);
-
-    const codeBox=$('organizerCodeBox');
-    if(codeBox)codeBox.textContent=code;
-    const countdown=$('adminCodeCountdown');
-    if(countdown){
-      countdown.dataset.expiresAt=String(expiresAt);
-      updateAdminCodeCountdown();
-    }
-
-    if(!adminCodeTimer){
-      adminCodeTimer=setInterval(async()=>{
-        if(!ev||!isAdmin||ev.testOnly)return stopAdminCodeRotation();
-        const ok=await rotateAdminCode(true);
-        if(!ok)return;
-        const s=(await getCurrentAdminSecret())||{};
-        const c=String(s.adminCode||'------');
-        const exp=Number(s.expiresAt||0);
-        const box=$('organizerCodeBox');
-        if(box)box.textContent=c;
-        const cd=$('adminCodeCountdown');
-        if(cd){cd.dataset.expiresAt=String(exp);updateAdminCodeCountdown()}
-      },30000);
-    }
-    if(!adminCodeCountdownTimer)adminCodeCountdownTimer=setInterval(updateAdminCodeCountdown,1000);
-  }catch(e){
-    console.error('renderOrganizer failed',e);
-    const codeBox=$('organizerCodeBox');
-    if(codeBox)codeBox.textContent='讀取失敗';
-    const countdown=$('adminCodeCountdown');
-    if(countdown)countdown.textContent='請重新整理或檢查 Firebase 規則';
-  }
+  await startAdminCodeRotation();
 }
 
 function renderRoster(){
@@ -1268,8 +1353,8 @@ function showTab(t){
     if(t==='organizer'&&!adminInvite)t='bracket';
   }
   ['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t));
-  if(t==='organizer'&&isAdmin&&!ev?.testOnly)startAdminCodeRotation();
-  else if(t!=='organizer')stopAdminCodeRotation();
+  if(t==='organizer')renderOrganizer();
+  else stopAdminCodeRotation();
 }
 function renderShare(){
  if(ev?.testOnly){
