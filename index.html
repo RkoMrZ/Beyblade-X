@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v12：修復抽籤空白、公開時間更新後主辦功能消失、分頁反橘狀態 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v13：修復重複showTab覆蓋、owner主辦權限持久、裁判頁空白與公開延長跳頁 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1546,6 +1546,7 @@ async function extendPublicEvent(id){
 
   const buttons=[...document.querySelectorAll(`[data-extend-id="${CSS.escape(id)}"]`)];
   const oldTexts=buttons.map(b=>b.textContent);
+  const keepTab=currentAdminTab||'share';
 
   try{
     buttons.forEach(btn=>{
@@ -1553,9 +1554,6 @@ async function extendPublicEvent(id){
       btn.textContent='增加中…';
     });
 
-    // 新規則：公開時間「最多只到現在起 2 小時」。
-    // 不能疊加。剩 30 分鐘 → 補到 2 小時；剩 1 小時 50 分 → 補到 2 小時。
-    // 即使連按多次，也不會變成 4、6、8 小時。
     const nextUntil=Date.now()+PUBLIC_WINDOW_MS;
 
     await rtdbRestPatchRoot({
@@ -1571,10 +1569,13 @@ async function extendPublicEvent(id){
     if(ev?.id===id){
       ev.publicOpen=true;
       ev.publicUntil=nextUntil;
+
+      // 建立者持續保持主辦權限。
+      if(isEventOwner())isAdmin=true;
+
       localEventSave();
-      const keepTab=currentAdminTab;
       renderAdmin();
-      if(keepTab)showTab(keepTab);
+      showTab(keepTab);
     }
 
     renderSavedEvents();
@@ -1991,8 +1992,19 @@ function put(){
 function adminFlagKey(id){return `bx_cloud_admin_${id}`}
 function adminCodeKey(id){return `bx_cloud_admin_code_${id}`}
 async function refreshAdminState(id){
+  if(!fbAuth?.currentUser){
+    isAdmin=false;
+    return false;
+  }
+
+  // 賽事建立者本身就是最高主辦權限，不需要再依 admins/$uid 節點判定。
+  if(ev?.id===id && ev?.ownerUid===fbAuth.currentUser.uid){
+    isAdmin=true;
+    localStorage.setItem(adminFlagKey(id),'1');
+    return true;
+  }
+
   isAdmin=false;
-  if(!fbAuth?.currentUser)return false;
 
   try{
     const snap=await fbDb.ref(`admins/${id}/${fbAuth.currentUser.uid}`).once('value');
@@ -2004,7 +2016,14 @@ async function refreshAdminState(id){
     else localStorage.removeItem(adminFlagKey(id));
   }catch(e){
     console.warn('refreshAdminState failed',e);
-    isAdmin=false;
+
+    // 網路/權限查詢失敗時，如果本機賽事資料確認自己就是 owner，仍保留主辦權限。
+    if(ev?.id===id && ev?.ownerUid===fbAuth.currentUser.uid){
+      isAdmin=true;
+      localStorage.setItem(adminFlagKey(id),'1');
+    }else{
+      isAdmin=false;
+    }
   }
 
   return isAdmin;
@@ -3968,7 +3987,10 @@ function stopAdminCodeRotation(){
   if(adminCodeCountdownTimer){clearInterval(adminCodeCountdownTimer);adminCodeCountdownTimer=null}
 }
 async function rotateAdminCode(force=false){
-  if(!ev||ev.testOnly||!isAdmin||!fbAuth?.currentUser)return false;
+  if(!ev||ev.testOnly||!hasOrganizerAccess()||!fbAuth?.currentUser)return false;
+
+  if(isEventOwner())isAdmin=true;
+
   try{
     const cur=(await rtdbRestGet(`secrets/${ev.id}`,8000))||{};
     const now=Date.now();
@@ -3990,7 +4012,9 @@ async function rotateAdminCode(force=false){
 }
 async function startAdminCodeRotation(){
   stopAdminCodeRotation();
-  if(!isAdmin||ev?.testOnly)return;
+  if(!hasOrganizerAccess()||ev?.testOnly)return;
+
+  if(isEventOwner())isAdmin=true;
 
   const refreshCodeUI=async(force=false)=>{
     const ok=await rotateAdminCode(force);
@@ -4046,11 +4070,16 @@ async function getRefereeSecret(){
   catch(e){console.warn('getRefereeSecret failed',e);return null}
 }
 async function rotateRefereeCode(force=false){
-  if(!ev||ev.testOnly||!isAdmin||!fbAuth?.currentUser)return false;
+  if(!ev||ev.testOnly||!hasOrganizerAccess()||!fbAuth?.currentUser)return false;
+
+  if(isEventOwner())isAdmin=true;
+
   try{
     const cur=(await getRefereeSecret())||{};
     const now=Date.now();
+
     if(!force && cur.code && Number(cur.expiresAt||0)>now+2500)return true;
+
     const code=String(Math.floor(100000+Math.random()*900000));
     await rtdbRestPut(`refereeSecrets/${ev.id}`,{code,expiresAt:now+30000},10000);
     return true;
@@ -4102,21 +4131,28 @@ async function claimRefereeAccess(){
 }
 async function startRefereeCodeRotation(){
   stopRefereeCodeRotation();
-  if(!isAdmin||ev?.testOnly)return;
+  if(!hasOrganizerAccess()||ev?.testOnly)return;
+
+  if(isEventOwner())isAdmin=true;
+
   const refresh=async(force=false)=>{
     const ok=await rotateRefereeCode(force);
     const box=$('refereeInviteCode');
     const cd=$('refereeCodeCountdown');
+
     if(!ok){
       if(box)box.textContent='取得失敗';
       if(cd)cd.textContent='請重新整理';
       return;
     }
+
     const s=(await getRefereeSecret())||{};
     if(box)box.textContent=String(s.code||'------');
     if(cd){cd.dataset.expiresAt=String(Number(s.expiresAt||0));updateRefereeCodeCountdown()}
   };
+
   await refresh(false);
+
   refereeCodeTimer=setInterval(()=>refresh(true),30000);
   refereeCodeCountdownTimer=setInterval(updateRefereeCodeCountdown,1000);
 }
@@ -4149,11 +4185,14 @@ async function renderOrganizer(){
     return;
   }
 
-  if(!isAdmin){
+  if(!hasOrganizerAccess()){
     stopAdminCodeRotation();
     tab.innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入目前顯示的 6 位驗證碼。驗證碼每 30 秒失效。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
     return;
   }
+
+  // owner 直接視為主辦，避免背景權限刷新時掉回觀看模式。
+  if(isEventOwner())isAdmin=true;
 
   tab.innerHTML=`<div class=card><h3>🛡 主辦管理</h3>
     <div class="cloudBadge on">● 雲端同步中</div>
@@ -4239,7 +4278,7 @@ function renderReferee(){
   const invite=new URLSearchParams(location.search).get('ref')==='1';
 
   // 主辦方：保留原本完整設定，再加上裁判加入 QR + 動態驗證碼
-  if(isAdmin||ev?.testOnly){
+  if(hasOrganizerAccess()){
     const n=ev.refereeCount||2,me=getMyReferee();
     const names=ev.refereeNames.map((name,i)=>`<div class=player><span class=num>${i+1}</span><input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}"></div>`).join('');
     const identityButtons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
@@ -4378,14 +4417,7 @@ function renderShare(){
 }
 async function copyPublic(){await navigator.clipboard.writeText(publicUrl());alert('已複製連結')}
 async function nativeShare(){if(navigator.share)await navigator.share({title:ev.name,text:'查看即時對戰表',url:publicUrl()});else copyPublic()}
-function showTab(t){['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))}
 
-
-const THEME_KEY='bx_theme';
-
-function currentTheme(){
-  return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark';
-}
 
 function updateThemeButton(){
   const btn=$('themeToggleBtn');
