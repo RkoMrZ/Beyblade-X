@@ -538,6 +538,34 @@ async function ensureRealtimeConnected(timeoutMs=10000){
     });
   });
 }
+async function rtdbRestProbe(timeoutMs=10000){
+  if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
+  const token=await fbAuth.currentUser.getIdToken(true);
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  if(!base)throw new Error('Firebase databaseURL 未設定');
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    // 只讀一個不存在的輕量節點；即使規則拒絕，也代表資料庫端點有連到。
+    const url=`${base}/__connection_probe__.json?auth=${encodeURIComponent(token)}`;
+    const res=await fetch(url,{method:'GET',signal:ctrl.signal,cache:'no-store'});
+    if(res.status===401||res.status===403){
+      // 有 HTTP 回應就代表 RTDB 端點可達，真正權限由後續實際寫入判斷。
+      return true;
+    }
+    if(!res.ok){
+      const text=await res.text();
+      throw new Error(`Realtime Database HTTP ${res.status}: ${text}`);
+    }
+    return true;
+  }catch(e){
+    if(e?.name==='AbortError')throw new Error('無法連到 Firebase Realtime Database（REST 連線逾時）');
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 async function rtdbRestPut(path,value,timeoutMs=12000){
   if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
   const token=await fbAuth.currentUser.getIdToken(true);
@@ -607,7 +635,8 @@ async function createTournament(){
       return;
     }
 
-    await ensureRealtimeConnected(10000);
+    // 建立雲端賽事改走 Firebase REST API，不再要求 RTDB WebSocket /.info/connected 先成功。
+    // 這可避免 iOS Safari / Web App 環境下 SDK 連線狀態誤判而卡住。
     fbUser=fbAuth.currentUser;
     ev={
       id:uid(),
@@ -630,6 +659,7 @@ async function createTournament(){
     const code=String(Math.floor(100000+Math.random()*900000));
     const expiresAt=Date.now()+30000;
 
+    await rtdbRestProbe(10000);
     await rtdbRestPut(`events/${ev.id}`,ev,12000);
     await rtdbRestPut(`secrets/${ev.id}`,{adminCode:code,expiresAt},12000);
     await rtdbRestPut(`admins/${ev.id}/${fbUser.uid}`,code,12000);
