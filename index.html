@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v7：主辦本機賽事立即開啟、延長/關閉公開改REST低頻操作 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v10：上方分台改為抽籤、獨立抽籤預覽與套用功能、分頁反橘 -->
 <title>Beyblade X Tournament</title>
 <style>
 :root{--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--blue:#56a8ff;--warn:#f4c84b}
@@ -642,6 +642,176 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+.sharePublicControl{
+  margin:14px 0 16px;
+  padding:14px;
+  border:1px solid var(--border, #344158);
+  border-radius:14px;
+  background:rgba(255,255,255,.025);
+}
+.sharePublicControl.on{
+  border-color:rgba(76,175,120,.55);
+}
+.sharePublicControl.off{
+  border-color:rgba(180,90,70,.48);
+}
+.sharePublicLabel{
+  font-size:12px;
+  opacity:.7;
+  margin-bottom:4px;
+}
+.sharePublicTime{
+  font-size:18px;
+  font-weight:800;
+  margin-bottom:6px;
+}
+.sharePublicActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:12px;
+}
+@media(max-width:520px){
+  .sharePublicActions button{
+    min-height:46px;
+    padding:8px 10px;
+    font-size:13px;
+  }
+}
+</style>
+
+
+<style>
+[data-tab-btn].tabActive{
+  opacity:1;
+}
+</style>
+
+
+<style>
+.drawCard{overflow:hidden}
+.drawHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.drawNotice{
+  margin-top:14px;
+  padding:12px 14px;
+  border:1px solid rgba(255,140,70,.30);
+  border-radius:14px;
+  background:rgba(255,120,55,.07);
+  line-height:1.6;
+  font-size:13px;
+}
+.drawActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:14px;
+}
+.drawSectionTitle{
+  margin:20px 0 9px;
+  font-weight:800;
+  font-size:14px;
+}
+.drawGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.drawChip{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  padding:10px 11px;
+  border:1px solid var(--border,#344158);
+  border-radius:12px;
+  background:rgba(255,255,255,.025);
+}
+.drawNo{
+  display:grid;
+  place-items:center;
+  flex:0 0 28px;
+  width:28px;
+  height:28px;
+  border-radius:9px;
+  font-weight:800;
+  font-size:12px;
+  background:rgba(255,110,50,.16);
+  border:1px solid rgba(255,110,50,.32);
+}
+.drawName{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-weight:700;
+}
+.drawPairList{
+  display:grid;
+  gap:9px;
+}
+.drawMatch{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  grid-template-areas:
+    "title title title"
+    "a vs b";
+  align-items:center;
+  gap:8px 10px;
+  padding:11px;
+  border:1px solid var(--border,#344158);
+  border-radius:14px;
+  background:rgba(255,255,255,.02);
+}
+.drawMatchTitle{
+  grid-area:title;
+  font-size:11px;
+  opacity:.6;
+  font-weight:700;
+}
+.drawSide{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.drawSide:first-of-type{grid-area:a}
+.drawSide:last-of-type{grid-area:b;justify-content:flex-end;text-align:right}
+.drawSide b{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.drawSlot{
+  display:grid;
+  place-items:center;
+  flex:0 0 25px;
+  width:25px;
+  height:25px;
+  border-radius:8px;
+  font-size:11px;
+  font-weight:900;
+  border:1px solid rgba(255,120,55,.32);
+  background:rgba(255,120,55,.12);
+}
+.drawVs{
+  grid-area:vs;
+  font-size:11px;
+  font-weight:900;
+  opacity:.45;
+}
+@media(max-width:520px){
+  .drawActions button{min-height:46px}
+  .drawGrid{grid-template-columns:1fr 1fr}
+  .drawChip{padding:9px}
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -694,8 +864,9 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 </section>
 
 <section id="admin" class="hidden">
- <div class="adminTabs"><button onclick="showTab('bracket')">🏆 對戰表</button><button id="organizerTopBtn" class="secondary" onclick="showTab('organizer')">🛡 主辦</button><button class="secondary" onclick="showTab('share')">🔗 QR／分享</button><button id="rosterTopBtn" class="secondary" onclick="showTab('roster')">👥 參賽名單</button></div>
+ <div class="adminTabs"><button class="secondary" data-tab-btn="bracket" onclick="showTab('bracket')">🏆 對戰表</button><button id="drawTopBtn" class="secondary" data-tab-btn="draw" onclick="showTab('draw')">🎲 抽籤</button><button class="secondary" data-tab-btn="share" onclick="showTab('share')">🔗 QR／分享</button><button id="rosterTopBtn" class="secondary" data-tab-btn="roster" onclick="showTab('roster')">👥 參賽名單</button></div>
  <div id="bracketTab"></div>
+ <div id="drawTab" class="hidden"></div>
  <div id="rosterTab" class="hidden"></div>
  <div id="refereeTab" class="hidden"></div>
  <div id="organizerTab" class="hidden"></div>
@@ -991,14 +1162,14 @@ async function closePublicEvent(id){
     return alert('只有這場賽事的主辦帳號可以關閉公開連結。');
   }
 
-  const btn=document.querySelector(`[data-close-public-id="${CSS.escape(id)}"]`);
-  const oldText=btn?.textContent||'關閉公開連結';
+  const buttons=[...document.querySelectorAll(`[data-close-public-id="${CSS.escape(id)}"]`)];
+  const oldTexts=buttons.map(b=>b.textContent);
 
   try{
-    if(btn){
+    buttons.forEach(btn=>{
       btn.disabled=true;
       btn.textContent='關閉中…';
-    }
+    });
 
     const now=Date.now();
 
@@ -1024,10 +1195,12 @@ async function closePublicEvent(id){
     console.error('closePublicEvent failed',err);
     alert('關閉公開連結失敗：'+(err?.message||err));
   }finally{
-    if(btn && document.body.contains(btn)){
-      btn.disabled=false;
-      btn.textContent=oldText;
-    }
+    buttons.forEach((btn,i)=>{
+      if(document.body.contains(btn)){
+        btn.disabled=false;
+        btn.textContent=oldTexts[i]||'關閉公開連結';
+      }
+    });
   }
 }
 
@@ -1041,19 +1214,20 @@ async function extendPublicEvent(id){
     return alert('只有這場賽事的主辦帳號可以延長公開時間。');
   }
 
-  const btn=document.querySelector(`[data-extend-id="${CSS.escape(id)}"]`);
-  const oldText=btn?.textContent||'延長 2 小時';
+  const buttons=[...document.querySelectorAll(`[data-extend-id="${CSS.escape(id)}"]`)];
+  const oldTexts=buttons.map(b=>b.textContent);
 
   try{
-    if(btn){
+    buttons.forEach(btn=>{
       btn.disabled=true;
-      btn.textContent='延長中…';
-    }
+      btn.textContent='增加中…';
+    });
 
-    const base=Math.max(Date.now(),Number(e.publicUntil||0));
-    const nextUntil=base+PUBLIC_WINDOW_MS;
+    // 新規則：公開時間「最多只到現在起 2 小時」。
+    // 不能疊加。剩 30 分鐘 → 補到 2 小時；剩 1 小時 50 分 → 補到 2 小時。
+    // 即使連按多次，也不會變成 4、6、8 小時。
+    const nextUntil=Date.now()+PUBLIC_WINDOW_MS;
 
-    // 低頻控制操作用 REST PATCH，避免 iOS Safari SDK 寫入偶發等待不回應。
     await rtdbRestPatchRoot({
       [`events/${id}/publicOpen`]:true,
       [`events/${id}/publicUntil`]:nextUntil
@@ -1077,15 +1251,17 @@ async function extendPublicEvent(id){
 
     const msg=String(err?.message||err);
     if(msg.includes('401')||msg.includes('403')||msg.includes('Permission denied')){
-      alert('延長公開時間失敗：Firebase Rules 拒絕寫入。請確認目前登入的是這場賽事原本的 Google 主辦帳號。');
+      alert('增加公開時間失敗：Firebase Rules 拒絕寫入。請確認目前登入的是這場賽事原本的 Google 主辦帳號。');
     }else{
-      alert('延長公開時間失敗：'+msg);
+      alert('增加公開時間失敗：'+msg);
     }
   }finally{
-    if(btn && document.body.contains(btn)){
-      btn.disabled=false;
-      btn.textContent=oldText;
-    }
+    buttons.forEach((btn,i)=>{
+      if(document.body.contains(btn)){
+        btn.disabled=false;
+        btn.textContent=oldTexts[i]||'增加 2 小時';
+      }
+    });
   }
 }
 
@@ -1188,7 +1364,7 @@ function renderSavedEvents(){
       </div>
       <div class=savedEventActions>
         <button type="button" data-open-id="${id}">繼續</button>
-        ${ownerControls?`<button type="button" class="secondary" data-extend-id="${id}">延長 2 小時</button>
+        ${ownerControls?`<button type="button" class="secondary" data-extend-id="${id}">增加 2 小時</button>
         <button type="button" class="secondary" data-close-public-id="${id}" ${e.publicOpen===false?'disabled':''}>關閉公開連結</button>`:''}
         <button type="button" class="danger" data-delete-id="${id}">${delLabel}</button>
       </div>
@@ -2897,15 +3073,125 @@ function freeFlowLabel(n){
   return `${steps.join(' → ')}・最後三人循環`;
 }
 
+
+let drawDraft=[];
+let drawDraftEventId='';
+
+function ensureDrawDraft(){
+  if(!ev)return;
+  if(drawDraftEventId!==ev.id || drawDraft.length!==ev.roster.length){
+    drawDraftEventId=ev.id;
+    drawDraft=[...ev.roster];
+  }
+}
+
+function drawPairRows(list){
+  const rows=[];
+  for(let i=0;i<list.length;i+=2){
+    rows.push({
+      n:(i/2)+1,
+      a:list[i]||'BYE',
+      b:list[i+1]||'BYE'
+    });
+  }
+  return rows;
+}
+
+function renderDraw(){
+  const tab=$('drawTab');
+  if(!tab||!ev)return;
+
+  ensureDrawDraft();
+
+  const editable=isAdmin||ev?.testOnly;
+  const canApply=editable&&noResults();
+  const pairs=drawPairRows(drawDraft);
+
+  const participantHtml=drawDraft.map((name,i)=>`
+    <div class=drawChip>
+      <span class=drawNo>${i+1}</span>
+      <span class=drawName>${esc(name)}</span>
+    </div>
+  `).join('');
+
+  const pairHtml=pairs.map(p=>`
+    <div class=drawMatch>
+      <div class=drawMatchTitle>第 ${p.n} 場</div>
+      <div class=drawSide><span class=drawSlot>A</span><b>${esc(p.a)}</b></div>
+      <div class=drawVs>VS</div>
+      <div class=drawSide><span class=drawSlot>B</span><b>${esc(p.b)}</b></div>
+    </div>
+  `).join('');
+
+  tab.innerHTML=`
+    <div class="card drawCard">
+      <div class=drawHead>
+        <div>
+          <div class=muted>🎲 隨機配對</div>
+          <h3 style="margin:4px 0 0">抽籤</h3>
+        </div>
+        <span class=refCountBadge>${drawDraft.length} 人</span>
+      </div>
+
+      <div class=drawNotice>
+        參考 BattleTree 的「先抽籤、再套用對戰表」概念，這裡改成我們自己的深色＋橘色介面。
+        按「重新抽籤」只會預覽，不會立刻改動正式對戰表。
+      </div>
+
+      <div class=drawActions>
+        <button type=button ${editable?'':'disabled'} onclick=shuffleDraw()>🎲 重新抽籤</button>
+        <button type=button class="${canApply?'':'secondary'}" ${canApply?'':'disabled'} onclick=applyDrawResult()>套用抽籤結果</button>
+      </div>
+
+      ${!canApply?`
+        <div class=refHint style="margin-top:10px">
+          ${editable?'目前已有比賽結果，為避免破壞晉級資料，不能重新套用抽籤結果。':'只有主辦可以操作抽籤。'}
+        </div>
+      `:''}
+
+      <div class=drawSectionTitle>抽籤順序</div>
+      <div class=drawGrid>${participantHtml}</div>
+
+      <div class=drawSectionTitle>第一輪配對預覽</div>
+      <div class=drawPairList>${pairHtml}</div>
+    </div>
+  `;
+}
+
+function shuffleDraw(){
+  if(!isAdmin&&!ev?.testOnly)return;
+  ensureDrawDraft();
+
+  // Fisher-Yates；只動暫存預覽，不碰正式賽事。
+  drawDraft=shuffle(drawDraft);
+  renderDraw();
+}
+
+function applyDrawResult(){
+  if(!isAdmin&&!ev?.testOnly)return;
+  if(!noResults())return alert('已有比賽結果，不能重新套用抽籤。');
+
+  ensureDrawDraft();
+
+  ev.roster=[...drawDraft];
+  ev.pairing='random';
+  ev.rounds=[];
+  ev.finalRR=null;
+  buildFirst();
+  put();
+
+  showTab('bracket');
+}
+
 function renderAdmin(){
   if(!ev){$('admin').classList.add('hidden');$('home').classList.remove('hidden');return;}
   normalizeEvent();
   let flow=ev.mode==='free'&&ev.freeFinal==='rr3'?freeFlowLabel(ev.roster.length):'標準單淘汰';
-  let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2>${isReferee&&!isAdmin?`<div class="cloudBadge on" style="margin-top:8px">⚖ 裁判模式：${esc(getMyReferee()||'尚未選擇')}</div>`:''}</div></div><div class=adminActions><button class=secondary onclick="alert('分台功能下一版加入')">⚙ 分台</button><button class=secondary onclick="showTab('referee')">⚖ 裁判</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
+  let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2>${isReferee&&!isAdmin?`<div class="cloudBadge on" style="margin-top:8px">⚖ 裁判模式：${esc(getMyReferee()||'尚未選擇')}</div>`:''}</div></div><div class=adminActions><button id=organizerHeroBtn class=secondary data-tab-btn="organizer" onclick="showTab('organizer')">🛡 主辦</button><button class=secondary data-tab-btn="referee" onclick="showTab('referee')">⚖ 裁判</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
   let cols=ev.rounds.map((r,ri)=>{let l=roundLayout(ri);return `<section class=roundCol data-round="${ri}"><div class=roundHead><h3>${stageLabel(ri,r)}</h3><div class=roundSub>${r.matches.length} 場對戰</div></div><div class=roundMatches style="--top:${l.top}px;--gap:${l.gap}px">${r.matches.map((m,mi)=>renderBracketMatch(m,ri,mi)).join('')}</div></section>`}).join('');
   if(ev.finalRR)cols+=renderRR();
   $('bracketTab').innerHTML=top+`<div class=bracketShell><div class=bracketTools><div class=zoomGroup><button onclick="zoomBracket(-.1)">−</button><span class=zoomLabel>100%</span><button onclick="zoomBracket(.1)">＋</button><button onclick=fitBracket()>全覽</button></div><div class=bracketHint>${isReferee&&!isAdmin?'點比賽卡開始執裁':'拖曳查看・點比賽卡編輯'}</div><button class=viewToggle onclick=toggleBracketFull()>⛶</button></div><div class=bracketScroll><div class=bracketStage><div class=bracketCanvas><svg class=bracketLinks></svg>${cols}</div></div></div></div>`;
-  renderRoster();renderReferee();renderOrganizer();renderShare();applyAccessUI();
+  renderDraw();renderRoster();renderReferee();renderOrganizer();renderShare();applyAccessUI();
   requestAnimationFrame(()=>{bracketScale=window.innerWidth<=640?.72:.9;setBracketScale(bracketScale);requestAnimationFrame(drawBracketLinks)});
 }
 function renderRR(){
@@ -3275,14 +3561,20 @@ async function releaseRRMatchAny(i){
 
 
 function applyAccessUI(){
-  const r=$('rosterTopBtn'),o=$('organizerTopBtn');
+  const r=$('rosterTopBtn');
+  const o=$('organizerHeroBtn');
+  const d=$('drawTopBtn');
+
   const p=new URLSearchParams(location.search);
   const adminInvite=p.get('admin')==='1';
-  if(r)r.classList.toggle('hidden',!isAdmin);
+
+  if(r)r.classList.toggle('hidden',!isAdmin&&!ev?.testOnly);
+  if(d)d.classList.toggle('hidden',!isAdmin&&!ev?.testOnly);
   if(o)o.classList.toggle('hidden',!(isAdmin||adminInvite||ev?.testOnly));
 
   document.querySelectorAll('.adminActions button').forEach(b=>{
     const isRefBtn=(b.textContent||'').includes('裁判');
+
     if(isRefBtn){
       b.classList.toggle('hidden',!(isAdmin||isReferee||ev?.testOnly));
     }else{
@@ -3523,19 +3815,22 @@ function addPlayer(){if(!isAdmin&&!ev?.testOnly)return;let v=$('newPlayer').valu
 function rebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.rounds=[];ev.finalRR=null;buildFirst();put()}
 function randomRebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.roster=shuffle(ev.roster);ev.pairing='random';rebuild()}
 function showTab(t){
-  const p=new URLSearchParams(location.search);
-  const adminInvite=p.get('admin')==='1';
-  const refereeInvite=p.get('ref')==='1';
-
-  if(!isAdmin&&!isReferee&&!ev?.testOnly){
-    if(t==='roster')t='bracket';
-    if(t==='referee'&&!refereeInvite)t='bracket';
-    if(t==='organizer'&&!adminInvite)t='bracket';
-  }
   if(isReferee&&!isAdmin&&t==='roster')t='bracket';
   if(isReferee&&!isAdmin&&t==='organizer')t='bracket';
+  if(isReferee&&!isAdmin&&t==='draw')t='bracket';
 
-  ['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t));
+  ['bracket','draw','roster','referee','organizer','share'].forEach(x=>{
+    $(x+'Tab').classList.toggle('hidden',x!==t);
+  });
+
+  document.querySelectorAll('[data-tab-btn]').forEach(btn=>{
+    const active=btn.dataset.tabBtn===t;
+    btn.classList.toggle('secondary',!active);
+    btn.classList.toggle('tabActive',active);
+    btn.setAttribute('aria-current',active?'page':'false');
+  });
+
+  if(t==='draw')renderDraw();
 
   if(t==='organizer')renderOrganizer();
   else stopAdminCodeRotation();
@@ -3628,12 +3923,62 @@ function renderReferee(){
   $('refereeTab').innerHTML='';
 }
 function renderShare(){
- if(ev?.testOnly){
-   $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這場是本機測試賽事，沒有雲端網址，因此不提供 QR 分享或跨手機同步。</div></div>`;
-   return;
- }
- $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這是公開觀看連結。觀眾只能查看即時比分與晉級，以及分享連結；不能修改賽程、比分或裁判狀態。</div><label>公開觀看網址</label><input id=pubUrl readonly value="${esc(publicUrl())}"><div id=qr class=qrbox></div><div class=toolbar><button onclick=copyPublic()>複製連結</button><button class=secondary onclick=nativeShare()>分享到 LINE／其他 App</button></div></div>`;
- setTimeout(()=>{let q=$('qr');q.innerHTML='';if(window.QRCode)new QRCode(q,{text:publicUrl(),width:180,height:180})},0)
+  if(ev?.testOnly){
+    $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這場是本機測試賽事，沒有雲端網址，因此不提供 QR 分享或跨手機同步。</div></div>`;
+    return;
+  }
+
+  const ownerControls=isGoogleUser() && ev?.ownerUid===fbAuth.currentUser.uid;
+  const expired=ev?.publicOpen===false || Number(ev?.publicUntil||0)<=Date.now();
+  const statusText=publicStatusText(ev);
+
+  $('shareTab').innerHTML=`
+    <div class=card>
+      <h3>QR／分享</h3>
+
+      <div class=notice>
+        這是公開觀看連結。觀眾只能查看即時比分與晉級，以及分享連結；不能修改賽程、比分或裁判狀態。
+      </div>
+
+      <div class="sharePublicControl ${expired?'off':'on'}">
+        <div>
+          <div class=sharePublicLabel>公開狀態</div>
+          <div class=sharePublicTime>${esc(statusText)}</div>
+          <div class=cloudNote>公開時間最多維持到現在起 2 小時；按「增加 2 小時」後，公開期限最多仍只會到現在起 2 小時，不會疊加成 4 小時以上。</div>
+        </div>
+
+        ${ownerControls?`
+          <div class=sharePublicActions>
+            <button type=button data-extend-id="${ev.id}">增加 2 小時</button>
+            <button type=button class="secondary" data-close-public-id="${ev.id}" ${ev.publicOpen===false?'disabled':''}>關閉公開連結</button>
+          </div>
+        `:''}
+      </div>
+
+      <label>公開觀看網址</label>
+      <input id=pubUrl readonly value="${esc(publicUrl())}">
+
+      <div id=qr class=qrbox></div>
+
+      <div class=toolbar>
+        <button onclick=copyPublic()>複製連結</button>
+        <button class=secondary onclick=nativeShare()>分享到 LINE／其他 App</button>
+      </div>
+    </div>`;
+
+  const extendBtn=$('shareTab').querySelector(`[data-extend-id="${CSS.escape(ev.id)}"]`);
+  if(extendBtn)extendBtn.addEventListener('click',()=>extendPublicEvent(ev.id));
+
+  const closeBtn=$('shareTab').querySelector(`[data-close-public-id="${CSS.escape(ev.id)}"]`);
+  if(closeBtn)closeBtn.addEventListener('click',()=>closePublicEvent(ev.id));
+
+  setTimeout(()=>{
+    const q=$('qr');
+    if(q&&window.QRCode){
+      q.innerHTML='';
+      new QRCode(q,{text:publicUrl(),width:180,height:180});
+    }
+  },0);
 }
 async function copyPublic(){await navigator.clipboard.writeText(publicUrl());alert('已複製連結')}
 async function nativeShare(){if(navigator.share)await navigator.share({title:ev.name,text:'查看即時對戰表',url:publicUrl()});else copyPublic()}
