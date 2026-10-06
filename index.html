@@ -596,6 +596,34 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+.refereeListHead{
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:10px;
+}
+.refereeListHead>div{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.refereeListHead button{
+  white-space:nowrap;
+}
+@media(max-width:520px){
+  .refereeListHead{
+    align-items:center;
+  }
+  .refereeListHead button{
+    min-height:42px;
+    padding:8px 12px;
+  }
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -2502,6 +2530,23 @@ function openRRMatch(i){
   $('matchModal').classList.remove('hidden');
 }
 function toggleBracketFull(){document.body.classList.toggle('bracketFullscreen');setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},80)}
+
+function addReferee(){
+  if(!isAdmin&&!ev?.testOnly)return;
+
+  normalizeEvent();
+
+  if(ev.refereeCount>=12){
+    return alert('裁判最多 12 位。');
+  }
+
+  ev.refereeCount+=1;
+  ev.refereeNames.push(`裁判 ${ev.refereeCount}`);
+
+  put();
+  showTab('referee');
+}
+
 function setRefereeCount(){
   if(!isAdmin&&!ev?.testOnly)return;
   let n=Math.round(Number($('refereeCountInput')?.value||2));
@@ -2922,9 +2967,21 @@ function renderReferee(){
       </div>`;
 
     $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 裁判設定</h3>
-      <div class=muted>主辦方設定裁判人數與名稱。裁判掃描下方 QR 取得執裁權限後，只要選一次自己的名稱即可。</div>
-      <div class=refCountRow style="margin-top:14px"><div><label>裁判人數</label><input id=refereeCountInput type=number min=1 max=12 value="${n}" inputmode=numeric></div><div><span class=refCountBadge>目前 ${n} 位</span></div><button onclick=setRefereeCount()>套用人數</button></div>
-      <div style="margin-top:14px"><label>裁判名稱</label>${names}<button style="width:100%;margin-top:8px" onclick=saveRefereeNames()>儲存裁判名稱</button></div>
+      <div class=muted>直接管理裁判名單。按「增加裁判」後會立即新增一位，名稱可以直接在下方修改。裁判掃描下方 QR 取得執裁權限後，只要選一次自己的名稱即可。</div>
+
+      <div class=refereeListHead style="margin-top:14px">
+        <div>
+          <label style="margin:0">裁判名單</label>
+          <span class=refCountBadge>目前 ${n} 位</span>
+        </div>
+        <button type=button onclick=addReferee()>＋ 增加裁判</button>
+      </div>
+
+      <div style="margin-top:10px">
+        ${names}
+        <button style="width:100%;margin-top:8px" onclick=saveRefereeNames()>儲存裁判名稱</button>
+      </div>
+
       ${inviteBlock}
       <div style="margin-top:18px"><label>這支手機的裁判身分</label><div class=judgePick>${identityButtons}</div>${me?`<div class=refHint>目前本機：<b>${esc(me)}</b></div>`:`<div class=refHint>尚未選擇。</div>`}</div>
       <div style="margin-top:12px"><button class=secondary onclick="showTab('bracket')">返回對戰表</button></div>
