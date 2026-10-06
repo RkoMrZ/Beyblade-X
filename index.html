@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v18：修復雲端賽事建立權限順序，先保留名額再建立event -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v19：名額保留改REST讀寫，修復iOS transaction逾時 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -2660,45 +2660,56 @@ async function reserveCloudEventSlot(){
   if(!isGoogleUser())throw new Error('尚未登入 Google');
 
   const uid=fbAuth.currentUser.uid;
-  const ref=fbDb.ref(`userEventCounts/${uid}`);
 
-  return await new Promise((resolve,reject)=>{
-    let settled=false;
-    const timer=setTimeout(()=>{
-      if(settled)return;
-      settled=true;
-      reject(new Error('雲端賽事名額確認逾時'));
-    },5000);
+  // iOS Safari 下 Firebase transaction 偶爾會一直等待，
+  // 改成低頻 REST 讀取 + REST PUT，兩邊都有 timeout。
+  let count=0;
 
-    ref.transaction(current=>{
-      const n=Number(current||0);
-      if(n>=CLOUD_EVENT_LIMIT)return;
-      return n+1;
-    },(error,committed,snapshot)=>{
-      if(settled)return;
-      settled=true;
-      clearTimeout(timer);
+  try{
+    const raw=await rtdbRestGet(`userEventCounts/${uid}`,5000);
+    count=Number(raw||0);
+  }catch(e){
+    console.warn('讀取 userEventCounts 失敗，改用 userEvents 索引估算',e);
 
-      if(error)return reject(error);
-      if(!committed)return resolve({ok:false,count:Number(snapshot?.val?.()||CLOUD_EVENT_LIMIT)});
-      resolve({ok:true,count:Number(snapshot.val()||1)});
-    },false);
-  });
+    try{
+      const index=(await rtdbRestGet(`userEvents/${uid}`,5000))||{};
+      count=Object.keys(index).filter(id=>index[id]).length;
+    }catch(e2){
+      console.warn('讀取 userEvents 索引也失敗，改用本機數量',e2);
+      count=cloudEventCountForCurrentGoogle();
+    }
+  }
+
+  if(!Number.isFinite(count)||count<0)count=0;
+
+  if(count>=CLOUD_EVENT_LIMIT){
+    return {ok:false,count};
+  }
+
+  const next=count+1;
+
+  await rtdbRestPut(`userEventCounts/${uid}`,next,8000);
+
+  return {ok:true,count:next,previous:count};
 }
 
 async function releaseCloudEventSlot(){
   if(!isGoogleUser())return;
 
   const uid=fbAuth.currentUser.uid;
-  const ref=fbDb.ref(`userEventCounts/${uid}`);
 
   try{
-    await new Promise((resolve,reject)=>{
-      ref.transaction(current=>{
-        const n=Number(current||0);
-        return Math.max(0,n-1);
-      },(error)=>error?reject(error):resolve(true),false);
-    });
+    let count=0;
+
+    try{
+      const raw=await rtdbRestGet(`userEventCounts/${uid}`,5000);
+      count=Number(raw||0);
+    }catch(e){
+      count=cloudEventCountForCurrentGoogle();
+    }
+
+    const next=Math.max(0,(Number.isFinite(count)?count:0)-1);
+    await rtdbRestPut(`userEventCounts/${uid}`,next,8000);
   }catch(e){
     console.warn('releaseCloudEventSlot failed',e);
   }
@@ -2867,7 +2878,7 @@ async function createTournament(){
     ){
       alert('建立雲端賽事失敗：Firebase Rules 仍是舊版。請把我這次提供的新 Rules 發布後再建立。');
     }else if(String(msg).includes('逾時')){
-      alert('建立雲端賽事逾時，已取消這次建立並歸還名額，請再試一次。');
+      alert('建立雲端賽事逾時，這次建立已取消。請檢查網路後再試一次。');
     }else{
       alert('建立雲端賽事失敗：'+msg+code);
     }
