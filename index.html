@@ -505,6 +505,40 @@ function withTimeout(promise,ms=12000,label='Firebase'){
     new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+'逾時，請檢查網路或 Firebase 規則。')),ms))
   ]);
 }
+async function ensureRealtimeConnected(timeoutMs=10000){
+  if(!(await initCloud()))throw new Error('Firebase 初始化失敗');
+  try{ firebase.database().goOnline(); }catch(e){}
+  if(fbAuth?.currentUser){
+    try{ await fbAuth.currentUser.getIdToken(true); }catch(e){console.warn('token refresh failed',e)}
+  }
+  return new Promise((resolve,reject)=>{
+    const ref=fbDb.ref('.info/connected');
+    let done=false;
+    const timer=setTimeout(()=>{
+      if(done)return;
+      done=true;
+      ref.off('value',cb);
+      reject(new Error('Realtime Database 尚未連線。請確認網路、databaseURL 與 Firebase Realtime Database 是否啟用。'));
+    },timeoutMs);
+    const cb=s=>{
+      if(done)return;
+      if(s.val()===true){
+        done=true;
+        clearTimeout(timer);
+        ref.off('value',cb);
+        resolve(true);
+      }
+    };
+    ref.on('value',cb,err=>{
+      if(done)return;
+      done=true;
+      clearTimeout(timer);
+      ref.off('value',cb);
+      reject(err);
+    });
+  });
+}
+
 async function createTournament(){
   const createBtn=document.querySelector('[data-create-tournament="1"]');
   const oldText=createBtn?.textContent||'建立賽程表';
@@ -540,6 +574,7 @@ async function createTournament(){
       return;
     }
 
+    await ensureRealtimeConnected(10000);
     fbUser=fbAuth.currentUser;
     ev={
       id:uid(),
@@ -580,7 +615,9 @@ async function createTournament(){
 
   }catch(e){
     console.error('createTournament failed',e);
-    alert('建立雲端賽事失敗：'+(e?.message||e));
+    const code=e?.code?`\n錯誤代碼：${e.code}`:'';
+    const msg=e?.message||String(e);
+    alert('建立雲端賽事失敗：'+msg+code);
   }finally{
     if(createBtn){
       createBtn.disabled=false;
