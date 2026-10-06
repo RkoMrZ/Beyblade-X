@@ -577,7 +577,11 @@ function put(){
   localEventSave();renderAdmin();
   if(ev?.testOnly)return;
   if(cloudReady&&ev?.id&&(isAdmin||isReferee)){
-    rtdbRestPut(`events/${ev.id}`,ev,10000).catch(e=>alert('雲端同步失敗：'+e.message));
+    rtdbRestPut(`events/${ev.id}`,ev,10000).catch(e=>{
+      console.error('event cloud sync failed',e);
+      const role=isReferee&&!isAdmin?'裁判':'主辦';
+      alert(`${role}雲端同步失敗：${e.message}`);
+    });
   }
 }
 function adminFlagKey(id){return `bx_cloud_admin_${id}`}
