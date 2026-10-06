@@ -1070,9 +1070,19 @@ function refereeIdentityKey(){return `bx_ref_identity_${ev?.id||'default'}`}
 function getMyReferee(){return localStorage.getItem(refereeIdentityKey())||''}
 function setMyReferee(name){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   if(name)localStorage.setItem(refereeIdentityKey(),name);
   else localStorage.removeItem(refereeIdentityKey());
-  renderReferee();
+
+  // 選好裁判身分後，立即重建對戰表。
+  // 這很重要，因為取得裁判權限前的比賽卡是沒有 onclick 的觀看版。
+  renderAdmin();
+
+  if(isReferee&&!isAdmin&&!ev?.testOnly && name){
+    showTab('bracket');
+  }else{
+    showTab('referee');
+  }
 }
 function saveRefereeNames(){
   if(!isAdmin&&!ev?.testOnly)return;
@@ -1189,10 +1199,10 @@ function renderAdmin(){
   if(!ev){$('admin').classList.add('hidden');$('home').classList.remove('hidden');return;}
   normalizeEvent();
   let flow=ev.mode==='free'&&ev.freeFinal==='rr3'?`${ev.roster.length} → ${Math.ceil(ev.roster.length/2)} → ${Math.ceil(ev.roster.length/4)} → 3 ＋ 最後三人循環`:'標準單淘汰';
-  let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2></div></div><div class=adminActions><button class=secondary onclick="alert('分台功能下一版加入')">⚙ 分台</button><button class=secondary onclick="showTab('referee')">⚖ 裁判</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
+  let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2>${isReferee&&!isAdmin?`<div class="cloudBadge on" style="margin-top:8px">⚖ 裁判模式：${esc(getMyReferee()||'尚未選擇')}</div>`:''}</div></div><div class=adminActions><button class=secondary onclick="alert('分台功能下一版加入')">⚙ 分台</button><button class=secondary onclick="showTab('referee')">⚖ 裁判</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
   let cols=ev.rounds.map((r,ri)=>{let l=roundLayout(ri);return `<section class=roundCol data-round="${ri}"><div class=roundHead><h3>${stageLabel(ri,r)}</h3><div class=roundSub>${r.matches.length} 場對戰</div></div><div class=roundMatches style="--top:${l.top}px;--gap:${l.gap}px">${r.matches.map((m,mi)=>renderBracketMatch(m,ri,mi)).join('')}</div></section>`}).join('');
   if(ev.finalRR)cols+=renderRR();
-  $('bracketTab').innerHTML=top+`<div class=bracketShell><div class=bracketTools><div class=zoomGroup><button onclick="zoomBracket(-.1)">−</button><span class=zoomLabel>100%</span><button onclick="zoomBracket(.1)">＋</button><button onclick=fitBracket()>全覽</button></div><div class=bracketHint>拖曳查看・點比賽卡編輯</div><button class=viewToggle onclick=toggleBracketFull()>⛶</button></div><div class=bracketScroll><div class=bracketStage><div class=bracketCanvas><svg class=bracketLinks></svg>${cols}</div></div></div></div>`;
+  $('bracketTab').innerHTML=top+`<div class=bracketShell><div class=bracketTools><div class=zoomGroup><button onclick="zoomBracket(-.1)">−</button><span class=zoomLabel>100%</span><button onclick="zoomBracket(.1)">＋</button><button onclick=fitBracket()>全覽</button></div><div class=bracketHint>${isReferee&&!isAdmin?'點比賽卡開始執裁':'拖曳查看・點比賽卡編輯'}</div><button class=viewToggle onclick=toggleBracketFull()>⛶</button></div><div class=bracketScroll><div class=bracketStage><div class=bracketCanvas><svg class=bracketLinks></svg>${cols}</div></div></div></div>`;
   renderRoster();renderReferee();renderOrganizer();renderShare();applyAccessUI();
   requestAnimationFrame(()=>{bracketScale=window.innerWidth<=640?.72:.9;setBracketScale(bracketScale);requestAnimationFrame(drawBracketLinks)});
 }
@@ -1498,7 +1508,7 @@ async function refreshRefereeState(id){
   if(!fbAuth?.currentUser)return false;
   try{
     const v=await rtdbRestGet(`refereeUsers/${id}/${fbAuth.currentUser.uid}`,8000);
-    isReferee=!!v;
+    isReferee=v!==null && v!==undefined && v!==false;
   }catch(e){console.warn('refreshRefereeState failed',e)}
   return isReferee;
 }
@@ -1506,11 +1516,17 @@ async function claimRefereeAccess(){
   if(!(await initCloud()))return;
   const code=$('joinRefereeCode')?.value.trim();
   if(!/^\d{6}$/.test(code))return alert('請輸入 6 位數裁判驗證碼。');
+
   try{
     await rtdbRestPut(`refereeUsers/${ev.id}/${fbAuth.currentUser.uid}`,code,10000);
     await refreshRefereeState(ev.id);
+
     if(!isReferee)return alert('驗證碼不正確或已過期。');
-    renderReferee();
+
+    // 權限剛取得時，原本的對戰表仍是觀看版。
+    // 重新渲染整個賽程，讓比賽卡立即取得裁判 onclick 權限。
+    renderAdmin();
+    showTab('referee');
   }catch(e){
     console.error(e);
     alert('取得裁判權限失敗：'+(e?.message||e));
