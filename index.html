@@ -1092,6 +1092,69 @@ function swapPlayers(ri,i,j){
  if(i<0||j<0)return;let r=ev.rounds[ri]; if(r.matches.some(m=>m.winner))return alert('本輪已有結果，請先重設再調整。');
  let flat=r.matches.flatMap(m=>[m.a,m.b]);[flat[i],flat[j]]=[flat[j],flat[i]];r.matches=Array.from({length:Math.ceil(flat.length/2)},(_,k)=>match(flat[k*2],flat[k*2+1]));autoByes(r.matches);put()
 }
+
+async function claimRRMatchAs(i){
+  if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有執裁權限。');
+
+  const who=currentRefereeName();
+  if(!who)return alert('請先到裁判頁選擇你的裁判名稱。');
+
+  let m=ev.finalRR?.matches?.[i];
+  if(!m)return alert('找不到這場循環賽資料。');
+  if(m.winner)return alert('這場已完成。');
+
+  const btn=document.querySelector('.startRefBtn');
+  const oldText=btn?.textContent||'⚖ 開始執裁';
+  if(btn){btn.disabled=true;btn.textContent='接手中…'}
+
+  try{
+    // 開始前先讀最新雲端，避免兩位裁判同時搶到同一場。
+    if(!ev.testOnly){
+      const latest=await rtdbRestGet(`events/${ev.id}`,8000);
+
+      if(latest){
+        const lm=latest?.finalRR?.matches?.[i];
+
+        if(lm?.refereeActive && lm.referee!==who){
+          ev=latest;
+          localEventSave();
+          renderAdmin();
+          openRRMatch(i);
+          return alert(`這場目前由 ${lm.referee} 執裁中。`);
+        }
+
+        ev=latest;
+      }
+    }
+
+    m=ev.finalRR?.matches?.[i];
+    if(!m)return alert('找不到這場循環賽資料。');
+
+    if(m.refereeActive&&m.referee!==who){
+      return alert(`這場目前由 ${m.referee} 執裁中。`);
+    }
+
+    // 同一位裁判接新場前，自動釋放自己其他尚未完成的場次。
+    releaseMyOtherMatches(who);
+
+    m.referee=who;
+    m.refereeActive=true;
+
+    const ok=await saveEventCloudNow();
+    if(!ok)return;
+
+    openRRMatch(i);
+  }catch(e){
+    console.error('claimRRMatchAs failed',e);
+    alert('開始執裁失敗：'+(e?.message||e));
+  }finally{
+    if(btn&&document.body.contains(btn)){
+      btn.disabled=false;
+      btn.textContent=oldText;
+    }
+  }
+}
+
 async function rrScore(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
   let m=ev.finalRR.matches[i];
@@ -1385,10 +1448,65 @@ function renderRR(){
 }
 function openRRMatch(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.finalRR.matches[i];
   const scoreEnabled=canEditMatchScore(m);
   const scoreDisabled=scoreEnabled?'':'disabled';
-  $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>最後三人循環・第 ${i+1} 場</div><h3>${esc(m.a)} vs ${esc(m.b)}</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div><div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="rr${i}a" value="${m.sa}"><button type=button id="rrb${i}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('rr${i}a','rrb${i}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div><div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="rr${i}b" value="${m.sb}"><button type=button id="rrb${i}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('rr${i}b','rrb${i}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div><div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'rr',0,i)}</div><div class=sheetFooter style="grid-template-columns:1fr"><button onclick="rrScore(${i})">記錄比分</button></div>`;
+
+  $('matchSheet').innerHTML=`
+    <div class=sheetHandle></div>
+
+    <div class=sheetTitle>
+      <div>
+        <div class=muted>最後三人循環・第 ${i+1} 場</div>
+        <h3>${esc(m.a)} vs ${esc(m.b)}</h3>
+      </div>
+      <button class=sheetClose onclick=closeMatchEditor()>✕</button>
+    </div>
+
+    <div class=sheetPlayer>
+      <b>${esc(m.a)}</b>
+      <div>
+        <input type=hidden id="rr${i}a" value="${m.sa}">
+        <button
+          type=button
+          id="rrb${i}a"
+          class="scorePickBtn ${m.sa!==''?'hasValue':''}"
+          ${scoreDisabled}
+          onclick="openScorePicker('rr${i}a','rrb${i}a')"
+        >${m.sa===''?'比分':esc(m.sa)}</button>
+      </div>
+    </div>
+
+    <div class=sheetPlayer>
+      <b>${esc(m.b)}</b>
+      <div>
+        <input type=hidden id="rr${i}b" value="${m.sb}">
+        <button
+          type=button
+          id="rrb${i}b"
+          class="scorePickBtn ${m.sb!==''?'hasValue':''}"
+          ${scoreDisabled}
+          onclick="openScorePicker('rr${i}b','rrb${i}b')"
+        >${m.sb===''?'比分':esc(m.sb)}</button>
+      </div>
+    </div>
+
+    <div class=sheetRef>
+      <b>裁判狀態</b>
+      ${refereeStatusHtml(m,'rr',0,i)}
+    </div>
+
+    ${!scoreEnabled?`
+      <div class=refHint style="margin:10px 0">
+        必須先按「開始執裁」，才能修改比分與記錄比分。
+      </div>
+    `:''}
+
+    <div class=sheetFooter style="grid-template-columns:1fr">
+      <button class=secondary ${scoreDisabled} onclick="rrScore(${i})">記錄比分</button>
+    </div>`;
+
   $('matchModal').classList.remove('hidden');
 }
 function toggleBracketFull(){document.body.classList.toggle('bracketFullscreen');setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},80)}
