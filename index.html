@@ -139,6 +139,33 @@ function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch
 function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
 function setSavedEventIds(ids){localStorage.setItem(SAVED,JSON.stringify([...new Set(ids)]))}
 function keepLocalEnabled(){return localStorage.getItem(KEEP)==='1'}
+function renderHomeSelections(){
+  const free=$('choiceFree'),single=$('choiceSingle'),cloud=$('choiceCloud'),test=$('choiceTest');
+  if(free)free.classList.toggle('selected',draftMode==='free');
+  if(single)single.classList.toggle('selected',draftMode==='single');
+  if(cloud)cloud.classList.toggle('selected',draftStorage==='cloud');
+  if(test)test.classList.toggle('selected',draftStorage==='test');
+  const s=$('homeSelectionSummary');
+  if(s)s.textContent=`目前選擇：${draftMode==='free'?'自由編排':'單淘汰賽'} ＋ ${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;
+}
+function selectHomeMode(mode){
+  if(mode!=='free'&&mode!=='single')return;
+  draftMode=mode;
+  renderHomeSelections();
+}
+function selectStorageMode(mode){
+  if(mode!=='cloud'&&mode!=='test')return;
+  draftStorage=mode;
+  localStorage.setItem(KEEP,mode==='test'?'1':'0');
+  renderHomeSelections();
+}
+function proceedCreate(){
+  $('home').classList.add('hidden');
+  $('create').classList.remove('hidden');
+  $('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;
+  $('freeOpts').classList.toggle('hidden',draftMode!=='free');
+  updatePreview();
+}
 function markEventSaved(id){
   if(!id)return;
   const ids=savedEventIds().filter(x=>x!==id);ids.unshift(id);setSavedEventIds(ids.slice(0,30));
