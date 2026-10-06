@@ -1233,7 +1233,7 @@ function renderRR(){
     return `<div class=rrRankRow><span class=rrPos>${i+1}</span><b>${esc(p)}</b><span>${s.w}-${s.l}</span></div>`;
   }).join('');
 
-  const canEdit=isAdmin||!!ev?.testOnly;
+  const canEdit=isAdmin||isReferee||!!ev?.testOnly;
   const games=(f.matches||[]).map((m,i)=>`<div class="rrMini ${m.refereeActive?'judging':''}" ${canEdit?`onclick="openRRMatch(${i})"`:''}><b>${esc(m.a)} vs ${esc(m.b)}</b><span>${m.sa===''?'–':m.sa} : ${m.sb===''?'–':m.sb}</span></div>`).join('');
 
   const statRows=ranked.map(p=>{
