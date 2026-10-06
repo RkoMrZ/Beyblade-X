@@ -148,7 +148,7 @@ const FIREBASE_CONFIG = {
   measurementId: "G-CPL47L0CV5"
 };
 const STORE='bx_events_v2', CURRENT='bx_current_v2', SAVED='bx_saved_events_v1', KEEP='bx_test_event_v1'; let draftMode='free', draftStorage='cloud', ev=null;
-let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false;
+let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,adminCodeTimer=null,adminCodeCountdownTimer=null;
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
 function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
@@ -262,6 +262,18 @@ function markEventSaved(id){
 function unmarkEventSaved(id){
   setSavedEventIds(savedEventIds().filter(x=>x!==id));
 }
+function purgeLocalEvent(id){
+  const all=events();
+  if(all[id]){
+    delete all[id];
+    localStorage.setItem(STORE,JSON.stringify(all));
+  }
+  unmarkEventSaved(id);
+  localStorage.removeItem(adminFlagKey(id));
+  localStorage.removeItem(adminCodeKey(id));
+  localStorage.removeItem(`bx_ref_identity_${id}`);
+  if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
+}
 function formatSavedTime(ts){
   if(!ts)return '';
   try{return new Date(ts).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return ''}
@@ -298,11 +310,22 @@ async function openSavedEvent(id){
     history.replaceState(null,'',location.pathname);
     renderAdmin();return;
   }
-  const ok=await loadCloudEvent(id);
-  if(ok){history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);return}
-  ev=cached;isAdmin=localStorage.getItem(adminFlagKey(id))==='1';
-  $('create').classList.add('hidden');$('admin').classList.remove('hidden');renderAdmin();
-  alert('目前無法讀取雲端，先開啟這支手機最後保留的版本。');
+
+  const result=await loadCloudEvent(id);
+  if(result==='ok'){
+    history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
+    return;
+  }
+
+  $('home').classList.remove('hidden');
+  if(result==='missing'){
+    purgeLocalEvent(id);
+    renderSavedEvents();
+    alert('這場雲端賽事已被刪除，連結與本機保留紀錄都已失效。');
+    return;
+  }
+
+  alert('目前無法連上雲端，請稍後再試。為避免開啟已刪除的舊資料，本機快取不會自動開啟。');
 }
 let pendingDeleteId='';
 function requestDeleteSavedEvent(id){
@@ -415,7 +438,18 @@ function listenCloudEvent(id){
   if(cloudUnsub)cloudUnsub();
   const ref=fbDb.ref(`events/${id}`);
   const cb=s=>{
-    if(!s.exists())return;
+    if(!s.exists()){
+      stopAdminCodeRotation();
+      purgeLocalEvent(id);
+      if(ev?.id===id)ev=null;
+      if(cloudUnsub){cloudUnsub();cloudUnsub=null}
+      ['create','admin'].forEach(x=>$(x).classList.add('hidden'));
+      $('home').classList.remove('hidden');
+      history.replaceState(null,'',location.pathname);
+      renderSavedEvents();
+      alert('這場雲端賽事已被刪除，這支裝置上的本機快取也已清除。');
+      return;
+    }
     ev=s.val();localEventSave();
     $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');
     renderAdmin();
@@ -424,16 +458,22 @@ function listenCloudEvent(id){
   cloudUnsub=()=>ref.off('value',cb);
 }
 async function loadCloudEvent(id){
-  if(!(await initCloud()))return false;
-  const s=await fbDb.ref(`events/${id}`).once('value');
-  if(!s.exists())return false;
-  ev=s.val();await refreshAdminState(id);listenCloudEvent(id);
-  $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');
-  renderAdmin();
-  if(new URLSearchParams(location.search).get('admin')==='1')showTab('organizer');
-  return true;
+  if(!(await initCloud()))return 'error';
+  try{
+    const s=await fbDb.ref(`events/${id}`).once('value');
+    if(!s.exists())return 'missing';
+    ev=s.val();await refreshAdminState(id);listenCloudEvent(id);
+    $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');
+    renderAdmin();
+    if(new URLSearchParams(location.search).get('admin')==='1')showTab('organizer');
+    return 'ok';
+  }catch(e){
+    console.error('loadCloudEvent failed',e);
+    return 'error';
+  }
 }
 function goHome(){
+  stopAdminCodeRotation();
   ev=null;if(cloudUnsub){cloudUnsub();cloudUnsub=null}
   ['create','admin'].forEach(x=>$(x).classList.add('hidden'));$('home').classList.remove('hidden');
   history.replaceState(null,'',location.pathname);
@@ -484,7 +524,7 @@ async function createTournament(){
  const code=String(Math.floor(100000+Math.random()*900000));
  try{
    await fbDb.ref(`events/${ev.id}`).set(ev);
-   await fbDb.ref(`secrets/${ev.id}/adminCode`).set(code);
+   await fbDb.ref(`secrets/${ev.id}`).set({adminCode:code,expiresAt:Date.now()+30000});
    await fbDb.ref(`admins/${ev.id}/${fbUser.uid}`).set(code);
    isAdmin=true;
    localStorage.setItem(adminFlagKey(ev.id),'1');
@@ -758,6 +798,61 @@ function applyAccessUI(){
     else b.classList.remove('hidden');
   });
 }
+
+function stopAdminCodeRotation(){
+  if(adminCodeTimer){clearInterval(adminCodeTimer);adminCodeTimer=null}
+  if(adminCodeCountdownTimer){clearInterval(adminCodeCountdownTimer);adminCodeCountdownTimer=null}
+}
+async function rotateAdminCode(force=false){
+  if(!ev||ev.testOnly||!isAdmin||!cloudReady||!fbUser)return false;
+  try{
+    const secretRef=fbDb.ref(`secrets/${ev.id}`);
+    const snap=await secretRef.once('value');
+    const cur=snap.val()||{};
+    const now=Date.now();
+    if(!force && cur.adminCode && Number(cur.expiresAt||0)>now+2500){
+      localStorage.setItem(adminCodeKey(ev.id),String(cur.adminCode));
+      return true;
+    }
+    const code=String(Math.floor(100000+Math.random()*900000));
+    const expiresAt=now+30000;
+    await secretRef.set({adminCode:code,expiresAt});
+    localStorage.setItem(adminCodeKey(ev.id),code);
+    return true;
+  }catch(e){
+    console.error('rotateAdminCode failed',e);
+    return false;
+  }
+}
+async function startAdminCodeRotation(){
+  stopAdminCodeRotation();
+  if(!isAdmin||ev?.testOnly)return;
+  await rotateAdminCode(false);
+  renderOrganizer();
+  adminCodeTimer=setInterval(async()=>{
+    if(!ev||!isAdmin||ev.testOnly)return stopAdminCodeRotation();
+    const ok=await rotateAdminCode(true);
+    if(ok)renderOrganizer();
+  },30000);
+  adminCodeCountdownTimer=setInterval(updateAdminCodeCountdown,1000);
+}
+async function getCurrentAdminSecret(){
+  if(!cloudReady||!ev||ev.testOnly)return null;
+  try{
+    const snap=await fbDb.ref(`secrets/${ev.id}`).once('value');
+    return snap.val()||null;
+  }catch(e){
+    console.warn(e);return null;
+  }
+}
+function updateAdminCodeCountdown(){
+  const el=$('adminCodeCountdown');
+  if(!el)return;
+  const expiresAt=Number(el.dataset.expiresAt||0);
+  const left=Math.max(0,Math.ceil((expiresAt-Date.now())/1000));
+  el.textContent=`${left} 秒後更換`;
+}
+
 function organizerUrl(){return location.origin+location.pathname+`?event=${encodeURIComponent(ev.id)}&admin=1`}
 function publicUrl(){return location.origin+location.pathname+`?event=${encodeURIComponent(ev.id)}`}
 async function claimAdmin(){
@@ -767,23 +862,40 @@ async function claimAdmin(){
   try{
     await fbDb.ref(`admins/${ev.id}/${fbUser.uid}`).set(code);
     await refreshAdminState(ev.id);
-    if(!isAdmin)return alert('驗證碼不正確。');
+    if(!isAdmin)return alert('驗證碼不正確或已過期，請向主辦取得目前顯示的新驗證碼。');
     localStorage.setItem(adminCodeKey(ev.id),code);
+    await startAdminCodeRotation();
     renderAdmin();showTab('organizer');alert('這支手機已取得管理權。');
-  }catch(e){alert('加入管理失敗：驗證碼可能不正確。')}
+  }catch(e){
+    console.error(e);
+    alert('加入管理失敗：驗證碼不正確或已過期。');
+  }
 }
-function renderOrganizer(){
+async function renderOrganizer(){
   if(!$('organizerTab'))return;
   if(ev?.testOnly){
-    $('organizerTab').innerHTML=`<div class=card><h3>🧪 測試賽事</h3><div class=notice>這場賽事是「本機測試模式」，不會上傳 Firebase，也無法讓第二支手機共同管理。</div><div class=cloudNote style="margin-top:12px">如果要正式多人同步，請回首頁取消勾選「測試新增賽事」，再建立一場正式雲端賽事。</div></div>`;
+    stopAdminCodeRotation();
+    $('organizerTab').innerHTML=`<div class=card><h3>🧪 測試賽事</h3><div class=notice>這場賽事是「本機測試模式」，不會上傳 Firebase，也無法讓第二支手機共同管理。</div><div class=cloudNote style="margin-top:12px">如果要正式多人同步，請回首頁建立一場雲端賽事。</div></div>`;
     return;
   }
-  const code=localStorage.getItem(adminCodeKey(ev.id))||'';
   if(!isAdmin){
-    $('organizerTab').innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入 6 位驗證碼。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
+    stopAdminCodeRotation();
+    $('organizerTab').innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入目前顯示的 6 位驗證碼。驗證碼每 30 秒失效。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
     return;
   }
-  $('organizerTab').innerHTML=`<div class=card><h3>🛡 主辦管理</h3><div class="cloudBadge on">● 雲端同步中</div><div class=organizerGrid style="margin-top:14px"><div><div class=muted>管理驗證碼</div><div class=organizerCode>${code||'已驗證'}</div><div class=cloudNote>第二支手機：掃右側 QR → 輸入這組驗證碼 → 即可共同管理。</div></div><div><div class=muted>管理 QR</div><div id=adminQr class=adminQr></div></div></div><label>管理連結</label><input readonly value="${esc(organizerUrl())}"><div class=notice style="margin-top:12px">管理 QR 不要公開貼在群組；一般觀眾請使用「QR／分享」裡的公開觀看連結。</div></div>`;
+
+  if(!adminCodeTimer) setTimeout(startAdminCodeRotation,0);
+  const secret=await getCurrentAdminSecret();
+  if(!secret || Number(secret.expiresAt||0)<=Date.now()){
+    await rotateAdminCode(true);
+  }
+  const latest=(await getCurrentAdminSecret())||{};
+  const code=String(latest.adminCode||localStorage.getItem(adminCodeKey(ev.id))||'------');
+  const expiresAt=Number(latest.expiresAt||0);
+  localStorage.setItem(adminCodeKey(ev.id),code);
+
+  $('organizerTab').innerHTML=`<div class=card><h3>🛡 主辦管理</h3><div class="cloudBadge on">● 雲端同步中</div><div class=organizerGrid style="margin-top:14px"><div><div class=muted>動態管理驗證碼</div><div class=organizerCode>${esc(code)}</div><div id=adminCodeCountdown class=cloudNote data-expires-at="${expiresAt}" style="text-align:center;margin-top:6px">30 秒後更換</div><div class=cloudNote>驗證碼每 30 秒自動更換，舊碼到期後即無法加入管理。第二支手機：掃右側 QR → 輸入目前顯示的驗證碼。</div></div><div><div class=muted>管理 QR</div><div id=adminQr class=adminQr></div></div></div><label>管理連結</label><input readonly value="${esc(organizerUrl())}"><div class=notice style="margin-top:12px">管理 QR 不要公開貼在群組；一般觀眾請使用「QR／分享」裡的公開觀看連結。</div></div>`;
+  updateAdminCodeCountdown();
   setTimeout(()=>{let q=$('adminQr');if(q&&window.QRCode){q.innerHTML='';new QRCode(q,{text:organizerUrl(),width:180,height:180})}},0);
 }
 
@@ -802,7 +914,9 @@ function showTab(t){
     if(t==='roster'||t==='referee')t='bracket';
     if(t==='organizer'&&!adminInvite)t='bracket';
   }
-  ['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))
+  ['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t));
+  if(t==='organizer'&&isAdmin&&!ev?.testOnly)startAdminCodeRotation();
+  else if(t!=='organizer')stopAdminCodeRotation();
 }
 function renderShare(){
  if(ev?.testOnly){
@@ -840,14 +954,14 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
   renderHeaderAuth();renderHomeSelections();renderSavedEvents();
   const p=new URLSearchParams(location.search),id=p.get('event');
   if(id){
-    const ok=await loadCloudEvent(id);
-    if(!ok){
-      const cached=events()[id];
-      if(cached){
-        ev=cached;isAdmin=localStorage.getItem(adminFlagKey(id))==='1';
-        $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');renderAdmin();
-        alert('雲端暫時無法讀取，已開啟本機最後保留版本。');
-      }else alert('找不到這個雲端賽事，或目前沒有讀取權限。');
+    const result=await loadCloudEvent(id);
+    if(result==='missing'){
+      purgeLocalEvent(id);
+      history.replaceState(null,'',location.pathname);
+      renderSavedEvents();
+      alert('這個雲端賽事已被刪除或不存在，分享連結已失效。');
+    }else if(result==='error'){
+      alert('目前無法連上雲端，請稍後再試。為避免顯示已刪除的舊賽事，本機快取不會自動開啟。');
     }
   }
 })();
