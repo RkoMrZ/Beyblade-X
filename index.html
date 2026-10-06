@@ -207,26 +207,34 @@ async function openSavedEvent(id){
 }
 async function deleteSavedEvent(id){
   const all=events(),cached=all[id];
-  if(!cached)return;
+  if(!cached)return alert('找不到這場賽事的本機資料。');
+
   if(cached.testOnly){
     if(!confirm('刪除這支手機上的測試賽事？\n\n這場沒有雲端資料。'))return;
-    unmarkEventSaved(id);delete all[id];localStorage.setItem(STORE,JSON.stringify(all));
+    unmarkEventSaved(id);
+    delete all[id];
+    localStorage.setItem(STORE,JSON.stringify(all));
     if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
-    renderSavedEvents();return;
+    renderSavedEvents();
+    return;
   }
 
   if(!confirm('永久刪除這場雲端賽事？\n\n這會同時刪除 Firebase 上的賽程、管理員與驗證碼資料，而且無法復原。'))return;
 
-  if(!(await initCloud()))return alert('目前無法連上 Firebase，請稍後再試。');
   try{
-    const adminSnap=await fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value');
-    if(!adminSnap.exists())return alert('只有這場賽事的主辦管理員可以刪除雲端賽事。');
+    const ok=await initCloud();
+    if(!ok)return alert('目前無法連上 Firebase，請稍後再試。');
 
-    await fbDb.ref().update({
-      [`events/${id}`]: null,
-      [`admins/${id}`]: null,
-      [`secrets/${id}`]: null
-    });
+    // 先確認這支手機是否有這場的管理權。
+    const adminSnap=await fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value');
+    if(!adminSnap.exists()){
+      return alert('這支手機目前沒有這場賽事的管理權，無法刪除雲端資料。');
+    }
+
+    // 分開刪除，避免 multi-location update 被 rules 卡住而整批失敗。
+    await fbDb.ref(`events/${id}`).remove();
+    await fbDb.ref(`secrets/${id}`).remove();
+    await fbDb.ref(`admins/${id}`).remove();
 
     unmarkEventSaved(id);
     delete all[id];
@@ -234,11 +242,12 @@ async function deleteSavedEvent(id){
     localStorage.removeItem(adminFlagKey(id));
     localStorage.removeItem(adminCodeKey(id));
     if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
+
     renderSavedEvents();
-    alert('雲端賽事與這支手機的保留紀錄都已刪除。');
+    alert('雲端賽事已刪除。');
   }catch(e){
-    console.error(e);
-    alert('刪除雲端賽事失敗：'+e.message);
+    console.error('deleteSavedEvent failed',e);
+    alert('刪除雲端賽事失敗：'+(e?.message||e));
   }
 }
 
