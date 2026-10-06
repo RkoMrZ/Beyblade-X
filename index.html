@@ -33,6 +33,16 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .bracketMatch{position:relative;width:100%;height:112px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:13px;padding:8px 9px;text-align:left;color:var(--text);box-shadow:0 8px 22px #0004;cursor:pointer}.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 8px 22px #0004}.bracketMatch:hover{border-color:#62718b}.bracketMatch.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite;box-shadow:0 0 0 1px #ffd45a55 inset,0 0 22px #ffd45a55,0 8px 22px #0005}@keyframes judgePulse{0%,100%{box-shadow:0 0 0 1px #ffd45a44 inset,0 0 8px #ffd45a22,0 8px 22px #0005}50%{box-shadow:0 0 0 2px #ffd45aaa inset,0 0 26px #ffd45a99,0 8px 22px #0005}}.bracketMatch .matchNo{height:18px;line-height:18px;margin:0 62px 4px 0}.bSide{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;align-items:center;height:34px;padding:4px 6px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:13px;line-height:1.15}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bScore{display:flex;align-items:center;justify-content:center;width:36px;height:24px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px;line-height:1}.bSide.winner .bScore{border-color:#a8672e;color:#ffb371}.winnerDot{flex:0 0 auto;font-size:10px;color:#ff9b54}.tapEdit{position:absolute;right:8px;top:7px;color:#7c879a;font-size:10px}.refTag{position:absolute;left:9px;right:9px;bottom:4px;display:block;max-width:calc(100% - 18px);padding:2px 6px;border:1px solid #334158;border-radius:999px;background:#0d131c;color:#9fb0c8;font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.refTag.on{border-color:#6c5630;color:#f0c27a;background:#211a11}.refTag.live{border-color:#ffd45a;color:#ffe9a6;background:#342b12;font-weight:800}.bracketMatch.judging .bSide:last-of-type{margin-bottom:17px}
 .rrCol{position:relative;width:236px;flex:0 0 236px;z-index:1}.rrPanel{background:linear-gradient(180deg,#281e14,#141820);border:1px solid #855521;border-radius:15px;padding:12px;box-shadow:0 0 25px #ff8a2a18}.rrPlayers{margin:0}.rrRow{display:grid;grid-template-columns:24px 1fr auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #4a3827;font-size:12px}.rrRank{font-weight:900;color:#ffb45f}.rrGames{display:grid;gap:8px;margin-top:10px}.rrMini{background:#141a24;border:1px solid #3c465a;border-radius:10px;padding:8px;font-size:11px;display:flex;justify-content:space-between;gap:8px}.rrMini b{font-weight:700}.rrMini span{color:var(--muted)}.rrMini.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}
 .matchModal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#0009;padding:16px}.matchSheet{width:min(520px,100%);background:#151a24;border:1px solid #3a465b;border-radius:20px 20px 16px 16px;padding:16px;box-shadow:0 20px 60px #000a}.sheetHandle{width:46px;height:5px;border-radius:999px;background:#3d4657;margin:0 auto 12px}.sheetTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.sheetTitle h3{margin:0}.sheetClose{background:#222a38;border:1px solid #3b4658;padding:8px 10px}.sheetPlayer{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;padding:10px 0}.sheetPlayer+.sheetPlayer{border-top:1px solid #2b3444}.sheetPlayer input{text-align:center}.sheetRef{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #2b3444}.sheetRef select{min-width:0}.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sheetActions button{min-width:0}.sheetFooter{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.scorePickBtn{width:72px;height:52px;border:1px solid #3b4658;background:#0f141d;color:#f7f8fa;border-radius:14px;font-size:15px;line-height:1;white-space:nowrap;font-weight:800;display:flex;align-items:center;justify-content:center}.scorePickBtn.hasValue{border-color:#ff7d45;background:#2b1c15;color:#ffb17e}.scorePickerPop{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:#0007;padding:16px}.scorePickerCard{width:min(420px,100%);background:#171d28;border:1px solid #3a465b;border-radius:18px;padding:14px;box-shadow:0 20px 60px #000b}.scorePickerTitle{font-size:13px;color:#aeb7c6;margin-bottom:10px;text-align:center}.scoreGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.scoreGrid button{min-height:54px;font-size:22px;border-radius:14px}.scoreClear{width:100%;margin-top:10px;background:#202838;border:1px solid #3a465b;color:#d5dbe5}
+.resetChoiceModal{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:#0009;padding:20px}
+.resetChoiceCard{width:min(390px,100%);background:#171d28;border:1px solid #3a465b;border-radius:18px;padding:16px;box-shadow:0 20px 60px #000b}
+.resetChoiceCard h3{margin:0 0 8px}
+.resetChoiceCard p{margin:0 0 14px;color:#aeb7c6;line-height:1.5;font-size:14px}
+.resetChoiceActions{display:grid;gap:10px}
+.resetChoiceActions button{min-height:52px}
+.resetChoiceActions .scoreOnly{background:#243147;border:1px solid #52627d;color:#fff}
+.resetChoiceActions .clearAll{background:#531d1d;border:1px solid #9b3b32;color:#ffb3aa}
+.resetChoiceActions .cancelReset{background:#202838;border:1px solid #3a465b;color:#d5dbe5}
+
 .quickScoreBox{margin:12px 0;padding:12px;border:1px solid #344158;border-radius:16px;background:#101620}
 .quickScoreTitle{font-size:14px;font-weight:800;color:#d8dee9;margin-bottom:10px}
 .quickScorePlayers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -193,6 +203,17 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
       </div>
     </div></div>
     <div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(0)">0</button><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore('')">清除比分</button></div></div>
+<div id="resetChoiceModal" class="resetChoiceModal hidden" onclick="if(event.target===this)closeResetChoice()">
+  <div class="resetChoiceCard">
+    <h3>重設這場比賽</h3>
+    <p>請選擇要只把比分歸零繼續執裁，或把這場的結果與執裁狀態全部清除。</p>
+    <div class="resetChoiceActions">
+      <button type="button" class="scoreOnly" onclick="resetScoreOnly()">比分重置為 0：0</button>
+      <button type="button" class="clearAll" onclick="clearMatchAll()">全部清除</button>
+      <button type="button" class="cancelReset" onclick="closeResetChoice()">取消</button>
+    </div>
+  </div>
+</div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
@@ -1180,10 +1201,55 @@ async function score(ri,mi){
     alert('比分已修改。因勝者改變，後續賽程已依新的勝者重新產生。');
   }
 }
-async function resetMatch(ri,mi){
-  if(!isAdmin&&!ev?.testOnly)return alert('只有主辦可以重設場次。');
 
-  const m=ev.rounds?.[ri]?.matches?.[mi];
+let resetChoiceTarget=null;
+
+function openResetChoice(kind,ri,mi){
+  if(!isAdmin&&!ev?.testOnly)return alert('只有主辦可以重設場次。');
+  resetChoiceTarget={kind,ri,mi};
+  $('resetChoiceModal').classList.remove('hidden');
+}
+
+function closeResetChoice(){
+  $('resetChoiceModal').classList.add('hidden');
+  resetChoiceTarget=null;
+}
+
+async function resetScoreOnly(){
+  const t=resetChoiceTarget;
+  if(!t)return;
+
+  let m=t.kind==='rr'
+    ? ev.finalRR?.matches?.[t.mi]
+    : ev.rounds?.[t.ri]?.matches?.[t.mi];
+
+  if(!m)return alert('找不到這場比賽資料。');
+
+  // 如果這場原本已完成，保留舊勝者供之後重新記錄比分時判斷是否需要重建後續賽程。
+  if(m.winner && !m._previousWinner)m._previousWinner=m.winner;
+
+  m.winner=null;
+  m.sa=0;
+  m.sb=0;
+
+  // 比分重置只歸零，不釋放目前裁判、不關閉比賽。
+  const ok=await saveEventCloudNow();
+  if(!ok)return;
+
+  closeResetChoice();
+
+  if(t.kind==='rr')openRRMatch(t.mi);
+  else openMatchEditor(t.ri,t.mi);
+}
+
+async function clearMatchAll(){
+  const t=resetChoiceTarget;
+  if(!t)return;
+
+  let m=t.kind==='rr'
+    ? ev.finalRR?.matches?.[t.mi]
+    : ev.rounds?.[t.ri]?.matches?.[t.mi];
+
   if(!m)return alert('找不到這場比賽資料。');
 
   const hadWinner=!!(m._previousWinner || m.winner);
@@ -1195,17 +1261,25 @@ async function resetMatch(ri,mi){
   m.refereeActive=false;
   m.referee='';
 
-  if(hadWinner)clearDownstreamAfterMatchReset(ri);
+  if(t.kind!=='rr' && hadWinner){
+    clearDownstreamAfterMatchReset(t.ri);
+  }
 
   const ok=await saveEventCloudNow();
   if(!ok)return;
 
+  closeResetChoice();
   closeMatchEditor();
   showTab('bracket');
+
   requestAnimationFrame(()=>{
     setBracketScale(bracketScale);
     drawBracketLinks();
   });
+}
+
+function resetMatch(ri,mi){
+  openResetChoice('round',ri,mi);
 }
 function swapPlayers(ri,i,j){
  if(i<0||j<0)return;let r=ev.rounds[ri]; if(r.matches.some(m=>m.winner))return alert('本輪已有結果，請先重設再調整。');
@@ -1843,28 +1917,8 @@ function renderRR(){
   </div>`;
 }
 
-async function resetRRMatch(i){
-  if(!isAdmin&&!ev?.testOnly)return alert('只有主辦可以重設場次。');
-
-  const m=ev.finalRR?.matches?.[i];
-  if(!m)return alert('找不到這場循環賽資料。');
-
-  m.winner=null;
-  m.sa=0;
-  m.sb=0;
-  delete m._previousWinner;
-  m.refereeActive=false;
-  m.referee='';
-
-  const ok=await saveEventCloudNow();
-  if(!ok)return;
-
-  closeMatchEditor();
-  showTab('bracket');
-  requestAnimationFrame(()=>{
-    setBracketScale(bracketScale);
-    drawBracketLinks();
-  });
+function resetRRMatch(i){
+  openResetChoice('rr',0,i);
 }
 
 function openRRMatch(i){
