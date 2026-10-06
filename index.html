@@ -33,6 +33,22 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .bracketMatch{position:relative;width:100%;height:112px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:13px;padding:8px 9px;text-align:left;color:var(--text);box-shadow:0 8px 22px #0004;cursor:pointer}.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 8px 22px #0004}.bracketMatch:hover{border-color:#62718b}.bracketMatch.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite;box-shadow:0 0 0 1px #ffd45a55 inset,0 0 22px #ffd45a55,0 8px 22px #0005}@keyframes judgePulse{0%,100%{box-shadow:0 0 0 1px #ffd45a44 inset,0 0 8px #ffd45a22,0 8px 22px #0005}50%{box-shadow:0 0 0 2px #ffd45aaa inset,0 0 26px #ffd45a99,0 8px 22px #0005}}.bracketMatch .matchNo{height:18px;line-height:18px;margin:0 62px 4px 0}.bSide{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;align-items:center;height:34px;padding:4px 6px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:13px;line-height:1.15}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bScore{display:flex;align-items:center;justify-content:center;width:36px;height:24px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px;line-height:1}.bSide.winner .bScore{border-color:#a8672e;color:#ffb371}.winnerDot{flex:0 0 auto;font-size:10px;color:#ff9b54}.tapEdit{position:absolute;right:8px;top:7px;color:#7c879a;font-size:10px}.refTag{position:absolute;left:9px;right:9px;bottom:4px;display:block;max-width:calc(100% - 18px);padding:2px 6px;border:1px solid #334158;border-radius:999px;background:#0d131c;color:#9fb0c8;font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.refTag.on{border-color:#6c5630;color:#f0c27a;background:#211a11}.refTag.live{border-color:#ffd45a;color:#ffe9a6;background:#342b12;font-weight:800}.bracketMatch.judging .bSide:last-of-type{margin-bottom:17px}
 .rrCol{position:relative;width:236px;flex:0 0 236px;z-index:1}.rrPanel{background:linear-gradient(180deg,#281e14,#141820);border:1px solid #855521;border-radius:15px;padding:12px;box-shadow:0 0 25px #ff8a2a18}.rrPlayers{margin:0}.rrRow{display:grid;grid-template-columns:24px 1fr auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #4a3827;font-size:12px}.rrRank{font-weight:900;color:#ffb45f}.rrGames{display:grid;gap:8px;margin-top:10px}.rrMini{background:#141a24;border:1px solid #3c465a;border-radius:10px;padding:8px;font-size:11px;display:flex;justify-content:space-between;gap:8px}.rrMini b{font-weight:700}.rrMini span{color:var(--muted)}.rrMini.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}
 .matchModal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#0009;padding:16px}.matchSheet{width:min(520px,100%);background:#151a24;border:1px solid #3a465b;border-radius:20px 20px 16px 16px;padding:16px;box-shadow:0 20px 60px #000a}.sheetHandle{width:46px;height:5px;border-radius:999px;background:#3d4657;margin:0 auto 12px}.sheetTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.sheetTitle h3{margin:0}.sheetClose{background:#222a38;border:1px solid #3b4658;padding:8px 10px}.sheetPlayer{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;padding:10px 0}.sheetPlayer+.sheetPlayer{border-top:1px solid #2b3444}.sheetPlayer input{text-align:center}.sheetRef{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #2b3444}.sheetRef select{min-width:0}.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sheetActions button{min-width:0}.sheetFooter{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.scorePickBtn{width:72px;height:52px;border:1px solid #3b4658;background:#0f141d;color:#f7f8fa;border-radius:14px;font-size:15px;line-height:1;white-space:nowrap;font-weight:800;display:flex;align-items:center;justify-content:center}.scorePickBtn.hasValue{border-color:#ff7d45;background:#2b1c15;color:#ffb17e}.scorePickerPop{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:#0007;padding:16px}.scorePickerCard{width:min(420px,100%);background:#171d28;border:1px solid #3a465b;border-radius:18px;padding:14px;box-shadow:0 20px 60px #000b}.scorePickerTitle{font-size:13px;color:#aeb7c6;margin-bottom:10px;text-align:center}.scoreGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.scoreGrid button{min-height:54px;font-size:22px;border-radius:14px}.scoreClear{width:100%;margin-top:10px;background:#202838;border:1px solid #3a465b;color:#d5dbe5}
+.quickScoreBox{margin:12px 0;padding:12px;border:1px solid #344158;border-radius:16px;background:#101620}
+.quickScoreTitle{font-size:14px;font-weight:800;color:#d8dee9;margin-bottom:10px}
+.quickScorePlayers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quickScoreSide{min-width:0;padding:10px;border:1px solid #2d3748;border-radius:14px;background:#0d131c}
+.quickScoreHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.quickScoreName{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quickScoreTotal{min-width:38px;text-align:center;padding:5px 8px;border:1px solid #ff7d45;border-radius:10px;background:#2b1c15;color:#ffb17e;font-weight:900}
+.quickScoreBtns{display:grid;grid-template-columns:1fr;gap:6px}
+.quickScoreBtns button{min-height:42px;padding:7px 8px;font-size:13px;line-height:1.15}
+.quickScoreHint{margin-top:9px;font-size:12px;color:#9ba6b8;line-height:1.45}
+@media(max-width:520px){
+  .quickScorePlayers{grid-template-columns:1fr}
+  .quickScoreBtns{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .quickScoreBtns button:last-child{grid-column:1/-1}
+}
+
 .refereeGrid{display:grid;grid-template-columns:300px 1fr;gap:12px}.refCard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}.refList{display:grid;gap:8px;margin-top:10px}.refPerson{display:flex;align-items:center;gap:8px;padding:9px 10px;background:#101620;border:1px solid #2d3748;border-radius:10px}.refPerson span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.refPerson button{padding:6px 9px}.judgeChooser{display:grid;gap:8px;margin:10px 0}.judgeChooser select{width:100%}.judgeStatus{padding:10px;border:1px solid #344158;border-radius:12px;background:#0f141d}.judgeStatus strong{color:#ffe39a}.liveMatchList{display:grid;gap:9px}.liveMatchRow{display:grid;grid-template-columns:92px 1fr auto;gap:8px;align-items:center;padding:10px;background:#101620;border:1px solid #2d3748;border-radius:12px}.liveMatchRow.busy{border-color:#7c6226;background:#191711}.liveMatchRow.mine{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}.liveMatchMeta{font-size:11px;color:#9aa6b8}.liveMatchPlayers{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.liveMatchAction{display:flex;gap:6px}.liveMatchAction button{padding:8px 10px;white-space:nowrap}.busyWho{font-size:11px;color:#f4d487;margin-top:3px}.refToolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.refToolbar button{flex:0 0 auto}@media(max-width:700px){.refereeGrid{grid-template-columns:1fr}.assignRow{grid-template-columns:72px 1fr}.assignRow select{grid-column:1/-1}.refCard{padding:12px}}
 body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{position:fixed;inset:0;z-index:40;border-radius:0;border:0;margin:0;background:#0b0d12}body.bracketFullscreen .bracketScroll{height:calc(100vh - 52px);min-height:0;padding-bottom:70px}body.bracketFullscreen header{display:none}
 @media(max-width:640px){header{padding:11px 10px}.brand h1{font-size:17px}main{padding:9px}.adminHero{padding:12px;border-radius:16px}.adminHero h2{font-size:21px}.adminActions{grid-template-columns:repeat(2,minmax(0,1fr))}.adminActions button{font-size:13px;padding:10px 7px}.metaChip{font-size:11px;padding:6px 8px}.bracketShell{border-radius:14px;margin-left:-2px;margin-right:-2px}.bracketTools{padding:7px 8px}.bracketHint{display:none}.bracketScroll{padding:10px 9px 22px;min-height:460px}.bracketCanvas{gap:38px;padding-left:4px}.roundCol{width:184px;flex-basis:184px}.rrCol{width:214px;flex-basis:214px}.roundHead{top:auto;min-height:50px}.roundHead h3{font-size:15px}.bracketMatch{height:104px;padding:7px}.bracketMatch .matchNo{height:16px;line-height:16px;margin-bottom:3px}.bSide{height:31px;padding:3px 6px}.bName{font-size:12px}.bScore{height:23px}.refTag{left:7px;right:7px;bottom:3px;max-width:calc(100% - 14px);line-height:13px}.bracketMatch.judging .bSide:last-of-type{margin-bottom:15px}.zoomGroup button,.viewToggle{padding:7px 9px}.zoomLabel{min-width:46px}.matchModal{padding:8px}.matchSheet{padding:14px;border-radius:18px 18px 12px 12px}}
@@ -1325,6 +1341,187 @@ function chooseScore(v){
   if(btn){btn.textContent=v===''?'比分':v;btn.classList.toggle('hasValue',v!=='');}
   closeScorePicker();
 }
+
+function scoreEventButtons(handler){
+  return `
+    <button type=button onclick="${handler}(1,'對方違規')">對方違規</button>
+    <button type=button onclick="${handler}(1,'轉停')">轉停</button>
+    <button type=button onclick="${handler}(2,'爆裂')">爆裂</button>
+    <button type=button onclick="${handler}(2,'擊飛')">擊飛</button>
+    <button type=button onclick="${handler}(3,'極限')">極限</button>`;
+}
+
+function quickScoreHtml(m,kind,ri,mi,enabled){
+  if(!enabled)return '';
+  const aScore=m.sa===''?0:+m.sa;
+  const bScore=m.sb===''?0:+m.sb;
+  const aHandler=kind==='rr'
+    ? `quickAddRRScore.bind(null,${mi},'a')`
+    : `quickAddMatchScore.bind(null,${ri},${mi},'a')`;
+  const bHandler=kind==='rr'
+    ? `quickAddRRScore.bind(null,${mi},'b')`
+    : `quickAddMatchScore.bind(null,${ri},${mi},'b')`;
+
+  // bind() 不能直接塞進 inline onclick，所以這裡產生實際函式字串。
+  const aButtons=kind==='rr'
+    ? `
+      <button type=button onclick="quickAddRRScore(${mi},'a',1,'對方違規')">對方違規</button>
+      <button type=button onclick="quickAddRRScore(${mi},'a',1,'轉停')">轉停</button>
+      <button type=button onclick="quickAddRRScore(${mi},'a',2,'爆裂')">爆裂</button>
+      <button type=button onclick="quickAddRRScore(${mi},'a',2,'擊飛')">擊飛</button>
+      <button type=button onclick="quickAddRRScore(${mi},'a',3,'極限')">極限</button>`
+    : `
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',1,'對方違規')">對方違規</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',1,'轉停')">轉停</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',2,'爆裂')">爆裂</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',2,'擊飛')">擊飛</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',3,'極限')">極限</button>`;
+
+  const bButtons=kind==='rr'
+    ? `
+      <button type=button onclick="quickAddRRScore(${mi},'b',1,'對方違規')">對方違規</button>
+      <button type=button onclick="quickAddRRScore(${mi},'b',1,'轉停')">轉停</button>
+      <button type=button onclick="quickAddRRScore(${mi},'b',2,'爆裂')">爆裂</button>
+      <button type=button onclick="quickAddRRScore(${mi},'b',2,'擊飛')">擊飛</button>
+      <button type=button onclick="quickAddRRScore(${mi},'b',3,'極限')">極限</button>`
+    : `
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',1,'對方違規')">對方違規</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',1,'轉停')">轉停</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',2,'爆裂')">爆裂</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',2,'擊飛')">擊飛</button>
+      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',3,'極限')">極限</button>`;
+
+  return `<div class=quickScoreBox>
+    <div class=quickScoreTitle>⚡ 快速加分</div>
+    <div class=quickScorePlayers>
+      <div class=quickScoreSide>
+        <div class=quickScoreHead>
+          <div class=quickScoreName>${esc(m.a)}</div>
+          <div class=quickScoreTotal id="${kind==='rr'?'qrr':'qm'}-${ri}-${mi}-a">${aScore}</div>
+        </div>
+        <div class=quickScoreBtns>${aButtons}</div>
+      </div>
+      <div class=quickScoreSide>
+        <div class=quickScoreHead>
+          <div class=quickScoreName>${esc(m.b)}</div>
+          <div class=quickScoreTotal id="${kind==='rr'?'qrr':'qm'}-${ri}-${mi}-b">${bScore}</div>
+        </div>
+        <div class=quickScoreBtns>${bButtons}</div>
+      </div>
+    </div>
+    <div class=quickScoreHint>達到 4 分（或以上）會自動判定勝者並送出結果；按鈕只顯示判定名稱，分值由系統自動計算。</div>
+  </div>`;
+}
+
+function syncQuickScoreDisplay(kind,ri,mi,m){
+  const prefix=kind==='rr'?'qrr':'qm';
+  const a=$( `${prefix}-${ri}-${mi}-a` );
+  const b=$( `${prefix}-${ri}-${mi}-b` );
+  if(a)a.textContent=m.sa===''?0:m.sa;
+  if(b)b.textContent=m.sb===''?0:m.sb;
+}
+
+async function quickAddMatchScore(ri,mi,side,points,reason){
+  if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+  let m=ev.rounds?.[ri]?.matches?.[mi];
+  if(!m)return alert('找不到這場比賽資料。');
+  if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
+
+  // 已完成場次進入修改模式時，快速加分不自動改寫既有勝者；
+  // 這種情況仍可用上方比分按鈕精確修正後再按「記錄比分」。
+  const wasCompleted=!!m.winner;
+
+  const key=side==='a'?'sa':'sb';
+  const other=side==='a'?'sb':'sa';
+  const current=m[key]===''?0:+m[key];
+  if(m[other]==='')m[other]=0;
+  m[key]=current+points;
+
+  // 同步上方比分顯示。
+  const input=$(`s${ri}-${mi}${side}`);
+  const btn=$(`sb${ri}-${mi}${side}`);
+  if(input)input.value=m[key];
+  if(btn){btn.textContent=m[key];btn.classList.add('hasValue');}
+  const otherSide=side==='a'?'b':'a';
+  const otherInput=$(`s${ri}-${mi}${otherSide}`);
+  const otherBtn=$(`sb${ri}-${mi}${otherSide}`);
+  if(otherInput)otherInput.value=m[other];
+  if(otherBtn&&m[other]!=='' ){otherBtn.textContent=m[other];otherBtn.classList.add('hasValue');}
+
+  syncQuickScoreDisplay('round',ri,mi,m);
+
+  if(wasCompleted){
+    localEventSave();
+    return;
+  }
+
+  if(+m[key]>=4){
+    const oldWinner=m.winner||null;
+    const newWinner=side==='a'?m.a:m.b;
+    m.winner=newWinner;
+    m.refereeActive=false;
+    m.referee='';
+
+    const rebuilt=rebuildDownstreamIfWinnerChanged(ri,oldWinner,newWinner);
+    if(!rebuilt)ensureNext();
+
+    await saveEventCloudNow();
+    closeMatchEditor();
+    showTab('bracket');
+    requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+    return;
+  }
+
+  await saveEventCloudNow();
+  openMatchEditor(ri,mi);
+}
+
+async function quickAddRRScore(i,side,points,reason){
+  if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+  let m=ev.finalRR?.matches?.[i];
+  if(!m)return alert('找不到這場循環賽資料。');
+  if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
+
+  const wasCompleted=!!m.winner;
+  const key=side==='a'?'sa':'sb';
+  const other=side==='a'?'sb':'sa';
+  const current=m[key]===''?0:+m[key];
+  if(m[other]==='')m[other]=0;
+  m[key]=current+points;
+
+  const input=$(`rr${i}${side}`);
+  const btn=$(`rrb${i}${side}`);
+  if(input)input.value=m[key];
+  if(btn){btn.textContent=m[key];btn.classList.add('hasValue');}
+  const otherSide=side==='a'?'b':'a';
+  const otherInput=$(`rr${i}${otherSide}`);
+  const otherBtn=$(`rrb${i}${otherSide}`);
+  if(otherInput)otherInput.value=m[other];
+  if(otherBtn&&m[other]!=='' ){otherBtn.textContent=m[other];otherBtn.classList.add('hasValue');}
+
+  syncQuickScoreDisplay('rr',0,i,m);
+
+  if(wasCompleted){
+    localEventSave();
+    return;
+  }
+
+  if(+m[key]>=4){
+    m.winner=side==='a'?m.a:m.b;
+    m.refereeActive=false;
+    m.referee='';
+
+    await saveEventCloudNow();
+    closeMatchEditor();
+    showTab('bracket');
+    requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+    return;
+  }
+
+  await saveEventCloudNow();
+  openRRMatch(i);
+}
+
 function openMatchEditor(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
   let m=ev.rounds[ri].matches[mi];
@@ -1334,6 +1531,7 @@ function openMatchEditor(ri,mi){
     <div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="s${ri}-${mi}a" value="${m.sa}"><button type=button id="sb${ri}-${mi}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('s${ri}-${mi}a','sb${ri}-${mi}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div>
     <div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="s${ri}-${mi}b" value="${m.sb}"><button type=button id="sb${ri}-${mi}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('s${ri}-${mi}b','sb${ri}-${mi}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div>
     <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
+    ${quickScoreHtml(m,'round',ri,mi,scoreEnabled)}
     ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分與記錄比分。</div>`:''}
     <div class=sheetFooter style="${(!isAdmin&&!ev?.testOnly)?'grid-template-columns:1fr':''}">
       <button class=secondary ${scoreDisabled} onclick="score(${ri},${mi})">記錄比分</button>
@@ -1514,6 +1712,8 @@ function openRRMatch(i){
       <b>裁判狀態</b>
       ${refereeStatusHtml(m,'rr',0,i)}
     </div>
+
+    ${quickScoreHtml(m,'rr',0,i,scoreEnabled)}
 
     ${!scoreEnabled?`
       <div class=refHint style="margin:10px 0">
