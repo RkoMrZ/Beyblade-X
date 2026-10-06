@@ -538,6 +538,39 @@ async function ensureRealtimeConnected(timeoutMs=10000){
     });
   });
 }
+async function rtdbRestPut(path,value,timeoutMs=12000){
+  if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
+  const token=await fbAuth.currentUser.getIdToken(true);
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  if(!base)throw new Error('Firebase databaseURL 未設定');
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
+    const res=await fetch(url,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(value),
+      signal:ctrl.signal,
+      cache:'no-store'
+    });
+    const text=await res.text();
+    if(!res.ok){
+      let detail=text;
+      try{detail=JSON.parse(text)?.error||text}catch{}
+      const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+      err.code=`HTTP_${res.status}`;
+      throw err;
+    }
+    return text?JSON.parse(text):null;
+  }catch(e){
+    if(e?.name==='AbortError')throw new Error('Firebase REST 寫入逾時');
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 
 async function createTournament(){
   const createBtn=document.querySelector('[data-create-tournament="1"]');
@@ -597,9 +630,9 @@ async function createTournament(){
     const code=String(Math.floor(100000+Math.random()*900000));
     const expiresAt=Date.now()+30000;
 
-    await withTimeout(fbDb.ref(`events/${ev.id}`).set(ev),12000,'建立雲端賽事');
-    await withTimeout(fbDb.ref(`secrets/${ev.id}`).set({adminCode:code,expiresAt}),12000,'建立管理驗證碼');
-    await withTimeout(fbDb.ref(`admins/${ev.id}/${fbUser.uid}`).set(code),12000,'建立主辦權限');
+    await rtdbRestPut(`events/${ev.id}`,ev,12000);
+    await rtdbRestPut(`secrets/${ev.id}`,{adminCode:code,expiresAt},12000);
+    await rtdbRestPut(`admins/${ev.id}/${fbUser.uid}`,code,12000);
 
     isAdmin=true;
     localStorage.setItem(adminFlagKey(ev.id),'1');
