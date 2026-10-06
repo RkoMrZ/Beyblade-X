@@ -2,7 +2,8 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><title>Beyblade X Tournament</title>
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v4：每帳號最多3場以計數節點強制限制、公開6小時自動到期、觀眾免Auth -->
+<title>Beyblade X Tournament</title>
 <style>
 :root{--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--blue:#56a8ff;--warn:#f4c84b}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif}
@@ -624,6 +625,23 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+.savedPublicStatus{
+  margin-top:6px;
+  font-size:12px;
+  font-weight:700;
+}
+.savedPublicStatus.on{opacity:.9}
+.savedPublicStatus.off{opacity:.65}
+.savedEventActions{
+  flex-wrap:wrap;
+}
+.savedEventActions button{
+  min-width:96px;
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -728,6 +746,28 @@ function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch
 function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
 function setSavedEventIds(ids){localStorage.setItem(SAVED,JSON.stringify([...new Set(ids)]))}
 function keepLocalEnabled(){return localStorage.getItem(KEEP)==='1'}
+
+async function ensureRefereeAuth(){
+  if(!(await initCloud()))return false;
+
+  // 已有 Google 或先前保留的匿名登入就直接沿用，不重新建立帳號。
+  if(fbAuth.currentUser){
+    fbUser=fbAuth.currentUser;
+    return true;
+  }
+
+  try{
+    await fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    const result=await fbAuth.signInAnonymously();
+    fbUser=result.user||fbAuth.currentUser;
+    return !!fbUser;
+  }catch(e){
+    console.error('ensureRefereeAuth failed',e);
+    alert('建立裁判登入身分失敗：'+(e?.message||e));
+    return false;
+  }
+}
+
 function isGoogleUser(){
   return !!(fbAuth?.currentUser && fbAuth.currentUser.providerData?.some(p=>p.providerId==='google.com'));
 }
@@ -772,17 +812,21 @@ function renderHomeSelections(){
 
   const hasMode=draftMode==='free'||draftMode==='single';
   const hasStorage=draftStorage==='cloud'||draftStorage==='test';
-  const ready=hasMode&&hasStorage;
+  const count=(draftStorage==='cloud'&&isGoogleUser())?cloudEventCountForCurrentGoogle():0;
+  const cloudFull=draftStorage==='cloud'&&isGoogleUser()&&count>=CLOUD_EVENT_LIMIT;
+  const ready=hasMode&&hasStorage&&!cloudFull;
 
   const modeText=draftMode==='free'?'自由編排':draftMode==='single'?'單淘汰賽':'尚未選擇賽制';
   const storageText=draftStorage==='cloud'?'雲端賽事':draftStorage==='test'?'測試賽事':'尚未選擇建立方式';
 
   if(s){
-    if(!ready){
+    if(cloudFull){
+      s.textContent=`目前選擇：${modeText} ＋ ${storageText}｜雲端賽事 ${count}/${CLOUD_EVENT_LIMIT}，請先刪除一場舊賽事`;
+    }else if(!hasMode||!hasStorage){
       s.textContent=`目前選擇：${modeText} ＋ ${storageText}`;
     }else if(draftStorage==='cloud' && isGoogleUser()){
       const who=fbAuth.currentUser.email||fbAuth.currentUser.displayName||'Google 帳號';
-      s.textContent=`目前選擇：${modeText} ＋ ${storageText}｜已登入：${who}`;
+      s.textContent=`目前選擇：${modeText} ＋ ${storageText}｜已登入：${who}｜雲端賽事 ${count}/${CLOUD_EVENT_LIMIT}`;
     }else if(draftStorage==='cloud'){
       s.textContent=`目前選擇：${modeText} ＋ ${storageText}｜建立前需登入 Google`;
     }else{
@@ -793,7 +837,9 @@ function renderHomeSelections(){
   if(next){
     next.disabled=!ready;
 
-    if(!ready){
+    if(cloudFull){
+      next.textContent=`雲端賽事已達 ${CLOUD_EVENT_LIMIT} 場上限`;
+    }else if(!hasMode||!hasStorage){
       next.textContent='請先選擇賽制與建立方式';
     }else if(draftStorage==='cloud'&&!isGoogleUser()){
       next.textContent='使用 Google 登入並設定賽事';
@@ -847,6 +893,14 @@ async function proceedCreate(){
     if(!ok)return;
   }
 
+  if(draftStorage==='cloud'){
+    const count=await getCloudEventCountFromServer();
+
+    if(count>=CLOUD_EVENT_LIMIT){
+      return alert(`這個 Google 帳號目前已有 ${count} 場雲端賽事，已達 ${CLOUD_EVENT_LIMIT} 場上限。請先刪除一場舊賽事後再建立。`);
+    }
+  }
+
   $('home').classList.add('hidden');
   $('create').classList.remove('hidden');
 
@@ -877,6 +931,109 @@ function purgeLocalEvent(id){
 function formatSavedTime(ts){
   if(!ts)return '';
   try{return new Date(ts).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return ''}
+}
+
+
+const CLOUD_EVENT_LIMIT=3;
+
+async function getCloudEventCountFromServer(){
+  if(!isGoogleUser())return 0;
+  const uid=fbAuth.currentUser.uid;
+  try{
+    const snap=await fbDb.ref(`userEventCounts/${uid}`).once('value');
+    const n=Number(snap.exists()?snap.val():0);
+    return Number.isFinite(n)&&n>=0?n:0;
+  }catch(e){
+    console.warn('getCloudEventCountFromServer failed',e);
+    return cloudEventCountForCurrentGoogle();
+  }
+}
+
+
+const PUBLIC_WINDOW_MS=6*60*60*1000;
+
+function cloudEventIdsForCurrentGoogle(){
+  if(!isGoogleUser())return [];
+  const uid=fbAuth.currentUser.uid;
+  return Object.values(events())
+    .filter(e=>e && !e.testOnly && e.ownerUid===uid)
+    .map(e=>e.id);
+}
+
+function cloudEventCountForCurrentGoogle(){
+  return cloudEventIdsForCurrentGoogle().length;
+}
+
+function publicStatusText(e){
+  if(!e || e.testOnly)return '';
+  if(e.publicOpen===false)return '公開已關閉';
+
+  const until=Number(e.publicUntil||0);
+  if(!until || until<=Date.now())return '公開已到期';
+
+  const ms=until-Date.now();
+  const mins=Math.max(1,Math.ceil(ms/60000));
+  if(mins>=60){
+    const h=Math.floor(mins/60);
+    const m=mins%60;
+    return `公開中・剩餘 ${h} 小時${m?` ${m} 分`:''}`;
+  }
+  return `公開中・剩餘 ${mins} 分`;
+}
+
+async function closePublicEvent(id){
+  const all=events();
+  const e=all[id];
+  if(!e || e.testOnly)return;
+  if(!isGoogleUser() || e.ownerUid!==fbAuth.currentUser.uid)return alert('只有這場賽事的主辦帳號可以關閉公開連結。');
+
+  e.publicOpen=false;
+  e.publicUntil=Date.now();
+  all[id]=e;
+  localStorage.setItem(STORE,JSON.stringify(all));
+
+  try{
+    await cloudUpdate({
+      [`events/${id}/publicOpen`]:false,
+      [`events/${id}/publicUntil`]:e.publicUntil
+    });
+    renderSavedEvents();
+    if(ev?.id===id){
+      ev.publicOpen=false;
+      ev.publicUntil=e.publicUntil;
+      renderAdmin();
+    }
+  }catch(err){
+    alert('關閉公開連結失敗：'+(err?.message||err));
+  }
+}
+
+async function extendPublicEvent(id){
+  const all=events();
+  const e=all[id];
+  if(!e || e.testOnly)return;
+  if(!isGoogleUser() || e.ownerUid!==fbAuth.currentUser.uid)return alert('只有這場賽事的主辦帳號可以延長公開時間。');
+
+  const base=Math.max(Date.now(),Number(e.publicUntil||0));
+  e.publicOpen=true;
+  e.publicUntil=base+PUBLIC_WINDOW_MS;
+  all[id]=e;
+  localStorage.setItem(STORE,JSON.stringify(all));
+
+  try{
+    await cloudUpdate({
+      [`events/${id}/publicOpen`]:true,
+      [`events/${id}/publicUntil`]:e.publicUntil
+    });
+    renderSavedEvents();
+    if(ev?.id===id){
+      ev.publicOpen=true;
+      ev.publicUntil=e.publicUntil;
+      renderAdmin();
+    }
+  }catch(err){
+    alert('延長公開時間失敗：'+(err?.message||err));
+  }
 }
 
 async function syncMyCloudEvents(){
@@ -921,34 +1078,68 @@ async function syncMyCloudEvents(){
 
 async function backfillMyCloudEventIndex(){
   if(!isGoogleUser())return;
+
   const uid=fbAuth.currentUser.uid;
   const all=events();
+  let ownedCount=0;
 
   for(const e of Object.values(all)){
     if(!e || e.testOnly || !e.id)continue;
     if(e.ownerUid!==uid)continue;
+
+    ownedCount++;
+
     try{
       await rtdbRestPut(`userEvents/${uid}/${e.id}`,true,8000);
     }catch(err){
       console.warn('backfill userEvents failed',e.id,err);
     }
   }
+
+  // 舊版本沒有 userEventCounts，登入時補一次目前已知的數量。
+  try{
+    const remoteIndex=(await rtdbRestGet(`userEvents/${uid}`,8000))||{};
+    const remoteCount=Object.keys(remoteIndex).filter(id=>remoteIndex[id]).length;
+    await rtdbRestPut(`userEventCounts/${uid}`,remoteCount,8000);
+  }catch(err){
+    console.warn('backfill userEventCounts failed',err);
+  }
 }
 
 function renderSavedEvents(){
   const box=$('savedEvents'),count=$('savedCount');if(!box||!count)return;
+
   const all=events(),ids=savedEventIds().filter(id=>all[id]);
   if(ids.length!==savedEventIds().length)setSavedEventIds(ids);
-  count.textContent=ids.length+' 場';
+
+  const cloudCount=isGoogleUser()?ids.map(id=>all[id]).filter(e=>e&&!e.testOnly&&e.ownerUid===fbAuth.currentUser.uid).length:0;
+  count.textContent=isGoogleUser()?`${cloudCount}/${CLOUD_EVENT_LIMIT} 場雲端`:`${ids.length} 場`;
+
   if(!ids.length){
     box.innerHTML='<div class=savedEmpty>目前沒有保留的賽事。建立新賽事後會顯示在這裡。</div>';
     return;
   }
+
   box.innerHTML=ids.map(id=>{
     const e=all[id],mode=e.mode==='free'?'自由編排':'單淘汰',when=formatSavedTime(e.created),isTest=!!e.testOnly;
     const typeHtml=isTest?'<span class="savedType test">🧪 測試賽事</span>':'<span class="savedType cloud">☁️ 雲端賽事</span>';
     const delLabel=isTest?'刪除本機':'刪除雲端';
-    return `<div class="savedEvent ${isTest?'test':'cloud'}"><div><div class=savedEventName>${typeHtml}${esc(e.name||'Beyblade X Tournament')}</div><div class=savedEventMeta>${e.roster?.length||0} 人・${mode}${when?'・'+when:''}</div></div><div class=savedEventActions><button type="button" data-open-id="${id}">繼續</button><button type="button" class="danger" data-delete-id="${id}">${delLabel}</button></div></div>`;
+    const ownerControls=!isTest && isGoogleUser() && e.ownerUid===fbAuth.currentUser.uid;
+    const status=!isTest?`<div class="savedPublicStatus ${e.publicOpen===false||Number(e.publicUntil||0)<=Date.now()?'off':'on'}">${publicStatusText(e)}</div>`:'';
+
+    return `<div class="savedEvent ${isTest?'test':'cloud'}">
+      <div>
+        <div class=savedEventName>${typeHtml}${esc(e.name||'Beyblade X Tournament')}</div>
+        <div class=savedEventMeta>${e.roster?.length||0} 人・${mode}${when?'・'+when:''}</div>
+        ${status}
+      </div>
+      <div class=savedEventActions>
+        <button type="button" data-open-id="${id}">繼續</button>
+        ${ownerControls?`<button type="button" class="secondary" data-extend-id="${id}">延長 6 小時</button>
+        <button type="button" class="secondary" data-close-public-id="${id}" ${e.publicOpen===false?'disabled':''}>關閉公開連結</button>`:''}
+        <button type="button" class="danger" data-delete-id="${id}">${delLabel}</button>
+      </div>
+    </div>`;
   }).join('');
 
   box.querySelectorAll('[data-open-id]').forEach(btn=>{
@@ -956,6 +1147,12 @@ function renderSavedEvents(){
   });
   box.querySelectorAll('[data-delete-id]').forEach(btn=>{
     btn.addEventListener('click',()=>requestDeleteSavedEvent(btn.dataset.deleteId));
+  });
+  box.querySelectorAll('[data-extend-id]').forEach(btn=>{
+    btn.addEventListener('click',()=>extendPublicEvent(btn.dataset.extendId));
+  });
+  box.querySelectorAll('[data-close-public-id]').forEach(btn=>{
+    btn.addEventListener('click',()=>closePublicEvent(btn.dataset.closePublicId));
   });
 }
 async function openSavedEvent(id){
@@ -1003,6 +1200,11 @@ async function openSavedEvent(id){
       purgeLocalEvent(id);
       renderSavedEvents();
       alert('這場雲端賽事已被刪除，連結與本機保留紀錄都已失效。');
+      return;
+    }
+
+    if(result==='expired'){
+      alert('這場賽事的公開觀看已關閉或 6 小時有效時間已到期。主辦本人請先登入原本的 Google 帳號後再開啟。');
       return;
     }
 
@@ -1057,11 +1259,17 @@ async function deleteSavedEvent(id){
 
     // 一次原子刪除三個節點，避免分段刪除造成權限條件改變或殘留資料
     const updates={};
+    const ownerUid=cached.ownerUid||fbUser.uid;
+    const currentCount=ownerUid===fbUser.uid?await getCloudEventCountFromServer():0;
+
     updates[`events/${id}`]=null;
     updates[`secrets/${id}`]=null;
     updates[`admins/${id}`]=null;
-    const ownerUid=cached.ownerUid||fbUser.uid;
     updates[`userEvents/${ownerUid}/${id}`]=null;
+    if(ownerUid===fbUser.uid){
+      updates[`userEventCounts/${ownerUid}`]=Math.max(0,currentCount-1);
+    }
+
     await rtdbRestPatchRoot(updates,12000);
 
     purgeLocalEvent(id);
@@ -1098,21 +1306,33 @@ async function deleteSavedEvent(id){
 function firebaseConfigured(){return !Object.values(FIREBASE_CONFIG).some(v=>String(v).includes('PASTE_'))}
 async function initCloud(){
   if(cloudReady){
-    fbUser=fbAuth?.currentUser||fbUser;
+    fbUser=fbAuth?.currentUser||null;
     return true;
   }
+
   if(!firebaseConfigured())return false;
+
   try{
     fbApp=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
-    fbAuth=firebase.auth();fbDb=firebase.database();
+    fbAuth=firebase.auth();
+    fbDb=firebase.database();
+
+    // 主辦 Google 登入、裁判匿名身分都採 LOCAL persistence。
+    // 一般觀眾不建立 Firebase Authentication 使用者。
     await fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    if(!fbAuth.currentUser)await fbAuth.signInAnonymously();
-    fbUser=fbAuth.currentUser;
+
+    fbUser=fbAuth.currentUser||null;
+
     fbAuth.onAuthStateChanged(async u=>{
       fbUser=u||null;
+      restTokenCache={token:null,ts:0};
+
       renderHeaderAuth();
+
       if($('home')&&!$('home').classList.contains('hidden')){
         renderHomeSelections();
+
+        // 只有 Google 主辦帳號才同步自己的雲端賽事清單。
         if(isGoogleUser()){
           await backfillMyCloudEventIndex();
           await syncMyCloudEvents();
@@ -1120,18 +1340,30 @@ async function initCloud(){
         }
       }
     });
-    cloudReady=true;return true;
-  }catch(e){console.error(e);alert('Firebase 連線失敗：'+e.message);return false}
+
+    cloudReady=true;
+    return true;
+  }catch(e){
+    console.error(e);
+    alert('Firebase 連線失敗：'+e.message);
+    return false;
+  }
 }
 function localEventSave(){
   let x=events();x[ev.id]=ev;localStorage.setItem(STORE,JSON.stringify(x));localStorage.setItem(CURRENT,ev.id);
   if((ev&&ev.testOnly) || savedEventIds().includes(ev.id))markEventSaved(ev.id);
 }
 function put(){
-  localEventSave();renderAdmin();
+  // put() 只保留給低頻設定/結構操作。
+  if(ev && !ev.testOnly)ev.syncVersion=Date.now();
+
+  localEventSave();
+  renderAdmin();
+
   if(ev?.testOnly)return;
-  if(cloudReady&&ev?.id&&(isAdmin||isReferee)){
-    rtdbRestPut(`events/${ev.id}`,ev,10000).catch(e=>{
+
+  if(cloudReady&&ev?.id&&(isAdmin||isReferee)&&fbAuth?.currentUser){
+    cloudSet(`events/${ev.id}`,ev).catch(e=>{
       console.error('event cloud sync failed',e);
       const role=isReferee&&!isAdmin?'裁判':'主辦';
       alert(`${role}雲端同步失敗：${e.message}`);
@@ -1143,90 +1375,221 @@ function adminCodeKey(id){return `bx_cloud_admin_code_${id}`}
 async function refreshAdminState(id){
   isAdmin=false;
   if(!fbAuth?.currentUser)return false;
+
   try{
-    const value=await rtdbRestGet(`admins/${id}/${fbAuth.currentUser.uid}`,8000);
+    const snap=await fbDb.ref(`admins/${id}/${fbAuth.currentUser.uid}`).once('value');
+    const value=snap.exists()?snap.val():null;
+
     isAdmin=value!==null && value!==undefined;
+
     if(isAdmin)localStorage.setItem(adminFlagKey(id),'1');
     else localStorage.removeItem(adminFlagKey(id));
   }catch(e){
-    console.warn('refreshAdminState REST failed',e);
-    // 讀取管理權失敗時不阻塞賽程表開啟；最多先以觀看模式進入
+    console.warn('refreshAdminState failed',e);
     isAdmin=false;
   }
+
   return isAdmin;
 }
 function listenCloudEvent(id){
-  if(!cloudReady)return;
+  if(!cloudReady||!ev)return;
 
   if(cloudUnsub)cloudUnsub();
 
-  let lastCloudSig='';
+  const unsubs=[];
+  let renderTimer=null;
+  let structureReloadBusy=false;
+  let seenSyncVersion=ev?.syncVersion ?? null;
 
-  const applyCloudEvent=data=>{
-    if(!data){
-      stopAdminCodeRotation();
-      stopRefereeCodeRotation();
-      purgeLocalEvent(id);
+  const scheduleRender=()=>{
+    if(renderTimer)return;
 
-      if(ev?.id===id)ev=null;
+    renderTimer=setTimeout(()=>{
+      renderTimer=null;
+      localEventSave();
 
-      ['create','admin'].forEach(x=>$(x).classList.add('hidden'));
-      $('home').classList.remove('hidden');
-      history.replaceState(null,'',location.pathname);
-      renderSavedEvents();
+      if($('admin')&&!$('admin').classList.contains('hidden')){
+        renderAdmin();
+      }
+    },70);
+  };
+
+  const onValue=(path,cb)=>{
+    const ref=fbDb.ref(path);
+    ref.on('value',cb);
+    unsubs.push(()=>ref.off('value',cb));
+  };
+
+  const onChildren=(path,onChild)=>{
+    const ref=fbDb.ref(path);
+
+    const added=s=>{
+      const key=Number(s.key);
+      if(Number.isInteger(key))onChild(key,s.val());
+    };
+    const changed=s=>{
+      const key=Number(s.key);
+      if(Number.isInteger(key))onChild(key,s.val());
+    };
+    const removed=s=>{
+      const key=Number(s.key);
+      if(Number.isInteger(key))onChild(key,null);
+    };
+
+    // 一個 round 一組 child listener。
+    // 初次 child_added 逐場載入；之後只有變動的那一場會傳輸。
+    ref.on('child_added',added);
+    ref.on('child_changed',changed);
+    ref.on('child_removed',removed);
+
+    unsubs.push(()=>{
+      ref.off('child_added',added);
+      ref.off('child_changed',changed);
+      ref.off('child_removed',removed);
+    });
+  };
+
+  const rebuildStructure=async()=>{
+    if(structureReloadBusy)return;
+    structureReloadBusy=true;
+
+    try{
+      // 只有新增下一輪 / 重建賽程 / 大型設定變更時才整份抓一次。
+      const latest=await publicCloudGet(`events/${id}`,10000);
+
+      if(!latest){
+        purgeLocalEvent(id);
+        if(ev?.id===id)ev=null;
+        ['create','admin'].forEach(x=>$(x).classList.add('hidden'));
+        $('home').classList.remove('hidden');
+        history.replaceState(null,'',location.pathname);
+        renderSavedEvents();
+        return;
+      }
+
+      ev=latest;
+      localEventSave();
+      renderAdmin();
+
+      // 重新綁定新一輪的 child listeners。
+      setTimeout(()=>listenCloudEvent(id),0);
+    }catch(e){
+      console.warn('structure reload failed',e);
+    }finally{
+      structureReloadBusy=false;
+    }
+  };
+
+  // 每個 round 只監聽 matches collection 的 child 事件。
+  // 64 人單淘汰約只需要 6 個 round collection，而不是 63 個 value listener。
+  (ev.rounds||[]).forEach((round,ri)=>{
+    onChildren(`events/${id}/rounds/${ri}/matches`,(mi,data)=>{
+      if(!ev?.rounds?.[ri]?.matches)return;
+
+      if(data===null){
+        ev.rounds[ri].matches.splice(mi,1);
+      }else{
+        ev.rounds[ri].matches[mi]=data;
+      }
+
+      scheduleRender();
+    });
+  });
+
+  if(ev.finalRR?.matches){
+    onChildren(`events/${id}/finalRR/matches`,(mi,data)=>{
+      if(!ev?.finalRR?.matches)return;
+
+      if(data===null){
+        ev.finalRR.matches.splice(mi,1);
+      }else{
+        ev.finalRR.matches[mi]=data;
+      }
+
+      scheduleRender();
+    });
+  }
+
+  // 低頻裁判設定只監聽小節點。
+  onValue(`events/${id}/refereeNames`,s=>{
+    const data=s.exists()?s.val():null;
+    if(Array.isArray(data)){
+      ev.refereeNames=data;
+      scheduleRender();
+    }
+  });
+
+  onValue(`events/${id}/refereeCount`,s=>{
+    if(s.exists()){
+      ev.refereeCount=Number(s.val())||ev.refereeCount;
+      scheduleRender();
+    }
+  });
+
+  // 結構版號只有在整份 event 低頻寫入時才改變。
+  onValue(`events/${id}/syncVersion`,s=>{
+    const v=s.exists()?s.val():null;
+
+    if(seenSyncVersion===null){
+      seenSyncVersion=v;
       return;
     }
 
-    const sig=JSON.stringify(data);
-    if(sig===lastCloudSig)return;
-    lastCloudSig=sig;
+    if(v!==null && v!==seenSyncVersion){
+      seenSyncVersion=v;
+      rebuildStructure();
+    }
+  });
 
-    ev=data;
-    localEventSave();
+  // 小節點監看賽事是否被刪除。
+  onValue(`events/${id}/ownerUid`,s=>{
+    if(s.exists())return;
 
-    $('home').classList.add('hidden');
-    $('create').classList.add('hidden');
-    $('admin').classList.remove('hidden');
+    stopAdminCodeRotation();
+    stopRefereeCodeRotation();
+    purgeLocalEvent(id);
 
-    renderAdmin();
+    if(ev?.id===id)ev=null;
+
+    ['create','admin'].forEach(x=>$(x).classList.add('hidden'));
+    $('home').classList.remove('hidden');
+    history.replaceState(null,'',location.pathname);
+    renderSavedEvents();
+  });
+
+  cloudUnsub=()=>{
+    if(renderTimer){
+      clearTimeout(renderTimer);
+      renderTimer=null;
+    }
+
+    unsubs.forEach(fn=>{
+      try{fn()}catch{}
+    });
   };
-
-  // 主要同步只使用 Firebase Realtime Database 即時 listener。
-  // 不再固定每幾秒 REST 輪詢，避免長時間比賽產生不必要請求。
-  const ref=fbDb.ref(`events/${id}`);
-  const cb=s=>applyCloudEvent(s.exists()?s.val():null);
-
-  ref.on('value',cb);
-  cloudUnsub=()=>ref.off('value',cb);
 }
 async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
 
   try{
-    let data=null;
-
-    // 優先使用 REST 讀取，避免 iOS Safari 下 RTDB SDK once() 偶發卡住
-    if(typeof rtdbRestGet==='function'){
-      data=await rtdbRestGet(`events/${id}`,10000);
-    }else{
-      const s=await Promise.race([
-        fbDb.ref(`events/${id}`).once('value'),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error('讀取賽事逾時')),10000))
-      ]);
-      data=s.exists()?s.val():null;
-    }
+    const data=await publicCloudGet(`events/${id}`,10000);
 
     if(!data)return 'missing';
 
     ev=data;
     localEventSave();
 
-    try{ await refreshAdminState(id); }
-    catch(e){ console.warn('refreshAdminState failed',e); }
-    try{ await refreshRefereeState(id); }
-    catch(e){ console.warn('refreshRefereeState failed',e); }
+    isAdmin=false;
+    isReferee=false;
 
-    // 先切換 UI，再啟動即時監聽，避免 listener 尚未回應時畫面全空
+    if(fbAuth?.currentUser){
+      try{ await refreshAdminState(id); }
+      catch(e){ console.warn('refreshAdminState failed',e); }
+
+      try{ await refreshRefereeState(id); }
+      catch(e){ console.warn('refreshRefereeState failed',e); }
+    }
+
     $('home').classList.add('hidden');
     $('create').classList.add('hidden');
     $('admin').classList.remove('hidden');
@@ -1241,17 +1604,20 @@ async function loadCloudEvent(id){
       return 'error';
     }
 
-    try{ listenCloudEvent(id); }
-    catch(e){ console.warn('listenCloudEvent failed',e); }
+    listenCloudEvent(id);
 
     const params=new URLSearchParams(location.search);
     if(params.get('admin')==='1')showTab('organizer');
     else if(params.get('ref')==='1')showTab('referee');
     else showTab('bracket');
-    return 'ok';
 
+    return 'ok';
   }catch(e){
     console.error('loadCloudEvent failed',e);
+    const msg=String(e?.message||e);
+    if(msg.includes('PERMISSION_DENIED')||msg.includes('permission_denied')){
+      return 'expired';
+    }
     return 'error';
   }
 }
@@ -1495,6 +1861,20 @@ async function getRestIdToken(force=false){
   return token;
 }
 
+
+async function publicCloudGet(path,timeoutMs=10000){
+  if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
+
+  const ref=fbDb.ref(path);
+
+  const snap=await Promise.race([
+    ref.once('value'),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase 公開讀取逾時')),timeoutMs))
+  ]);
+
+  return snap.exists()?snap.val():null;
+}
+
 async function rtdbRestGet(path,timeoutMs=12000){
   const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
   if(!base)throw new Error('Firebase databaseURL 未設定');
@@ -1581,9 +1961,16 @@ async function createTournament(){
       return;
     }
 
-    // 建立雲端賽事改走 Firebase REST API，不再要求 RTDB WebSocket /.info/connected 先成功。
-    // 這可避免 iOS Safari / Web App 環境下 SDK 連線狀態誤判而卡住。
+    const existingCount=await getCloudEventCountFromServer();
+    if(existingCount>=CLOUD_EVENT_LIMIT){
+      alert(`這個 Google 帳號已達 ${CLOUD_EVENT_LIMIT} 場雲端賽事上限，請先刪除一場舊賽事。`);
+      goHome();
+      return;
+    }
+
     fbUser=fbAuth.currentUser;
+    const now=Date.now();
+
     ev={
       id:uid(),
       name:$('eventName').value.trim()||'Beyblade X Tournament',
@@ -1593,11 +1980,13 @@ async function createTournament(){
       roster:r,
       rounds:[],
       finalRR:null,
-      created:Date.now(),
-      cloudVersion:4,
+      created:now,
+      cloudVersion:5,
       ownerUid:fbUser.uid,
       ownerEmail:fbUser.email||'',
       ownerName:fbUser.displayName||'',
+      publicOpen:true,
+      publicUntil:now+PUBLIC_WINDOW_MS,
       testOnly:false
     };
     buildFirst();
@@ -1606,10 +1995,16 @@ async function createTournament(){
     const expiresAt=Date.now()+30000;
 
     await rtdbRestProbe(10000);
-    await rtdbRestPut(`events/${ev.id}`,ev,12000);
-    await rtdbRestPut(`secrets/${ev.id}`,{adminCode:code,expiresAt},12000);
-    await rtdbRestPut(`admins/${ev.id}/${fbUser.uid}`,code,12000);
-    await rtdbRestPut(`userEvents/${fbUser.uid}/${ev.id}`,true,12000);
+
+    // 原子建立：events / secret / admin / userEvents 一次完成。
+    // Rules 也會再次檢查每個 Google 帳號最多 3 場。
+    await cloudUpdate({
+      [`events/${ev.id}`]:ev,
+      [`secrets/${ev.id}`]:{adminCode:code,expiresAt},
+      [`admins/${ev.id}/${fbUser.uid}`]:code,
+      [`userEvents/${fbUser.uid}/${ev.id}`]:true,
+      [`userEventCounts/${fbUser.uid}`]:existingCount+1
+    });
 
     isAdmin=true;
     localStorage.setItem(adminFlagKey(ev.id),'1');
@@ -1628,7 +2023,12 @@ async function createTournament(){
     console.error('createTournament failed',e);
     const code=e?.code?`\n錯誤代碼：${e.code}`:'';
     const msg=e?.message||String(e);
-    alert('建立雲端賽事失敗：'+msg+code);
+
+    if(String(msg).includes('PERMISSION_DENIED')){
+      alert(`建立雲端賽事失敗：可能已達 ${CLOUD_EVENT_LIMIT} 場上限，或 Firebase Rules 尚未更新。`);
+    }else{
+      alert('建立雲端賽事失敗：'+msg+code);
+    }
   }finally{
     if(createBtn){
       createBtn.disabled=false;
@@ -1797,53 +2197,29 @@ async function claimRRMatchAs(i){
   if(btn){btn.disabled=true;btn.textContent='接手中…'}
 
   try{
-    // 開始前先讀最新雲端，避免兩位裁判同時搶到同一場。
-    if(!ev.testOnly){
-      const latest=await rtdbRestGet(`events/${ev.id}`,8000);
-
-      if(latest){
-        const lm=latest?.finalRR?.matches?.[i];
-
-        if(lm?.refereeActive && lm.referee!==who){
-          ev=latest;
-          localEventSave();
-          renderAdmin();
-          openRRMatch(i);
-          return alert(`這場目前由 ${lm.referee} 執裁中。`);
-        }
-
-        ev=latest;
-      }
+    if(ev.testOnly){
+      releaseMyOtherMatches(who);
+      m.referee=who;
+      m.refereeActive=true;
+      localEventSave();
+      renderAdmin();
+      openRRMatch(i);
+      return;
     }
 
-    m=ev.finalRR?.matches?.[i];
-    if(!m)return alert('找不到這場循環賽資料。');
+    await releaseMyOtherMatchesCloud(who,'rr',0,i);
 
-    if(m.refereeActive&&m.referee!==who){
-      return alert(`這場目前由 ${m.referee} 執裁中。`);
+    const result=await atomicClaimMatch('rr',0,i,who);
+
+    if(!result.ok){
+      if(result.busyBy)return alert(`這場目前由 ${result.busyBy} 執裁中。`);
+      return alert('開始執裁失敗：'+(result.error||'未知錯誤'));
     }
 
-    // 同一位裁判接新場前，自動釋放自己其他尚未完成的場次。
-    releaseMyOtherMatches(who);
-
-    m.referee=who;
-    m.refereeActive=true;
-
-    const ok=await saveEventCloudNow();
-    if(!ok)return;
-
+    ev.finalRR.matches[i]=result.data;
+    localEventSave();
+    renderAdmin();
     openRRMatch(i);
-  }catch(e){
-    console.error('claimRRMatchAs failed',e);
-    if(String(e?.message||e).includes('quota-exceeded')){
-      alert('Firebase 驗證請求暫時超過額度。這版已停止每次同步強制刷新登入憑證；請稍後再試一次。');
-    }else{
-      if(String(e?.message||e).includes('quota-exceeded')){
-      alert('Firebase 驗證請求暫時超過額度。這版已停止每次同步強制刷新登入憑證；請稍後再試一次。');
-    }else{
-      alert('開始執裁失敗：'+(e?.message||e));
-    }
-    }
   }finally{
     if(btn&&document.body.contains(btn)){
       btn.disabled=false;
@@ -1910,14 +2286,31 @@ function setMyReferee(name){
     showTab('referee');
   }
 }
-function saveRefereeNames(){
+async function saveRefereeNames(){
   if(!isAdmin&&!ev?.testOnly)return;
+
   normalizeEvent();
+
   ev.refereeNames=Array.from({length:ev.refereeCount},(_,i)=>{
     const v=$(`refName${i}`)?.value.trim();
     return v||`裁判 ${i+1}`;
   });
-  put();showTab('referee');
+
+  localEventSave();
+
+  if(!ev.testOnly){
+    try{
+      await cloudUpdate({
+        [`events/${ev.id}/refereeNames`]:ev.refereeNames,
+        [`events/${ev.id}/refereeCount`]:ev.refereeCount
+      });
+    }catch(e){
+      return alert('儲存裁判名稱失敗：'+(e?.message||e));
+    }
+  }
+
+  renderAdmin();
+  showTab('referee');
 }
 function refereeOptionsHtml(kind,ri,mi){
   normalizeEvent();
@@ -1954,31 +2347,81 @@ async function refreshEventBeforeCriticalAction(){
   return ev;
 }
 
+
+async function cloudSet(path,value){
+  if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
+  if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
+
+  await fbDb.ref(path).set(value);
+  return true;
+}
+
+async function cloudUpdate(updates){
+  if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
+  if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
+
+  await fbDb.ref().update(updates);
+  return true;
+}
+
+function matchCloudPath(kind,ri,mi){
+  return kind==='rr'
+    ? `events/${ev.id}/finalRR/matches/${mi}`
+    : `events/${ev.id}/rounds/${ri}/matches/${mi}`;
+}
+
+async function saveSingleMatchCloud(kind,ri,mi){
+  if(ev?.testOnly){
+    localEventSave();
+    renderAdmin();
+    return true;
+  }
+
+  const m=kind==='rr'
+    ? ev.finalRR?.matches?.[mi]
+    : ev.rounds?.[ri]?.matches?.[mi];
+
+  if(!m)return false;
+
+  localEventSave();
+
+  try{
+    await cloudSet(matchCloudPath(kind,ri,mi),m);
+    return true;
+  }catch(e){
+    console.error('single match sync failed',e);
+    alert('比分同步失敗：'+(e?.message||e));
+    return false;
+  }
+}
+
 async function saveEventCloudNow(){
+  // 只有低頻的「結構變更」才整份寫入。
+  // syncVersion 讓其他手機知道需要重新抓一次賽程結構。
+  if(ev && !ev.testOnly)ev.syncVersion=Date.now();
+
   localEventSave();
   renderAdmin();
 
   if(ev?.testOnly)return true;
 
   if(!cloudReady||!ev?.id){
-    alert('目前尚未連上雲端，無法同步執裁狀態。');
+    alert('目前尚未連上雲端，無法同步。');
+    return false;
+  }
+
+  if(!fbAuth?.currentUser){
+    alert('目前是觀看模式，沒有雲端寫入權限。');
     return false;
   }
 
   try{
-    await rtdbRestPut(`events/${ev.id}`,ev,10000);
+    await cloudSet(`events/${ev.id}`,ev);
     return true;
   }catch(e){
     console.error('event cloud sync failed',e);
-
-    const msg=String(e?.message||e);
-    if(msg.includes('quota-exceeded')){
-      alert('Firebase 驗證額度暫時受限。這版已停用背景輪詢，請稍後再試一次。');
-      return false;
-    }
-
     const role=isReferee&&!isAdmin?'裁判':'主辦';
-    alert(`${role}雲端同步失敗：${msg}`);
+    alert(`${role}雲端同步失敗：${e?.message||e}`);
     return false;
   }
 }
@@ -2043,28 +2486,14 @@ function closeScorePicker(){
 async function chooseScore(v){
   if(!activeScoreTarget)return;
 
-  // 「清除比分」在比賽流程裡視為真正的 0 分，而不是空字串。
   const scoreValue=(v===''?0:+v);
-
-  const input=$(activeScoreTarget.inputId);
-  const btn=$(activeScoreTarget.buttonId);
-
-  if(input)input.value=scoreValue;
-
-  if(btn){
-    btn.textContent=scoreValue;
-    btn.classList.add('hasValue');
-  }
-
   const id=activeScoreTarget.inputId;
-
   let matchInfo=null;
 
   let mm=id.match(/^s(\d+)-(\d+)([ab])$/);
   if(mm&&ev?.rounds?.[+mm[1]]?.matches?.[+mm[2]]){
     const ri=+mm[1],mi=+mm[2],side=mm[3];
     const m=ev.rounds[ri].matches[mi];
-
     m[side==='a'?'sa':'sb']=scoreValue;
     matchInfo={kind:'round',ri,mi};
   }
@@ -2073,24 +2502,18 @@ async function chooseScore(v){
   if(mm&&ev?.finalRR?.matches?.[+mm[1]]){
     const mi=+mm[1],side=mm[2];
     const m=ev.finalRR.matches[mi];
-
     m[side==='a'?'sa':'sb']=scoreValue;
     matchInfo={kind:'rr',ri:0,mi};
   }
 
   closeScorePicker();
 
-  // 直接同步，讓背景對戰表的比分也立刻變成同一個數字。
   if(matchInfo){
-    await saveEventCloudNow();
+    const ok=await saveSingleMatchCloud(matchInfo.kind,matchInfo.ri,matchInfo.mi);
+    if(!ok)return;
 
-    // saveEventCloudNow() 會重畫對戰表；
-    // 再開回同一場編輯視窗，避免 UI 顯示舊資料。
-    if(matchInfo.kind==='rr'){
-      openRRMatch(matchInfo.mi);
-    }else{
-      openMatchEditor(matchInfo.ri,matchInfo.mi);
-    }
+    if(matchInfo.kind==='rr')openRRMatch(matchInfo.mi);
+    else openMatchEditor(matchInfo.ri,matchInfo.mi);
   }
 }
 
@@ -2196,8 +2619,6 @@ async function quickAddMatchScore(ri,mi,side,points,reason){
   if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
   if(matchReachedFinishThreshold(m))return;
 
-  // 進入修改比分時，先把舊的完成狀態暫時取消。
-  // 只有按下「記錄比分」且分數達到 4 分以上才重新完成。
   if(m.winner){
     m._previousWinner=m.winner;
     m.winner=null;
@@ -2210,29 +2631,11 @@ async function quickAddMatchScore(ri,mi,side,points,reason){
   if(m[other]==='')m[other]=0;
   m[key]=current+points;
 
-  // 同步上方比分顯示
-  const input=$(`s${ri}-${mi}${side}`);
-  const btn=$(`qm-${ri}-${mi}-${side}`);
-  if(input)input.value=m[key];
-  if(btn){
-    btn.textContent=m[key];
-    btn.classList.add('hasValue');
-  }
-
-  const otherSide=side==='a'?'b':'a';
-  const otherInput=$(`s${ri}-${mi}${otherSide}`);
-  const otherBtn=$(`qm-${ri}-${mi}-${otherSide}`);
-  if(otherInput)otherInput.value=m[other];
-  if(otherBtn&&m[other]!==''){
-    otherBtn.textContent=m[other];
-    otherBtn.classList.add('hasValue');
-  }
-
   syncQuickScoreDisplay('round',ri,mi,m);
 
-  // 只同步「進行中的比分」，不在這裡判定勝者。
-  await saveEventCloudNow();
-  openMatchEditor(ri,mi);
+  // 高頻操作只寫目前這一場，不再 PUT 整份 event。
+  const ok=await saveSingleMatchCloud('round',ri,mi);
+  if(ok)openMatchEditor(ri,mi);
 }
 
 async function quickAddRRScore(i,side,points,reason){
@@ -2255,27 +2658,10 @@ async function quickAddRRScore(i,side,points,reason){
   if(m[other]==='')m[other]=0;
   m[key]=current+points;
 
-  const input=$(`rr${i}${side}`);
-  const btn=$(`qrr-0-${i}-${side}`);
-  if(input)input.value=m[key];
-  if(btn){
-    btn.textContent=m[key];
-    btn.classList.add('hasValue');
-  }
-
-  const otherSide=side==='a'?'b':'a';
-  const otherInput=$(`rr${i}${otherSide}`);
-  const otherBtn=$(`qrr-0-${i}-${otherSide}`);
-  if(otherInput)otherInput.value=m[other];
-  if(otherBtn&&m[other]!==''){
-    otherBtn.textContent=m[other];
-    otherBtn.classList.add('hasValue');
-  }
-
   syncQuickScoreDisplay('rr',0,i,m);
 
-  await saveEventCloudNow();
-  openRRMatch(i);
+  const ok=await saveSingleMatchCloud('rr',0,i);
+  if(ok)openRRMatch(i);
 }
 
 
@@ -2531,7 +2917,7 @@ function openRRMatch(i){
 }
 function toggleBracketFull(){document.body.classList.toggle('bracketFullscreen');setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},80)}
 
-function addReferee(){
+async function addReferee(){
   if(!isAdmin&&!ev?.testOnly)return;
 
   normalizeEvent();
@@ -2542,8 +2928,20 @@ function addReferee(){
 
   ev.refereeCount+=1;
   ev.refereeNames.push(`裁判 ${ev.refereeCount}`);
+  localEventSave();
 
-  put();
+  if(!ev.testOnly){
+    try{
+      await cloudUpdate({
+        [`events/${ev.id}/refereeNames`]:ev.refereeNames,
+        [`events/${ev.id}/refereeCount`]:ev.refereeCount
+      });
+    }catch(e){
+      return alert('增加裁判失敗：'+(e?.message||e));
+    }
+  }
+
+  renderAdmin();
   showTab('referee');
 }
 
@@ -2603,6 +3001,91 @@ function rebuildDownstreamIfWinnerChanged(ri,oldWinner,newWinner){
   return true;
 }
 
+
+
+async function releaseMyOtherMatchesCloud(who,exceptKind,exceptRi,exceptMi){
+  if(!who||!ev)return;
+
+  const jobs=[];
+
+  (ev.rounds||[]).forEach((round,ri)=>{
+    (round.matches||[]).forEach((m,mi)=>{
+      if(
+        m &&
+        m.refereeActive &&
+        m.referee===who &&
+        !m.winner &&
+        !(exceptKind==='round' && ri===exceptRi && mi===exceptMi)
+      ){
+        m.referee='';
+        m.refereeActive=false;
+
+        if(!ev.testOnly){
+          jobs.push(cloudSet(`events/${ev.id}/rounds/${ri}/matches/${mi}`,m));
+        }
+      }
+    });
+  });
+
+  if(ev.finalRR?.matches){
+    ev.finalRR.matches.forEach((m,mi)=>{
+      if(
+        m &&
+        m.refereeActive &&
+        m.referee===who &&
+        !m.winner &&
+        !(exceptKind==='rr' && mi===exceptMi)
+      ){
+        m.referee='';
+        m.refereeActive=false;
+
+        if(!ev.testOnly){
+          jobs.push(cloudSet(`events/${ev.id}/finalRR/matches/${mi}`,m));
+        }
+      }
+    });
+  }
+
+  if(jobs.length){
+    await Promise.allSettled(jobs);
+  }
+}
+
+async function atomicClaimMatch(kind,ri,mi,who){
+  if(ev?.testOnly)return {ok:true,data:null};
+
+  if(!(await initCloud()))return {ok:false,error:'Firebase 尚未連線'};
+  if(!fbAuth?.currentUser)return {ok:false,error:'尚未取得裁判/主辦寫入權限'};
+
+  const ref=fbDb.ref(matchCloudPath(kind,ri,mi));
+
+  return await new Promise(resolve=>{
+    ref.transaction(current=>{
+      if(!current)return;
+
+      if(current.refereeActive && current.referee && current.referee!==who){
+        return; // abort
+      }
+
+      current.referee=who;
+      current.refereeActive=true;
+      return current;
+    },(error,committed,snapshot)=>{
+      if(error){
+        resolve({ok:false,error:error.message||String(error)});
+      }else if(!committed){
+        const current=snapshot?.val?.()||null;
+        resolve({
+          ok:false,
+          busyBy:current?.referee||'其他裁判'
+        });
+      }else{
+        resolve({ok:true,data:snapshot.val()});
+      }
+    },false);
+  });
+}
+
 async function claimMatchAs(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有執裁權限。');
 
@@ -2617,37 +3100,30 @@ async function claimMatchAs(ri,mi){
   if(btn){btn.disabled=true;btn.textContent='接手中…'}
 
   try{
-    // 開始前先讀最新雲端狀態，避免另一位裁判已經搶先接手。
-    if(!ev.testOnly){
-      const latest=await rtdbRestGet(`events/${ev.id}`,8000);
-      if(latest){
-        const lm=latest?.rounds?.[ri]?.matches?.[mi];
-        if(lm?.refereeActive && lm.referee!==who){
-          ev=latest;
-          localEventSave();
-          renderAdmin();
-          openMatchEditor(ri,mi);
-          return alert(`這場目前由 ${lm.referee} 執裁中。`);
-        }
-        ev=latest;
-      }
+    if(ev.testOnly){
+      releaseMyOtherMatches(who);
+      m.referee=who;
+      m.refereeActive=true;
+      localEventSave();
+      renderAdmin();
+      openMatchEditor(ri,mi);
+      return;
     }
 
-    m=ev.rounds?.[ri]?.matches?.[mi];
-    if(!m)return alert('找不到這場比賽資料。');
-    if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
+    await releaseMyOtherMatchesCloud(who,'round',ri,mi);
 
-    releaseMyOtherMatches(who);
-    m.referee=who;
-    m.refereeActive=true;
+    // 原子鎖只讀寫這一場，不先下載整份 event。
+    const result=await atomicClaimMatch('round',ri,mi,who);
 
-    const ok=await saveEventCloudNow();
-    if(!ok)return;
+    if(!result.ok){
+      if(result.busyBy)return alert(`這場目前由 ${result.busyBy} 執裁中。`);
+      return alert('開始執裁失敗：'+(result.error||'未知錯誤'));
+    }
 
+    ev.rounds[ri].matches[mi]=result.data;
+    localEventSave();
+    renderAdmin();
     openMatchEditor(ri,mi);
-  }catch(e){
-    console.error('claimMatchAs failed',e);
-    alert('開始執裁失敗：'+(e?.message||e));
   }finally{
     if(btn&&document.body.contains(btn)){
       btn.disabled=false;
@@ -2657,21 +3133,35 @@ async function claimMatchAs(ri,mi){
 }
 async function releaseMatchAny(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.rounds[ri].matches[mi];
   const me=currentRefereeName();
-  if(!isAdmin&&!ev?.testOnly&&m.referee!==me)return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
-  m.referee='';m.refereeActive=false;
-  await saveEventCloudNow();
-  openMatchEditor(ri,mi);
+
+  if(!isAdmin&&!ev?.testOnly&&m.referee!==me){
+    return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
+  }
+
+  m.referee='';
+  m.refereeActive=false;
+
+  const ok=await saveSingleMatchCloud('round',ri,mi);
+  if(ok)openMatchEditor(ri,mi);
 }
 async function releaseRRMatchAny(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.finalRR.matches[i];
   const me=currentRefereeName();
-  if(!isAdmin&&!ev?.testOnly&&m.referee!==me)return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
-  m.referee='';m.refereeActive=false;
-  await saveEventCloudNow();
-  openRRMatch(i);
+
+  if(!isAdmin&&!ev?.testOnly&&m.referee!==me){
+    return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
+  }
+
+  m.referee='';
+  m.refereeActive=false;
+
+  const ok=await saveSingleMatchCloud('rr',0,i);
+  if(ok)openRRMatch(i);
 }
 
 
@@ -2798,25 +3288,30 @@ function updateRefereeCodeCountdown(){
 async function refreshRefereeState(id){
   isReferee=false;
   if(!fbAuth?.currentUser)return false;
+
   try{
-    const v=await rtdbRestGet(`refereeUsers/${id}/${fbAuth.currentUser.uid}`,8000);
+    const snap=await fbDb.ref(`refereeUsers/${id}/${fbAuth.currentUser.uid}`).once('value');
+    const v=snap.exists()?snap.val():null;
     isReferee=v!==null && v!==undefined && v!==false;
-  }catch(e){console.warn('refreshRefereeState failed',e)}
+  }catch(e){
+    console.warn('refreshRefereeState failed',e);
+  }
+
   return isReferee;
 }
 async function claimRefereeAccess(){
-  if(!(await initCloud()))return;
+  if(!(await ensureRefereeAuth()))return;
+
   const code=$('joinRefereeCode')?.value.trim();
   if(!/^\d{6}$/.test(code))return alert('請輸入 6 位數裁判驗證碼。');
 
   try{
-    await rtdbRestPut(`refereeUsers/${ev.id}/${fbAuth.currentUser.uid}`,code,10000);
+    // 沿用同一個 LOCAL Firebase user，不會每次加分/切頁重新匿名登入。
+    await cloudSet(`refereeUsers/${ev.id}/${fbAuth.currentUser.uid}`,code);
     await refreshRefereeState(ev.id);
 
     if(!isReferee)return alert('驗證碼不正確或已過期。');
 
-    // 權限剛取得時，原本的對戰表仍是觀看版。
-    // 重新渲染整個賽程，讓比賽卡立即取得裁判 onclick 權限。
     renderAdmin();
     showTab('referee');
   }catch(e){
@@ -3085,6 +3580,9 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
       history.replaceState(null,'',location.pathname);
       renderSavedEvents();
       alert('這個雲端賽事已被刪除或不存在，分享連結已失效。');
+    }else if(result==='expired'){
+      history.replaceState(null,'',location.pathname);
+      alert('這場賽事的公開觀看已關閉或 6 小時有效時間已到期。');
     }else if(result==='error'){
       alert('目前無法連上雲端，請稍後再試。');
     }
