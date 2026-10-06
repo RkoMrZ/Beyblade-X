@@ -113,7 +113,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 </section>
 
 <section id="admin" class="hidden">
- <div class="adminTabs"><button onclick="showTab('bracket')">🏆 對戰表</button><button id="rosterTopBtn" class="secondary" onclick="showTab('roster')">👥 參賽名單</button><button id="organizerTopBtn" class="secondary" onclick="showTab('organizer')">🛡 主辦</button><button class="secondary" onclick="showTab('share')">🔗 QR／分享</button></div>
+ <div class="adminTabs"><button onclick="showTab('bracket')">🏆 對戰表</button><button id="organizerTopBtn" class="secondary" onclick="showTab('organizer')">🛡 主辦</button><button class="secondary" onclick="showTab('share')">🔗 QR／分享</button><button id="rosterTopBtn" class="secondary" onclick="showTab('roster')">👥 參賽名單</button></div>
  <div id="bracketTab"></div>
  <div id="rosterTab" class="hidden"></div>
  <div id="refereeTab" class="hidden"></div>
@@ -492,7 +492,9 @@ async function createTournament(){
    listenCloudEvent(ev.id);
    history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(ev.id)}`);
    $('create').classList.add('hidden');$('admin').classList.remove('hidden');
-   localEventSave();renderAdmin();
+   localEventSave();
+   markEventSaved(ev.id);
+   renderAdmin();
  }catch(e){
    console.error('createTournament cloud bootstrap failed',e);
    alert('建立雲端賽事失敗：'+e.message+'\n\n請確認 Firebase「規則」已發布。');
@@ -527,6 +529,7 @@ function pick(ri,mi,side){
  let m=ev.rounds[ri].matches[mi],v=side==='a'?m.a:m.b;if(v==='BYE')return;m.winner=v;m.refereeActive=false;m.referee='';put();ensureNext();put()
 }
 function score(ri,mi){
+  if(!isAdmin&&!ev?.testOnly)return;
  let m=ev.rounds[ri].matches[mi],a=$(`s${ri}-${mi}a`).value,b=$(`s${ri}-${mi}b`).value;
  if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
  m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;m.refereeActive=false;m.referee='';
@@ -535,6 +538,7 @@ function score(ri,mi){
  requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
 }
 function resetMatch(ri,mi){
+  if(!isAdmin&&!ev?.testOnly)return;
  ev.rounds=ev.rounds.slice(0,ri+1);ev.finalRR=null;let m=ev.rounds[ri].matches[mi];m.winner=null;m.sa='';m.sb='';m.refereeActive=false;m.referee='';put()
 }
 function swapPlayers(ri,i,j){
@@ -542,6 +546,7 @@ function swapPlayers(ri,i,j){
  let flat=r.matches.flatMap(m=>[m.a,m.b]);[flat[i],flat[j]]=[flat[j],flat[i]];r.matches=Array.from({length:Math.ceil(flat.length/2)},(_,k)=>match(flat[k*2],flat[k*2+1]));autoByes(r.matches);put()
 }
 function rrScore(i){
+  if(!isAdmin&&!ev?.testOnly)return;
  let m=ev.finalRR.matches[i],a=$(`rr${i}a`).value,b=$(`rr${i}b`).value;
  if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
  m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;m.refereeActive=false;m.referee='';
@@ -561,18 +566,21 @@ function roundLayout(ri){
 }
 function renderBracketMatch(m,ri,mi){
   const scoreA=m.sa===''?'–':m.sa, scoreB=m.sb===''?'–':m.sb;
-  return `<button type="button" class="bracketMatch ${m.winner?'done':''} ${m.refereeActive?'judging':''}" data-ri="${ri}" data-mi="${mi}" onclick="openMatchEditor(${ri},${mi})"><span class=tapEdit>點擊編輯</span><div class=matchNo>第 ${mi+1} 場</div>
+  const canEdit=isAdmin||!!ev?.testOnly;
+  return `<button type="button" class="bracketMatch ${m.winner?'done':''} ${m.refereeActive?'judging':''}" data-ri="${ri}" data-mi="${mi}" ${canEdit?`onclick="openMatchEditor(${ri},${mi})"`:'aria-disabled="true"'}><span class=tapEdit>${canEdit?'點擊編輯':'觀看'}</span><div class=matchNo>第 ${mi+1} 場</div>
     <div class="bSide ${m.winner===m.a?'winner':''}"><span class=bName>${m.winner===m.a?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.a)}</span></span><span class=bScore>${esc(scoreA)}</span></div>
     <div class="bSide ${m.winner===m.b?'winner':''}"><span class=bName>${m.winner===m.b?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.b)}</span></span><span class=bScore>${esc(scoreB)}</span></div>${m.refereeActive?`<span class="refTag live">⚖ 執裁中：${esc(m.referee)}</span>`:''}</button>`;
 }
 function refereeIdentityKey(){return `bx_ref_identity_${ev?.id||'default'}`}
 function getMyReferee(){return localStorage.getItem(refereeIdentityKey())||''}
 function setMyReferee(name){
+  if(!isAdmin&&!ev?.testOnly)return;
   if(name)localStorage.setItem(refereeIdentityKey(),name);
   else localStorage.removeItem(refereeIdentityKey());
   renderReferee();
 }
 function saveRefereeNames(){
+  if(!isAdmin&&!ev?.testOnly)return;
   normalizeEvent();
   ev.refereeNames=Array.from({length:ev.refereeCount},(_,i)=>{
     const v=$(`refName${i}`)?.value.trim();
@@ -611,6 +619,7 @@ function chooseScore(v){
   closeScorePicker();
 }
 function openMatchEditor(ri,mi){
+  if(!isAdmin&&!ev?.testOnly)return;
   let m=ev.rounds[ri].matches[mi];
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
     <div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="s${ri}-${mi}a" value="${m.sa}"><button type=button id="sb${ri}-${mi}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" onclick="openScorePicker('s${ri}-${mi}a','sb${ri}-${mi}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div>
@@ -674,7 +683,7 @@ function normalizeEvent(){
 function renderAdmin(){
   normalizeEvent();
   let flow=ev.mode==='free'&&ev.freeFinal==='rr3'?`${ev.roster.length} → ${Math.ceil(ev.roster.length/2)} → ${Math.ceil(ev.roster.length/4)} → 3 ＋ 最後三人循環`:'標準單淘汰';
-  let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2></div></div><div class=adminActions><button class=secondary onclick="showTab('organizer')">🛡 主辦</button><button class=secondary onclick="alert('分台功能下一版加入')">⚙ 分台</button><button class=secondary onclick="showTab('referee')">⚖ 裁判</button><button class=shareBtn onclick="showTab('share')">🔗 分享連結</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
+  let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2></div></div><div class=adminActions><button class=secondary onclick="alert('分台功能下一版加入')">⚙ 分台</button><button class=secondary onclick="showTab('referee')">⚖ 裁判</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
   let cols=ev.rounds.map((r,ri)=>{let l=roundLayout(ri);return `<section class=roundCol data-round="${ri}"><div class=roundHead><h3>${stageLabel(ri,r)}</h3><div class=roundSub>${r.matches.length} 場對戰</div></div><div class=roundMatches style="--top:${l.top}px;--gap:${l.gap}px">${r.matches.map((m,mi)=>renderBracketMatch(m,ri,mi)).join('')}</div></section>`}).join('');
   if(ev.finalRR)cols+=renderRR();
   $('bracketTab').innerHTML=top+`<div class=bracketShell><div class=bracketTools><div class=zoomGroup><button onclick="zoomBracket(-.1)">−</button><span class=zoomLabel>100%</span><button onclick="zoomBracket(.1)">＋</button><button onclick=fitBracket()>全覽</button></div><div class=bracketHint>拖曳查看・點比賽卡編輯</div><button class=viewToggle onclick=toggleBracketFull()>⛶</button></div><div class=bracketScroll><div class=bracketStage><div class=bracketCanvas><svg class=bracketLinks></svg>${cols}</div></div></div></div>`;
@@ -684,16 +693,19 @@ function renderAdmin(){
 function renderRR(){
   let f=ev.finalRR;
   let rows=f.players.map(p=>({p,w:f.matches.filter(m=>m.winner===p).length,l:f.matches.filter(m=>m.winner&&m.winner!==p&&(m.a===p||m.b===p)).length})).sort((a,b)=>b.w-a.w);
-  let games=f.matches.map((m,i)=>`<div class="rrMini ${m.refereeActive?'judging':''}" onclick="openRRMatch(${i})"><b>${esc(m.a)} vs ${esc(m.b)}</b><span>${m.sa===''?'–':m.sa} : ${m.sb===''?'–':m.sb}</span></div>`).join('');
+  const canEdit=isAdmin||!!ev?.testOnly;
+  let games=f.matches.map((m,i)=>`<div class="rrMini ${m.refereeActive?'judging':''}" ${canEdit?`onclick="openRRMatch(${i})"`:''}><b>${esc(m.a)} vs ${esc(m.b)}</b><span>${m.sa===''?'–':m.sa} : ${m.sb===''?'–':m.sb}</span></div>`).join('');
   return `<section class=rrCol><div class=roundHead><h3 style="color:#ff9b4a">👑 最後三人循環</h3><div class=roundSub>決定最終名次</div></div><div class=rrPanel><div class=rrPlayers>${rows.map((x,i)=>`<div class=rrRow><span class=rrRank>${i+1}</span><b>${esc(x.p)}</b><span>${x.w}-${x.l}</span></div>`).join('')}</div><div class=rrGames>${games}</div></div></section>`;
 }
 function openRRMatch(i){
+  if(!isAdmin&&!ev?.testOnly)return;
   let m=ev.finalRR.matches[i];
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>最後三人循環・第 ${i+1} 場</div><h3>${esc(m.a)} vs ${esc(m.b)}</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div><div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="rr${i}a" value="${m.sa}"><button type=button id="rrb${i}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" onclick="openScorePicker('rr${i}a','rrb${i}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div><div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="rr${i}b" value="${m.sb}"><button type=button id="rrb${i}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" onclick="openScorePicker('rr${i}b','rrb${i}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div><div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'rr',0,i)}</div><div class=sheetFooter style="grid-template-columns:1fr"><button onclick="rrScore(${i})">記錄比分</button></div>`;
   $('matchModal').classList.remove('hidden');
 }
 function toggleBracketFull(){document.body.classList.toggle('bracketFullscreen');setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},80)}
 function setRefereeCount(){
+  if(!isAdmin&&!ev?.testOnly)return;
   let n=Math.round(Number($('refereeCountInput')?.value||2));
   n=Math.max(1,Math.min(12,n));
   normalizeEvent();
@@ -702,21 +714,27 @@ function setRefereeCount(){
   put();showTab('referee');
 }
 function claimMatchAs(ri,mi,who){
+  if(!isAdmin&&!ev?.testOnly)return;
   let m=ev.rounds[ri].matches[mi];
   if(m.winner)return alert('這場已完成。');
   if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
   releaseMyOtherMatches(who);m.referee=who;m.refereeActive=true;put();openMatchEditor(ri,mi);
 }
-function releaseMatchAny(ri,mi){let m=ev.rounds[ri].matches[mi];m.referee='';m.refereeActive=false;put();openMatchEditor(ri,mi)}
+function releaseMatchAny(ri,mi){if(!isAdmin&&!ev?.testOnly)return;let m=ev.rounds[ri].matches[mi];m.referee='';m.refereeActive=false;put();openMatchEditor(ri,mi)}
 function claimRRMatchAs(i,who){
+  if(!isAdmin&&!ev?.testOnly)return;
   let m=ev.finalRR.matches[i];
   if(m.winner)return alert('這場已完成。');
   if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
   releaseMyOtherMatches(who);m.referee=who;m.refereeActive=true;put();openRRMatch(i);
 }
-function releaseRRMatchAny(i){let m=ev.finalRR.matches[i];m.referee='';m.refereeActive=false;put();openRRMatch(i)}
+function releaseRRMatchAny(i){if(!isAdmin&&!ev?.testOnly)return;let m=ev.finalRR.matches[i];m.referee='';m.refereeActive=false;put();openRRMatch(i)}
 function releaseMyOtherMatches(who){ev.rounds.forEach(r=>r.matches.forEach(m=>{if(m.refereeActive&&m.referee===who){m.referee='';m.refereeActive=false}}));if(ev.finalRR)ev.finalRR.matches.forEach(m=>{if(m.refereeActive&&m.referee===who){m.referee='';m.refereeActive=false}})}
 function renderReferee(){
+  if(!isAdmin&&!ev?.testOnly){
+    $('refereeTab').innerHTML='';
+    return;
+  }
   normalizeEvent();
   const n=ev.refereeCount||2,me=getMyReferee();
   const names=ev.refereeNames.map((name,i)=>`<div class=player><span class=num>${i+1}</span><input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}"></div>`).join('');
@@ -732,11 +750,12 @@ function renderReferee(){
 
 function applyAccessUI(){
   const r=$('rosterTopBtn'),o=$('organizerTopBtn');
+  const adminInvite=new URLSearchParams(location.search).get('admin')==='1';
   if(r)r.classList.toggle('hidden',!isAdmin);
-  if(o)o.classList.remove('hidden');
+  if(o)o.classList.toggle('hidden',!(isAdmin||adminInvite||ev?.testOnly));
   document.querySelectorAll('.adminActions button').forEach(b=>{
-    const txt=b.textContent||'';
-    if(!isAdmin && !txt.includes('分享') && !txt.includes('主辦'))b.classList.add('hidden');
+    if(!isAdmin&&!ev?.testOnly)b.classList.add('hidden');
+    else b.classList.remove('hidden');
   });
 }
 function organizerUrl(){return location.origin+location.pathname+`?event=${encodeURIComponent(ev.id)}&admin=1`}
@@ -772,18 +791,25 @@ function renderRoster(){
  $('rosterTab').innerHTML=`<div class=card><h3>編輯參賽名單</h3><div class=notice>對戰表建立後修改姓名會同步改名；新增／刪除選手會影響籤表，因此目前只允許在尚未有比賽結果時重建。</div><div id=editRoster>${ev.roster.map((n,i)=>`<div class=player><span class=num>${i+1}</span><input value="${esc(n)}" onchange="rename(${i},this.value)"><button class="mini danger" onclick="delPlayer(${i})">刪</button></div>`).join('')}</div><div class=row><input id=newPlayer placeholder="新增選手"><button onclick=addPlayer()>＋新增</button></div><div class=toolbar style="margin-top:10px"><button class=secondary onclick=rebuild()>依目前名單重建籤表</button><button class=secondary onclick=randomRebuild()>🎲 抽籤重建</button></div></div>`
 }
 function noResults(){return ev.rounds.every(r=>r.matches.every(m=>!m.winner||m.a==='BYE'||m.b==='BYE'))&&!ev.finalRR}
-function rename(i,v){let old=ev.roster[i],nv=v.trim()||old;ev.roster[i]=nv;ev.rounds.forEach(r=>r.matches.forEach(m=>{if(m.a===old)m.a=nv;if(m.b===old)m.b=nv;if(m.winner===old)m.winner=nv}));if(ev.finalRR){ev.finalRR.players=ev.finalRR.players.map(x=>x===old?nv:x);ev.finalRR.matches.forEach(m=>{if(m.a===old)m.a=nv;if(m.b===old)m.b=nv;if(m.winner===old)m.winner=nv})}put()}
-function delPlayer(i){if(!noResults())return alert('已有比賽結果，請先重設／重建後再刪除。');ev.roster.splice(i,1);rebuild()}
-function addPlayer(){let v=$('newPlayer').value.trim();if(!v)return; if(!noResults())return alert('已有比賽結果，請先重設／重建後再新增。');ev.roster.push(v);rebuild()}
-function rebuild(){ev.rounds=[];ev.finalRR=null;buildFirst();put()}
-function randomRebuild(){ev.roster=shuffle(ev.roster);ev.pairing='random';rebuild()}
-function showTab(t){['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))}
+function rename(i,v){if(!isAdmin&&!ev?.testOnly)return;let old=ev.roster[i],nv=v.trim()||old;ev.roster[i]=nv;ev.rounds.forEach(r=>r.matches.forEach(m=>{if(m.a===old)m.a=nv;if(m.b===old)m.b=nv;if(m.winner===old)m.winner=nv}));if(ev.finalRR){ev.finalRR.players=ev.finalRR.players.map(x=>x===old?nv:x);ev.finalRR.matches.forEach(m=>{if(m.a===old)m.a=nv;if(m.b===old)m.b=nv;if(m.winner===old)m.winner=nv})}put()}
+function delPlayer(i){if(!isAdmin&&!ev?.testOnly)return;if(!noResults())return alert('已有比賽結果，請先重設／重建後再刪除。');ev.roster.splice(i,1);rebuild()}
+function addPlayer(){if(!isAdmin&&!ev?.testOnly)return;let v=$('newPlayer').value.trim();if(!v)return; if(!noResults())return alert('已有比賽結果，請先重設／重建後再新增。');ev.roster.push(v);rebuild()}
+function rebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.rounds=[];ev.finalRR=null;buildFirst();put()}
+function randomRebuild(){if(!isAdmin&&!ev?.testOnly)return;ev.roster=shuffle(ev.roster);ev.pairing='random';rebuild()}
+function showTab(t){
+  const adminInvite=new URLSearchParams(location.search).get('admin')==='1';
+  if(!isAdmin&&!ev?.testOnly){
+    if(t==='roster'||t==='referee')t='bracket';
+    if(t==='organizer'&&!adminInvite)t='bracket';
+  }
+  ['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))
+}
 function renderShare(){
  if(ev?.testOnly){
    $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這場是本機測試賽事，沒有雲端網址，因此不提供 QR 分享或跨手機同步。</div></div>`;
    return;
  }
- $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這是公開觀看連結。觀眾可以即時看到比分與晉級，但沒有管理權。</div><label>公開觀看網址</label><input id=pubUrl readonly value="${esc(publicUrl())}"><div id=qr class=qrbox></div><div class=toolbar><button onclick=copyPublic()>複製連結</button><button class=secondary onclick=nativeShare()>分享到 LINE／其他 App</button></div></div>`;
+ $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這是公開觀看連結。觀眾只能查看即時比分與晉級，以及分享連結；不能修改賽程、比分或裁判狀態。</div><label>公開觀看網址</label><input id=pubUrl readonly value="${esc(publicUrl())}"><div id=qr class=qrbox></div><div class=toolbar><button onclick=copyPublic()>複製連結</button><button class=secondary onclick=nativeShare()>分享到 LINE／其他 App</button></div></div>`;
  setTimeout(()=>{let q=$('qr');q.innerHTML='';if(window.QRCode)new QRCode(q,{text:publicUrl(),width:180,height:180})},0)
 }
 async function copyPublic(){await navigator.clipboard.writeText(publicUrl());alert('已複製連結')}
