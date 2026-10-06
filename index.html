@@ -39,7 +39,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .quickScoreSide{min-width:0;padding:10px;border:1px solid #2d3748;border-radius:14px;background:#0d131c}
 .quickScoreHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .quickScoreName{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.quickScoreTotal{min-width:38px;text-align:center;padding:5px 8px;border:1px solid #ff7d45;border-radius:10px;background:#2b1c15;color:#ffb17e;font-weight:900}
+.quickScoreTotal{min-width:48px;min-height:44px;text-align:center;padding:5px 10px;border:1px solid #ff7d45;border-radius:12px;background:#2b1c15;color:#ffb17e;font-weight:900;font-size:20px}.quickScoreTotal:disabled{opacity:.55;cursor:not-allowed}
 .quickScoreBtns{display:grid;grid-template-columns:1fr;gap:6px}
 .quickScoreBtns button{min-height:42px;padding:7px 8px;font-size:13px;line-height:1.15}
 .quickScoreHint{margin-top:9px;font-size:12px;color:#9ba6b8;line-height:1.45}
@@ -1130,21 +1130,27 @@ function pick(ri,mi,side){
 }
 async function score(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.rounds[ri].matches[mi];
 
   if(!canEditMatchScore(m)){
     return alert('請先按「開始執裁／修改比分」，取得這一場的執裁權限後才能記錄比分。');
   }
 
-  let a=$(`s${ri}-${mi}a`).value,b=$(`s${ri}-${mi}b`).value;
-  if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
+  let a=$(`s${ri}-${mi}a`).value;
+  let b=$(`s${ri}-${mi}b`).value;
 
-  const oldWinner=m.winner||null;
+  if(a===''||b==='')return alert('請先輸入雙方比分。');
+  if(+a===+b)return alert('雙方比分不能相同。');
+  if(Math.max(+a,+b)<4)return alert('至少一方必須達到 4 分，才能記錄此場完成。');
+
+  const oldWinner=m._previousWinner || m.winner || null;
   const newWinner=+a>+b?m.a:m.b;
 
   m.sa=a;
   m.sb=b;
   m.winner=newWinner;
+  delete m._previousWinner;
   m.refereeActive=false;
   m.referee='';
 
@@ -1155,7 +1161,10 @@ async function score(ri,mi){
 
   closeMatchEditor();
   showTab('bracket');
-  requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+  requestAnimationFrame(()=>{
+    setBracketScale(bracketScale);
+    drawBracketLinks();
+  });
 
   if(rebuilt){
     alert('比分已修改。因勝者改變，後續賽程已依新的勝者重新產生。');
@@ -1241,18 +1250,24 @@ async function claimRRMatchAs(i){
 
 async function rrScore(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.finalRR.matches[i];
 
   if(!canEditMatchScore(m)){
     return alert('請先按「開始執裁／修改比分」，取得這一場的執裁權限後才能記錄比分。');
   }
 
-  let a=$(`rr${i}a`).value,b=$(`rr${i}b`).value;
-  if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
+  let a=$(`rr${i}a`).value;
+  let b=$(`rr${i}b`).value;
+
+  if(a===''||b==='')return alert('請先輸入雙方比分。');
+  if(+a===+b)return alert('雙方比分不能相同。');
+  if(Math.max(+a,+b)<4)return alert('至少一方必須達到 4 分，才能記錄此場完成。');
 
   m.sa=a;
   m.sb=b;
   m.winner=+a>+b?m.a:m.b;
+  delete m._previousWinner;
   m.refereeActive=false;
   m.referee='';
 
@@ -1260,7 +1275,10 @@ async function rrScore(i){
 
   closeMatchEditor();
   showTab('bracket');
-  requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+  requestAnimationFrame(()=>{
+    setBracketScale(bracketScale);
+    drawBracketLinks();
+  });
 }
 function stageLabel(ri,r){
   if(ev.mode==='free'&&ev.freeFinal==='rr3'){
@@ -1392,9 +1410,33 @@ function closeScorePicker(){
 }
 function chooseScore(v){
   if(!activeScoreTarget)return;
-  const input=$(activeScoreTarget.inputId),btn=$(activeScoreTarget.buttonId);
+
+  const input=$(activeScoreTarget.inputId);
+  const btn=$(activeScoreTarget.buttonId);
+
   if(input)input.value=v;
-  if(btn){btn.textContent=v===''?'比分':v;btn.classList.toggle('hasValue',v!=='');}
+  if(btn){
+    btn.textContent=v===''?'0':v;
+    btn.classList.toggle('hasValue',v!=='');
+  }
+
+  // 直接修改數字時，同步回目前的比賽資料。
+  const id=activeScoreTarget.inputId;
+
+  let mm=id.match(/^s(\d+)-(\d+)([ab])$/);
+  if(mm&&ev?.rounds?.[+mm[1]]?.matches?.[+mm[2]]){
+    const m=ev.rounds[+mm[1]].matches[+mm[2]];
+    m[mm[3]==='a'?'sa':'sb']=v===''?0:+v;
+    localEventSave();
+  }
+
+  mm=id.match(/^rr(\d+)([ab])$/);
+  if(mm&&ev?.finalRR?.matches?.[+mm[1]]){
+    const m=ev.finalRR.matches[+mm[1]];
+    m[mm[2]==='a'?'sa':'sb']=v===''?0:+v;
+    localEventSave();
+  }
+
   closeScorePicker();
 }
 
@@ -1408,64 +1450,79 @@ function scoreEventButtons(handler){
 }
 
 function quickScoreHtml(m,kind,ri,mi,enabled){
-  if(!enabled)return '';
   const aScore=m.sa===''?0:+m.sa;
   const bScore=m.sb===''?0:+m.sb;
-  const aHandler=kind==='rr'
-    ? `quickAddRRScore.bind(null,${mi},'a')`
-    : `quickAddMatchScore.bind(null,${ri},${mi},'a')`;
-  const bHandler=kind==='rr'
-    ? `quickAddRRScore.bind(null,${mi},'b')`
-    : `quickAddMatchScore.bind(null,${ri},${mi},'b')`;
 
-  // bind() 不能直接塞進 inline onclick，所以這裡產生實際函式字串。
+  const aInputId=kind==='rr'?`rr${mi}a`:`s${ri}-${mi}a`;
+  const bInputId=kind==='rr'?`rr${mi}b`:`s${ri}-${mi}b`;
+  const aScoreId=kind==='rr'?`qrr-0-${mi}-a`:`qm-${ri}-${mi}-a`;
+  const bScoreId=kind==='rr'?`qrr-0-${mi}-b`:`qm-${ri}-${mi}-b`;
+  const disabled=enabled?'':'disabled';
+
   const aButtons=kind==='rr'
     ? `
-      <button type=button onclick="quickAddRRScore(${mi},'a',1,'對方違規')">對方違規</button>
-      <button type=button onclick="quickAddRRScore(${mi},'a',1,'轉停')">轉停</button>
-      <button type=button onclick="quickAddRRScore(${mi},'a',2,'爆裂')">爆裂</button>
-      <button type=button onclick="quickAddRRScore(${mi},'a',2,'擊飛')">擊飛</button>
-      <button type=button onclick="quickAddRRScore(${mi},'a',3,'極限')">極限</button>`
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',1,'對方違規')">對方違規</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',1,'轉停')">轉停</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',2,'爆裂')">爆裂</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',2,'擊飛')">擊飛</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',3,'極限')">極限</button>`
     : `
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',1,'對方違規')">對方違規</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',1,'轉停')">轉停</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',2,'爆裂')">爆裂</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',2,'擊飛')">擊飛</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'a',3,'極限')">極限</button>`;
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',1,'對方違規')">對方違規</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',1,'轉停')">轉停</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',2,'爆裂')">爆裂</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',2,'擊飛')">擊飛</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',3,'極限')">極限</button>`;
 
   const bButtons=kind==='rr'
     ? `
-      <button type=button onclick="quickAddRRScore(${mi},'b',1,'對方違規')">對方違規</button>
-      <button type=button onclick="quickAddRRScore(${mi},'b',1,'轉停')">轉停</button>
-      <button type=button onclick="quickAddRRScore(${mi},'b',2,'爆裂')">爆裂</button>
-      <button type=button onclick="quickAddRRScore(${mi},'b',2,'擊飛')">擊飛</button>
-      <button type=button onclick="quickAddRRScore(${mi},'b',3,'極限')">極限</button>`
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',1,'對方違規')">對方違規</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',1,'轉停')">轉停</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',2,'爆裂')">爆裂</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',2,'擊飛')">擊飛</button>
+      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',3,'極限')">極限</button>`
     : `
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',1,'對方違規')">對方違規</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',1,'轉停')">轉停</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',2,'爆裂')">爆裂</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',2,'擊飛')">擊飛</button>
-      <button type=button onclick="quickAddMatchScore(${ri},${mi},'b',3,'極限')">極限</button>`;
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',1,'對方違規')">對方違規</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',1,'轉停')">轉停</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',2,'爆裂')">爆裂</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',2,'擊飛')">擊飛</button>
+      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',3,'極限')">極限</button>`;
 
   return `<div class=quickScoreBox>
     <div class=quickScoreTitle>⚡ 快速加分</div>
+
     <div class=quickScorePlayers>
       <div class=quickScoreSide>
+        <input type=hidden id="${aInputId}" value="${m.sa}">
         <div class=quickScoreHead>
           <div class=quickScoreName>${esc(m.a)}</div>
-          <div class=quickScoreTotal id="${kind==='rr'?'qrr':'qm'}-${ri}-${mi}-a">${aScore}</div>
+          <button type=button
+            class=quickScoreTotal
+            id="${aScoreId}"
+            ${disabled}
+            onclick="openScorePicker('${aInputId}','${aScoreId}')"
+          >${aScore}</button>
         </div>
-        <div class=quickScoreBtns>${aButtons}</div>
+        ${enabled?`<div class=quickScoreBtns>${aButtons}</div>`:''}
       </div>
+
       <div class=quickScoreSide>
+        <input type=hidden id="${bInputId}" value="${m.sb}">
         <div class=quickScoreHead>
           <div class=quickScoreName>${esc(m.b)}</div>
-          <div class=quickScoreTotal id="${kind==='rr'?'qrr':'qm'}-${ri}-${mi}-b">${bScore}</div>
+          <button type=button
+            class=quickScoreTotal
+            id="${bScoreId}"
+            ${disabled}
+            onclick="openScorePicker('${bInputId}','${bScoreId}')"
+          >${bScore}</button>
         </div>
-        <div class=quickScoreBtns>${bButtons}</div>
+        ${enabled?`<div class=quickScoreBtns>${bButtons}</div>`:''}
       </div>
     </div>
-    <div class=quickScoreHint>達到 4 分（或以上）會自動判定勝者並送出結果；按鈕只顯示判定名稱，分值由系統自動計算。</div>
+
+    <div class=quickScoreHint>
+      點右側數字可直接修改比分；快速加分只會累計比分。至少一方達到 4 分後，再按「記錄比分」完成此場。
+    </div>
   </div>`;
 }
 
@@ -1479,100 +1536,87 @@ function syncQuickScoreDisplay(kind,ri,mi,m){
 
 async function quickAddMatchScore(ri,mi,side,points,reason){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.rounds?.[ri]?.matches?.[mi];
   if(!m)return alert('找不到這場比賽資料。');
   if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
 
-  // 已完成場次進入修改模式時，快速加分不自動改寫既有勝者；
-  // 這種情況仍可用上方比分按鈕精確修正後再按「記錄比分」。
-  const wasCompleted=!!m.winner;
+  // 進入修改比分時，先把舊的完成狀態暫時取消。
+  // 只有按下「記錄比分」且分數達到 4 分以上才重新完成。
+  if(m.winner){
+    m._previousWinner=m.winner;
+    m.winner=null;
+  }
 
   const key=side==='a'?'sa':'sb';
   const other=side==='a'?'sb':'sa';
   const current=m[key]===''?0:+m[key];
+
   if(m[other]==='')m[other]=0;
   m[key]=current+points;
 
-  // 同步上方比分顯示。
+  // 同步上方比分顯示
   const input=$(`s${ri}-${mi}${side}`);
-  const btn=$(`sb${ri}-${mi}${side}`);
+  const btn=$(`qm-${ri}-${mi}-${side}`);
   if(input)input.value=m[key];
-  if(btn){btn.textContent=m[key];btn.classList.add('hasValue');}
+  if(btn){
+    btn.textContent=m[key];
+    btn.classList.add('hasValue');
+  }
+
   const otherSide=side==='a'?'b':'a';
   const otherInput=$(`s${ri}-${mi}${otherSide}`);
-  const otherBtn=$(`sb${ri}-${mi}${otherSide}`);
+  const otherBtn=$(`qm-${ri}-${mi}-${otherSide}`);
   if(otherInput)otherInput.value=m[other];
-  if(otherBtn&&m[other]!=='' ){otherBtn.textContent=m[other];otherBtn.classList.add('hasValue');}
+  if(otherBtn&&m[other]!==''){
+    otherBtn.textContent=m[other];
+    otherBtn.classList.add('hasValue');
+  }
 
   syncQuickScoreDisplay('round',ri,mi,m);
 
-  if(wasCompleted){
-    localEventSave();
-    return;
-  }
-
-  if(+m[key]>=4){
-    const oldWinner=m.winner||null;
-    const newWinner=side==='a'?m.a:m.b;
-    m.winner=newWinner;
-    m.refereeActive=false;
-    m.referee='';
-
-    const rebuilt=rebuildDownstreamIfWinnerChanged(ri,oldWinner,newWinner);
-    if(!rebuilt)ensureNext();
-
-    await saveEventCloudNow();
-    closeMatchEditor();
-    showTab('bracket');
-    requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
-    return;
-  }
-
+  // 只同步「進行中的比分」，不在這裡判定勝者。
   await saveEventCloudNow();
   openMatchEditor(ri,mi);
 }
 
 async function quickAddRRScore(i,side,points,reason){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
   let m=ev.finalRR?.matches?.[i];
   if(!m)return alert('找不到這場循環賽資料。');
   if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
 
-  const wasCompleted=!!m.winner;
+  if(m.winner){
+    m._previousWinner=m.winner;
+    m.winner=null;
+  }
+
   const key=side==='a'?'sa':'sb';
   const other=side==='a'?'sb':'sa';
   const current=m[key]===''?0:+m[key];
+
   if(m[other]==='')m[other]=0;
   m[key]=current+points;
 
   const input=$(`rr${i}${side}`);
-  const btn=$(`rrb${i}${side}`);
+  const btn=$(`qrr-0-${i}-${side}`);
   if(input)input.value=m[key];
-  if(btn){btn.textContent=m[key];btn.classList.add('hasValue');}
+  if(btn){
+    btn.textContent=m[key];
+    btn.classList.add('hasValue');
+  }
+
   const otherSide=side==='a'?'b':'a';
   const otherInput=$(`rr${i}${otherSide}`);
-  const otherBtn=$(`rrb${i}${otherSide}`);
+  const otherBtn=$(`qrr-0-${i}-${otherSide}`);
   if(otherInput)otherInput.value=m[other];
-  if(otherBtn&&m[other]!=='' ){otherBtn.textContent=m[other];otherBtn.classList.add('hasValue');}
+  if(otherBtn&&m[other]!==''){
+    otherBtn.textContent=m[other];
+    otherBtn.classList.add('hasValue');
+  }
 
   syncQuickScoreDisplay('rr',0,i,m);
-
-  if(wasCompleted){
-    localEventSave();
-    return;
-  }
-
-  if(+m[key]>=4){
-    m.winner=side==='a'?m.a:m.b;
-    m.refereeActive=false;
-    m.referee='';
-
-    await saveEventCloudNow();
-    closeMatchEditor();
-    showTab('bracket');
-    requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
-    return;
-  }
 
   await saveEventCloudNow();
   openRRMatch(i);
@@ -1584,8 +1628,6 @@ function openMatchEditor(ri,mi){
   const scoreEnabled=canEditMatchScore(m);
   const scoreDisabled=scoreEnabled?'':'disabled';
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
-    <div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="s${ri}-${mi}a" value="${m.sa}"><button type=button id="sb${ri}-${mi}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('s${ri}-${mi}a','sb${ri}-${mi}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div>
-    <div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="s${ri}-${mi}b" value="${m.sb}"><button type=button id="sb${ri}-${mi}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('s${ri}-${mi}b','sb${ri}-${mi}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div>
     <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
     ${quickScoreHtml(m,'round',ri,mi,scoreEnabled)}
     ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分與記錄比分。</div>`:''}
@@ -1736,35 +1778,7 @@ function openRRMatch(i){
       <button class=sheetClose onclick=closeMatchEditor()>✕</button>
     </div>
 
-    <div class=sheetPlayer>
-      <b>${esc(m.a)}</b>
-      <div>
-        <input type=hidden id="rr${i}a" value="${m.sa}">
-        <button
-          type=button
-          id="rrb${i}a"
-          class="scorePickBtn ${m.sa!==''?'hasValue':''}"
-          ${scoreDisabled}
-          onclick="openScorePicker('rr${i}a','rrb${i}a')"
-        >${m.sa===''?'比分':esc(m.sa)}</button>
-      </div>
-    </div>
-
-    <div class=sheetPlayer>
-      <b>${esc(m.b)}</b>
-      <div>
-        <input type=hidden id="rr${i}b" value="${m.sb}">
-        <button
-          type=button
-          id="rrb${i}b"
-          class="scorePickBtn ${m.sb!==''?'hasValue':''}"
-          ${scoreDisabled}
-          onclick="openScorePicker('rr${i}b','rrb${i}b')"
-        >${m.sb===''?'比分':esc(m.sb)}</button>
-      </div>
-    </div>
-
-    <div class=sheetRef>
+<div class=sheetRef>
       <b>裁判狀態</b>
       ${refereeStatusHtml(m,'rr',0,i)}
     </div>
