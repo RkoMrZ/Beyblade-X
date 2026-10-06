@@ -1401,6 +1401,31 @@ function setRefereeCount(){
   ev.refereeNames=Array.from({length:n},(_,i)=>ev.refereeNames[i]||`裁判 ${i+1}`);
   put();showTab('referee');
 }
+
+function releaseMyOtherMatches(who){
+  if(!ev||!who)return;
+
+  // 一位裁判同一時間只允許執裁一場。
+  // 接新場次時，自動釋放自己先前尚未完成的其他場次。
+  (ev.rounds||[]).forEach(round=>{
+    (round.matches||[]).forEach(m=>{
+      if(m && m.refereeActive && m.referee===who && !m.winner){
+        m.refereeActive=false;
+        m.referee='';
+      }
+    });
+  });
+
+  if(ev.finalRR?.matches){
+    ev.finalRR.matches.forEach(m=>{
+      if(m && m.refereeActive && m.referee===who && !m.winner){
+        m.refereeActive=false;
+        m.referee='';
+      }
+    });
+  }
+}
+
 async function claimMatchAs(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有執裁權限。');
 
