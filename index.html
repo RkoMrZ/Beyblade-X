@@ -210,7 +210,7 @@ const FIREBASE_CONFIG = {
   measurementId: "G-CPL47L0CV5"
 };
 const STORE='bx_events_v2', CURRENT='bx_current_v2', SAVED='bx_saved_events_v1', KEEP='bx_test_event_v1'; let draftMode='free', draftStorage='cloud', ev=null;
-let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,cloudPollTimer=null,cloudPollBusy=false,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
+let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
 function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
@@ -621,7 +621,6 @@ function listenCloudEvent(id){
   if(!cloudReady)return;
 
   if(cloudUnsub)cloudUnsub();
-  if(cloudPollTimer){clearInterval(cloudPollTimer);cloudPollTimer=null}
 
   let lastCloudSig='';
 
@@ -630,7 +629,9 @@ function listenCloudEvent(id){
       stopAdminCodeRotation();
       stopRefereeCodeRotation();
       purgeLocalEvent(id);
+
       if(ev?.id===id)ev=null;
+
       ['create','admin'].forEach(x=>$(x).classList.add('hidden'));
       $('home').classList.remove('hidden');
       history.replaceState(null,'',location.pathname);
@@ -642,8 +643,6 @@ function listenCloudEvent(id){
     if(sig===lastCloudSig)return;
     lastCloudSig=sig;
 
-    // 不覆蓋目前正開啟的比分小視窗內容，但更新背景賽程。
-    const modalOpen=$('matchModal')&&!$('matchModal').classList.contains('hidden');
     ev=data;
     localEventSave();
 
@@ -651,32 +650,16 @@ function listenCloudEvent(id){
     $('create').classList.add('hidden');
     $('admin').classList.remove('hidden');
 
-    if(!modalOpen)renderAdmin();
-    else {
-      // 背景對戰表也要更新「執裁中」狀態
-      renderAdmin();
-    }
+    renderAdmin();
   };
 
-  // Firebase 即時 listener 保留。
+  // 主要同步只使用 Firebase Realtime Database 即時 listener。
+  // 不再固定每幾秒 REST 輪詢，避免長時間比賽產生不必要請求。
   const ref=fbDb.ref(`events/${id}`);
   const cb=s=>applyCloudEvent(s.exists()?s.val():null);
+
   ref.on('value',cb);
   cloudUnsub=()=>ref.off('value',cb);
-
-  // iOS Safari / Web App 有時 RTDB listener 不穩，補一個 REST 1 秒輪詢。
-  cloudPollTimer=setInterval(async()=>{
-    if(cloudPollBusy||!ev||ev.id!==id)return;
-    cloudPollBusy=true;
-    try{
-      const data=await rtdbRestGet(`events/${id}`,7000);
-      applyCloudEvent(data);
-    }catch(e){
-      console.warn('cloud poll failed',e);
-    }finally{
-      cloudPollBusy=false;
-    }
-  },3000);
 }
 async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
@@ -943,6 +926,7 @@ async function rtdbRestPatchRoot(updates,timeoutMs=12000){
 }
 
 let restTokenCache={token:null,ts:0};
+// 低請求量模式：Token 快取 + 即時 listener；REST 只在關鍵操作前/寫入時使用。
 
 async function getRestIdToken(force=false){
   if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
@@ -1141,6 +1125,32 @@ async function score(ri,mi){
   let b=$(`s${ri}-${mi}b`).value;
 
   if(a===''||b==='')return alert('請先輸入雙方比分。');
+
+  // 特例：0 : 0 = 取消／關閉這場目前的執裁結果。
+  // 用在點錯場次或要把已完成場次退回「尚未完成」。
+  if(+a===0 && +b===0){
+    const hadWinner=!!(m._previousWinner || m.winner);
+
+    m.sa=0;
+    m.sb=0;
+    m.winner=null;
+    delete m._previousWinner;
+    m.refereeActive=false;
+    m.referee='';
+
+    if(hadWinner)clearDownstreamAfterMatchReset(ri);
+
+    await saveEventCloudNow();
+
+    closeMatchEditor();
+    showTab('bracket');
+    requestAnimationFrame(()=>{
+      setBracketScale(bracketScale);
+      drawBracketLinks();
+    });
+    return;
+  }
+
   if(+a===+b)return alert('雙方比分不能相同。');
   if(Math.max(+a,+b)<4)return alert('至少一方必須達到 4 分，才能記錄此場完成。');
 
@@ -1170,9 +1180,32 @@ async function score(ri,mi){
     alert('比分已修改。因勝者改變，後續賽程已依新的勝者重新產生。');
   }
 }
-function resetMatch(ri,mi){
-  if(!isAdmin&&!ev?.testOnly)return;
- ev.rounds=ev.rounds.slice(0,ri+1);ev.finalRR=null;let m=ev.rounds[ri].matches[mi];m.winner=null;m.sa='';m.sb='';m.refereeActive=false;m.referee='';put()
+async function resetMatch(ri,mi){
+  if(!isAdmin&&!ev?.testOnly)return alert('只有主辦可以重設場次。');
+
+  const m=ev.rounds?.[ri]?.matches?.[mi];
+  if(!m)return alert('找不到這場比賽資料。');
+
+  const hadWinner=!!(m._previousWinner || m.winner);
+
+  m.winner=null;
+  m.sa=0;
+  m.sb=0;
+  delete m._previousWinner;
+  m.refereeActive=false;
+  m.referee='';
+
+  if(hadWinner)clearDownstreamAfterMatchReset(ri);
+
+  const ok=await saveEventCloudNow();
+  if(!ok)return;
+
+  closeMatchEditor();
+  showTab('bracket');
+  requestAnimationFrame(()=>{
+    setBracketScale(bracketScale);
+    drawBracketLinks();
+  });
 }
 function swapPlayers(ri,i,j){
  if(i<0||j<0)return;let r=ev.rounds[ri]; if(r.matches.some(m=>m.winner))return alert('本輪已有結果，請先重設再調整。');
@@ -1261,6 +1294,27 @@ async function rrScore(i){
   let b=$(`rr${i}b`).value;
 
   if(a===''||b==='')return alert('請先輸入雙方比分。');
+
+  // 循環賽同樣支援 0 : 0 直接把該場退回未完成狀態。
+  if(+a===0 && +b===0){
+    m.sa=0;
+    m.sb=0;
+    m.winner=null;
+    delete m._previousWinner;
+    m.refereeActive=false;
+    m.referee='';
+
+    await saveEventCloudNow();
+
+    closeMatchEditor();
+    showTab('bracket');
+    requestAnimationFrame(()=>{
+      setBracketScale(bracketScale);
+      drawBracketLinks();
+    });
+    return;
+  }
+
   if(+a===+b)return alert('雙方比分不能相同。');
   if(Math.max(+a,+b)<4)return alert('至少一方必須達到 4 分，才能記錄此場完成。');
 
@@ -1340,11 +1394,32 @@ function canEditMatchScore(m){
   const me=currentRefereeName();
   return !!(me && m.refereeActive && m.referee===me);
 }
+
+async function refreshEventBeforeCriticalAction(){
+  if(ev?.testOnly)return ev;
+  if(!cloudReady||!ev?.id)return ev;
+
+  try{
+    const latest=await rtdbRestGet(`events/${ev.id}`,8000);
+    if(latest){
+      ev=latest;
+      localEventSave();
+      return latest;
+    }
+  }catch(e){
+    // 即時 listener 仍是主要來源；這個 REST 只是操作前的單次保險。
+    console.warn('critical preflight refresh failed',e);
+  }
+
+  return ev;
+}
+
 async function saveEventCloudNow(){
   localEventSave();
   renderAdmin();
 
   if(ev?.testOnly)return true;
+
   if(!cloudReady||!ev?.id){
     alert('目前尚未連上雲端，無法同步執裁狀態。');
     return false;
@@ -1355,8 +1430,15 @@ async function saveEventCloudNow(){
     return true;
   }catch(e){
     console.error('event cloud sync failed',e);
+
+    const msg=String(e?.message||e);
+    if(msg.includes('quota-exceeded')){
+      alert('Firebase 驗證額度暫時受限。這版已停用背景輪詢，請稍後再試一次。');
+      return false;
+    }
+
     const role=isReferee&&!isAdmin?'裁判':'主辦';
-    alert(`${role}雲端同步失敗：${e.message}`);
+    alert(`${role}雲端同步失敗：${msg}`);
     return false;
   }
 }
@@ -1521,7 +1603,7 @@ function quickScoreHtml(m,kind,ri,mi,enabled){
     </div>
 
     <div class=quickScoreHint>
-      點右側數字可直接修改比分；快速加分只會累計比分。至少一方達到 4 分後，再按「記錄比分」完成此場。
+      點右側數字可直接修改比分；0：0 後按「記錄比分」可取消這場結果。至少一方達到 4 分後，再按「記錄比分」完成此場。
     </div>
   </div>`;
 }
@@ -1760,6 +1842,31 @@ function renderRR(){
     </div>
   </div>`;
 }
+
+async function resetRRMatch(i){
+  if(!isAdmin&&!ev?.testOnly)return alert('只有主辦可以重設場次。');
+
+  const m=ev.finalRR?.matches?.[i];
+  if(!m)return alert('找不到這場循環賽資料。');
+
+  m.winner=null;
+  m.sa=0;
+  m.sb=0;
+  delete m._previousWinner;
+  m.refereeActive=false;
+  m.referee='';
+
+  const ok=await saveEventCloudNow();
+  if(!ok)return;
+
+  closeMatchEditor();
+  showTab('bracket');
+  requestAnimationFrame(()=>{
+    setBracketScale(bracketScale);
+    drawBracketLinks();
+  });
+}
+
 function openRRMatch(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
@@ -1791,8 +1898,9 @@ function openRRMatch(i){
       </div>
     `:''}
 
-    <div class=sheetFooter style="grid-template-columns:1fr">
+    <div class=sheetFooter style="${(isAdmin||ev?.testOnly)?'':'grid-template-columns:1fr'}">
       <button class=secondary ${scoreDisabled} onclick="rrScore(${i})">記錄比分</button>
+      ${(isAdmin||ev?.testOnly)?`<button class=danger onclick="resetRRMatch(${i})">重設</button>`:''}
     </div>`;
 
   $('matchModal').classList.remove('hidden');
@@ -1832,6 +1940,16 @@ function releaseMyOtherMatches(who){
   }
 }
 
+
+
+function clearDownstreamAfterMatchReset(ri){
+  // 這一場如果原本已經有勝者，後續賽程可能已經帶入該選手。
+  // 因此只保留到目前這一輪，清掉後續輪次與最後三人循環，
+  // 待這輪重新完成後再由 ensureNext() 重新產生。
+  if(!ev?.rounds)return;
+  ev.rounds=ev.rounds.slice(0,ri+1);
+  ev.finalRR=null;
+}
 
 function rebuildDownstreamIfWinnerChanged(ri,oldWinner,newWinner){
   if(!oldWinner || oldWinner===newWinner)return false;
