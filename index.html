@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v21：雲端寫入3秒轉REST、5秒逾時，回對戰表自動回頂部 -->
+<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v22：回對戰表重置內外捲動、抽獎勾選名單與同輪不重複中籤 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1197,6 +1197,59 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
     padding:9px!important;
     font-size:20px!important;
   }
+}
+</style>
+
+
+<style>
+.raffleSelectAll{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:0 0 9px;
+  font-size:12px;
+}
+.rafflePerson{
+  cursor:pointer;
+}
+.raffleCheck{
+  width:20px;
+  height:20px;
+  flex:0 0 20px;
+  accent-color:var(--accent);
+}
+.raffleWon{
+  opacity:.42;
+  filter:grayscale(.85);
+  cursor:default;
+}
+.raffleWon .drawName{
+  text-decoration:line-through;
+}
+.raffleWonTag{
+  margin-left:auto;
+  font-size:10px;
+  font-weight:800;
+  white-space:nowrap;
+  color:var(--muted);
+}
+.raffleHistory{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.raffleHistoryItem{
+  padding:7px 9px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:rgba(255,255,255,.025);
+  font-size:11px;
+  font-weight:700;
+}
+:root[data-theme="light"] .raffleHistoryItem{
+  background:#f7f9fc;
+  border-color:#d7dde7;
 }
 </style>
 
@@ -3578,20 +3631,21 @@ function backToBracketFromMatch(){
   closeMatchEditor();
   showTab('bracket');
 
-  // iPhone Safari 關閉底部編輯視窗後會保留原本的頁面 scroll 位置。
-  // 回到對戰表時直接回最上方，避免畫面停在賽程最底部。
-  requestAnimationFrame(()=>{
-    window.scrollTo({top:0,left:0,behavior:'auto'});
-    document.documentElement.scrollTop=0;
-    document.body.scrollTop=0;
+  // Safari 關閉 fixed modal 後，外層頁面與 bracketScroll 都可能恢復舊位置。
+  // 分 3 個 frame 強制歸零，避免回來仍停在最後一場附近。
+  scrollPageTop();
 
+  requestAnimationFrame(()=>{
+    scrollPageTop();
     setBracketScale(bracketScale);
     drawBracketLinks();
 
     requestAnimationFrame(()=>{
-      window.scrollTo({top:0,left:0,behavior:'auto'});
-      document.documentElement.scrollTop=0;
-      document.body.scrollTop=0;
+      scrollPageTop();
+
+      requestAnimationFrame(()=>{
+        scrollPageTop();
+      });
     });
   });
 }
@@ -3700,18 +3754,64 @@ let raffleTimer=null;
 let raffleSpinning=false;
 
 function raffleStorageKey(){
-  return `bx_raffle_result_${ev?.id||'default'}`;
+  return `bx_raffle_round_${ev?.id||'default'}`;
 }
 
-function getSavedRaffleWinner(){
-  try{return localStorage.getItem(raffleStorageKey())||''}catch(e){return ''}
+function defaultRaffleState(){
+  const roster=[...(ev?.roster||[])].filter(Boolean);
+  const checked={};
+  roster.forEach(name=>checked[name]=true);
+  return {winners:[],checked};
 }
 
-function saveRaffleWinner(name){
+function getRaffleState(){
+  const roster=[...(ev?.roster||[])].filter(Boolean);
+  let state=null;
+
   try{
-    if(name)localStorage.setItem(raffleStorageKey(),name);
-    else localStorage.removeItem(raffleStorageKey());
+    const raw=localStorage.getItem(raffleStorageKey());
+    if(raw)state=JSON.parse(raw);
   }catch(e){}
+
+  if(!state || !Array.isArray(state.winners) || typeof state.checked!=='object' || !state.checked){
+    state=defaultRaffleState();
+  }
+
+  // 名單變動時自動補上新參賽者，已不在名單的人移除。
+  state.winners=state.winners.filter(name=>roster.includes(name));
+
+  const nextChecked={};
+  roster.forEach(name=>{
+    if(state.winners.includes(name))nextChecked[name]=false;
+    else nextChecked[name]=state.checked[name]!==false;
+  });
+  state.checked=nextChecked;
+
+  return state;
+}
+
+function saveRaffleState(state){
+  try{localStorage.setItem(raffleStorageKey(),JSON.stringify(state))}catch(e){}
+}
+
+function setRaffleChecked(name,checked){
+  if(!hasOrganizerAccess()||raffleSpinning)return;
+
+  const state=getRaffleState();
+  if(state.winners.includes(name))return;
+
+  state.checked[name]=!!checked;
+  saveRaffleState(state);
+  renderDraw();
+}
+
+function resetPrizeRaffleRound(){
+  if(!hasOrganizerAccess()||raffleSpinning)return;
+  clearInterval(raffleTimer);
+  raffleTimer=null;
+  raffleSpinning=false;
+  saveRaffleState(defaultRaffleState());
+  renderDraw();
 }
 
 function secureRandomIndex(max){
@@ -3740,15 +3840,35 @@ function renderDraw(){
 
   const editable=hasOrganizerAccess();
   const roster=[...ev.roster].filter(Boolean);
-  const savedWinner=getSavedRaffleWinner();
-  const winnerValid=savedWinner && roster.includes(savedWinner);
+  const state=getRaffleState();
+  const winners=state.winners||[];
+  const lastWinner=winners.length?winners[winners.length-1]:'';
 
-  const participantHtml=roster.map((name,i)=>`
-    <div class=drawChip>
-      <span class=drawNo>${i+1}</span>
-      <span class=drawName>${esc(name)}</span>
-    </div>
-  `).join('');
+  const available=roster.filter(name=>!winners.includes(name) && state.checked[name]!==false);
+
+  const participantHtml=roster.map((name,i)=>{
+    const won=winners.includes(name);
+    const checked=!won && state.checked[name]!==false;
+
+    return `
+      <label class="drawChip rafflePerson ${won?'raffleWon':''}">
+        <input
+          class=raffleCheck
+          type=checkbox
+          ${checked?'checked':''}
+          ${won||!editable?'disabled':''}
+          onchange='setRaffleChecked(${JSON.stringify(name)},this.checked)'
+        >
+        <span class=drawNo>${won?'✓':i+1}</span>
+        <span class=drawName>${esc(name)}</span>
+        ${won?'<span class=raffleWonTag>已中籤</span>':''}
+      </label>
+    `;
+  }).join('');
+
+  const historyHtml=winners.length
+    ? winners.map((name,i)=>`<span class=raffleHistoryItem>第 ${i+1} 位：${esc(name)}</span>`).join('')
+    : '<span class=muted>本輪尚未有人中籤</span>';
 
   tab.innerHTML=`
     <div class="card drawCard raffleCard">
@@ -3761,28 +3881,38 @@ function renderDraw(){
       </div>
 
       <div class=drawNotice>
-        會從目前「參賽名單」的所有人中隨機抽出 1 位得主。
-        這個功能只用來抽獎，<b>不會改變參賽順序、第一輪配對或任何比賽結果。</b>
+        每次只抽出 1 位。<b>同一輪已中籤的人不會再次被抽到</b>；
+        中籤後會在下方名單變成灰色。勾選框預設全部開啟，也可以先取消不參加本次抽獎的人。
+        這個功能不會修改對戰順序或比賽結果。
       </div>
 
       <div class=raffleStage>
-        <div class=raffleLabel>中獎者</div>
-        <div id=raffleWinner class="raffleWinner ${winnerValid?'hasWinner':''}">
-          ${winnerValid?`🎉 ${esc(savedWinner)}`:'等待抽籤'}
+        <div class=raffleLabel>本次中獎者</div>
+        <div id=raffleWinner class="raffleWinner ${lastWinner?'hasWinner':''}">
+          ${lastWinner?`🎉 ${esc(lastWinner)}`:'等待抽籤'}
         </div>
-        <div id=raffleRolling class=raffleRolling>${roster.length?`共有 ${roster.length} 位參賽者`:'目前沒有參賽者'}</div>
+        <div id=raffleRolling class=raffleRolling>
+          ${roster.length?`本輪可抽 ${available.length} 人・已中籤 ${winners.length} 人`:'目前沒有參賽者'}
+        </div>
       </div>
 
       <div class=drawActions>
-        <button id=raffleStartBtn type=button ${editable&&roster.length?'':'disabled'} onclick=startPrizeRaffle()>
-          ${winnerValid?'🎁 再抽一次':'🎁 開始抽籤'}
+        <button id=raffleStartBtn type=button ${editable&&available.length?'':'disabled'} onclick=startPrizeRaffle()>
+          ${winners.length?'🎁 抽下一位':'🎁 開始抽籤'}
         </button>
-        <button type=button class=secondary ${editable&&winnerValid?'':'disabled'} onclick=clearPrizeRaffle()>清除結果</button>
+        <button type=button class=secondary ${editable&&(winners.length||roster.length)?'':'disabled'} onclick=resetPrizeRaffleRound()>開始新一輪</button>
       </div>
 
       ${!editable?`<div class=refHint style="margin-top:10px">只有主辦可以操作抽獎。</div>`:''}
 
+      <div class=drawSectionTitle>本輪中籤紀錄</div>
+      <div class=raffleHistory>${historyHtml}</div>
+
       <div class=drawSectionTitle>本次抽籤名單</div>
+      <div class=raffleSelectAll>
+        <span>✅ 預設全部勾選</span>
+        <span class=muted>已中籤者會自動取消並鎖定</span>
+      </div>
       <div class=drawGrid>${participantHtml || '<div class=muted>目前沒有參賽者。</div>'}</div>
     </div>
   `;
@@ -4490,7 +4620,15 @@ function startPrizeRaffle(){
   if(!hasOrganizerAccess()||raffleSpinning||!ev)return;
 
   const roster=[...(ev.roster||[])].filter(Boolean);
-  if(!roster.length)return alert('目前沒有參賽者可以抽籤。');
+  const state=getRaffleState();
+  const winners=state.winners||[];
+
+  // 同一輪只從「有勾選 + 尚未中籤」的人裡抽。
+  const pool=roster.filter(name=>!winners.includes(name) && state.checked[name]!==false);
+
+  if(!pool.length){
+    return alert('本輪已沒有可抽的人。請重新勾選名單，或按「開始新一輪」。');
+  }
 
   raffleSpinning=true;
 
@@ -4514,7 +4652,7 @@ function startPrizeRaffle(){
   clearInterval(raffleTimer);
   raffleTimer=setInterval(()=>{
     ticks++;
-    const preview=roster[secureRandomIndex(roster.length)];
+    const preview=pool[secureRandomIndex(pool.length)];
 
     if(winnerEl)winnerEl.textContent=preview;
     if(rollingEl)rollingEl.textContent=`抽籤中 ${'•'.repeat((ticks%3)+1)}`;
@@ -4523,8 +4661,14 @@ function startPrizeRaffle(){
       clearInterval(raffleTimer);
       raffleTimer=null;
 
-      const winner=roster[secureRandomIndex(roster.length)];
-      saveRaffleWinner(winner);
+      const winner=pool[secureRandomIndex(pool.length)];
+
+      const latest=getRaffleState();
+      if(!latest.winners.includes(winner)){
+        latest.winners.push(winner);
+      }
+      latest.checked[winner]=false;
+      saveRaffleState(latest);
 
       if(winnerEl){
         winnerEl.textContent=`🎉 ${winner}`;
@@ -4532,32 +4676,37 @@ function startPrizeRaffle(){
       }
       if(rollingEl)rollingEl.textContent='恭喜中獎！';
 
-      if(btn){
-        btn.disabled=false;
-        btn.textContent='🎁 再抽一次';
-      }
-
       raffleSpinning=false;
-      renderDraw();
+
+      // 重畫後，中籤者會自動變灰且 checkbox 鎖定。
+      setTimeout(renderDraw,350);
     }
   },70);
 }
 
 function clearPrizeRaffle(){
-  if(!hasOrganizerAccess()||raffleSpinning)return;
-
-  clearInterval(raffleTimer);
-  raffleTimer=null;
-  raffleSpinning=false;
-  saveRaffleWinner('');
-  renderDraw();
+  resetPrizeRaffleRound();
 }
 
 
 function scrollPageTop(){
-  window.scrollTo({top:0,left:0,behavior:'auto'});
+  // 外層頁面
+  try{window.scrollTo({top:0,left:0,behavior:'auto'})}catch(e){window.scrollTo(0,0)}
   document.documentElement.scrollTop=0;
+  document.documentElement.scrollLeft=0;
   document.body.scrollTop=0;
+  document.body.scrollLeft=0;
+
+  // 對戰表自己也是 overflow:auto；iPhone Safari 會記住這個內層 scrollTop。
+  const sc=document.querySelector('.bracketScroll');
+  if(sc){
+    try{sc.scrollTo({top:0,left:0,behavior:'auto'})}catch(e){
+      sc.scrollTop=0;
+      sc.scrollLeft=0;
+    }
+    sc.scrollTop=0;
+    sc.scrollLeft=0;
+  }
 }
 
 function showTab(t){
@@ -4583,10 +4732,12 @@ function showTab(t){
   syncTabButtons(t);
 
   if(t==='bracket'){
+    scrollPageTop();
     requestAnimationFrame(()=>{
       scrollPageTop();
       requestAnimationFrame(scrollPageTop);
     });
+    setTimeout(scrollPageTop,80);
   }
 
   if(t==='draw'){
