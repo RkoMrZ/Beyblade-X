@@ -115,7 +115,16 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
  <div id="shareTab" class="hidden"></div>
 </section>
 <div id="matchModal" class="matchModal hidden" onclick="if(event.target===this)closeMatchEditor()"><div id="matchSheet" class="matchSheet"></div></div>
-<div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore('')">清除比分</button></div></div>
+<div id="deleteConfirmModal" class="matchModal hidden"><div class="matchSheet" style="max-width:520px">
+      <div class="sheetHandle"></div>
+      <h3 style="margin:0 0 8px">刪除賽事</h3>
+      <div id="deleteConfirmText" class="muted" style="line-height:1.7"></div>
+      <div class="sheetFooter" style="margin-top:16px">
+        <button id="deleteCancelBtn" type="button" class="secondary">取消</button>
+        <button id="deleteOkBtn" type="button" class="danger">確認刪除</button>
+      </div>
+    </div></div>
+    <div id="scorePicker" class="scorePickerPop hidden" onclick="if(event.target===this)closeScorePicker()"><div class="scorePickerCard"><div class="scorePickerTitle">點選比分</div><div class="scoreGrid"><button type="button" onclick="chooseScore(1)">1</button><button type="button" onclick="chooseScore(2)">2</button><button type="button" onclick="chooseScore(3)">3</button><button type="button" onclick="chooseScore(4)">4</button><button type="button" onclick="chooseScore(5)">5</button><button type="button" onclick="chooseScore(6)">6</button></div><button type="button" class="scoreClear" onclick="chooseScore('')">清除比分</button></div></div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
@@ -182,13 +191,23 @@ function renderSavedEvents(){
   const all=events(),ids=savedEventIds().filter(id=>all[id]);
   if(ids.length!==savedEventIds().length)setSavedEventIds(ids);
   count.textContent=ids.length+' 場';
-  if(!ids.length){box.innerHTML='<div class=savedEmpty>目前沒有保留的賽事。建立新賽事後會顯示在這裡。</div>';return}
+  if(!ids.length){
+    box.innerHTML='<div class=savedEmpty>目前沒有保留的賽事。建立新賽事後會顯示在這裡。</div>';
+    return;
+  }
   box.innerHTML=ids.map(id=>{
     const e=all[id],mode=e.mode==='free'?'自由編排':'單淘汰',when=formatSavedTime(e.created),isTest=!!e.testOnly;
     const typeHtml=isTest?'<span class="savedType test">🧪 測試賽事</span>':'<span class="savedType cloud">☁️ 雲端賽事</span>';
     const delLabel=isTest?'刪除本機':'刪除雲端';
-    return `<div class="savedEvent ${isTest?'test':'cloud'}"><div><div class=savedEventName>${typeHtml}${esc(e.name||'Beyblade X Tournament')}</div><div class=savedEventMeta>${e.roster?.length||0} 人・${mode}${when?'・'+when:''}</div></div><div class=savedEventActions><button onclick="openSavedEvent('${id}')">繼續</button><button class="danger" onclick="deleteSavedEvent('${id}')">${delLabel}</button></div></div>`;
+    return `<div class="savedEvent ${isTest?'test':'cloud'}"><div><div class=savedEventName>${typeHtml}${esc(e.name||'Beyblade X Tournament')}</div><div class=savedEventMeta>${e.roster?.length||0} 人・${mode}${when?'・'+when:''}</div></div><div class=savedEventActions><button type="button" data-open-id="${id}">繼續</button><button type="button" class="danger" data-delete-id="${id}">${delLabel}</button></div></div>`;
   }).join('');
+
+  box.querySelectorAll('[data-open-id]').forEach(btn=>{
+    btn.addEventListener('click',()=>openSavedEvent(btn.dataset.openId));
+  });
+  box.querySelectorAll('[data-delete-id]').forEach(btn=>{
+    btn.addEventListener('click',()=>requestDeleteSavedEvent(btn.dataset.deleteId));
+  });
 }
 async function openSavedEvent(id){
   const cached=events()[id];if(!cached)return alert('找不到這場賽事的本機快取。');
@@ -205,33 +224,48 @@ async function openSavedEvent(id){
   $('create').classList.add('hidden');$('admin').classList.remove('hidden');renderAdmin();
   alert('目前無法讀取雲端，先開啟這支手機最後保留的版本。');
 }
+let pendingDeleteId='';
+function requestDeleteSavedEvent(id){
+  const cached=events()[id];
+  if(!cached)return alert('找不到這場賽事的本機資料。');
+  pendingDeleteId=id;
+  const modal=$('deleteConfirmModal'),text=$('deleteConfirmText'),ok=$('deleteOkBtn');
+  if(cached.testOnly){
+    text.innerHTML='這會刪除這支手機上的<strong>測試賽事</strong>。<br>這場沒有雲端資料。';
+    ok.textContent='刪除本機';
+  }else{
+    text.innerHTML='這會<strong>永久刪除雲端賽事</strong>，包含 Firebase 上的賽程、管理員與驗證碼資料。<br><br>此動作無法復原。';
+    ok.textContent='刪除雲端';
+  }
+  modal.classList.remove('hidden');
+}
+function closeDeleteConfirm(){
+  pendingDeleteId='';
+  $('deleteConfirmModal')?.classList.add('hidden');
+}
 async function deleteSavedEvent(id){
   const all=events(),cached=all[id];
   if(!cached)return alert('找不到這場賽事的本機資料。');
 
   if(cached.testOnly){
-    if(!confirm('刪除這支手機上的測試賽事？\n\n這場沒有雲端資料。'))return;
     unmarkEventSaved(id);
     delete all[id];
     localStorage.setItem(STORE,JSON.stringify(all));
     if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
+    closeDeleteConfirm();
     renderSavedEvents();
     return;
   }
-
-  if(!confirm('永久刪除這場雲端賽事？\n\n這會同時刪除 Firebase 上的賽程、管理員與驗證碼資料，而且無法復原。'))return;
 
   try{
     const ok=await initCloud();
     if(!ok)return alert('目前無法連上 Firebase，請稍後再試。');
 
-    // 先確認這支手機是否有這場的管理權。
     const adminSnap=await fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value');
     if(!adminSnap.exists()){
       return alert('這支手機目前沒有這場賽事的管理權，無法刪除雲端資料。');
     }
 
-    // 分開刪除，避免 multi-location update 被 rules 卡住而整批失敗。
     await fbDb.ref(`events/${id}`).remove();
     await fbDb.ref(`secrets/${id}`).remove();
     await fbDb.ref(`admins/${id}`).remove();
@@ -243,6 +277,7 @@ async function deleteSavedEvent(id){
     localStorage.removeItem(adminCodeKey(id));
     if(localStorage.getItem(CURRENT)===id)localStorage.removeItem(CURRENT);
 
+    closeDeleteConfirm();
     renderSavedEvents();
     alert('雲端賽事已刪除。');
   }catch(e){
@@ -665,6 +700,21 @@ async function nativeShare(){if(navigator.share)await navigator.share({title:ev.
 function showTab(t){['bracket','roster','referee','organizer','share'].forEach(x=>$(x+'Tab').classList.toggle('hidden',x!==t))}
 
 window.addEventListener('resize',()=>{clearTimeout(window.__bxResize);window.__bxResize=setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},120)});
+
+
+$('deleteCancelBtn')?.addEventListener('click',closeDeleteConfirm);
+$('deleteOkBtn')?.addEventListener('click',async()=>{
+  if(!pendingDeleteId)return closeDeleteConfirm();
+  const btn=$('deleteOkBtn');
+  btn.disabled=true;
+  const old=btn.textContent;
+  btn.textContent='刪除中…';
+  try{await deleteSavedEvent(pendingDeleteId)}
+  finally{btn.disabled=false;btn.textContent=old}
+});
+$('deleteConfirmModal')?.addEventListener('click',e=>{
+  if(e.target===$('deleteConfirmModal'))closeDeleteConfirm();
+});
 
 (async function bootstrapCloud(){
   draftStorage=localStorage.getItem(KEEP)==='1'?'test':'cloud';
