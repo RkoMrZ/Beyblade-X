@@ -319,6 +319,34 @@ function formatSavedTime(ts){
   if(!ts)return '';
   try{return new Date(ts).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return ''}
 }
+
+async function syncMyCloudEvents(){
+  if(!isGoogleUser())return 0;
+
+  try{
+    // Safari 與「加入主畫面 Web App」的 localStorage 是不同容器。
+    // 因此登入同一 Google 帳號時，直接從 Firebase 把此帳號建立的雲端賽事同步回目前容器。
+    const allCloud=(await rtdbRestGet('events',12000))||{};
+    const uid=fbAuth.currentUser.uid;
+    const mine=Object.values(allCloud).filter(e=>e && !e.testOnly && e.ownerUid===uid && e.id);
+
+    const local=events();
+    const ids=new Set(savedEventIds());
+
+    for(const e of mine){
+      local[e.id]=e;
+      ids.add(e.id);
+    }
+
+    localStorage.setItem(STORE,JSON.stringify(local));
+    setSavedEventIds([...ids]);
+    return mine.length;
+  }catch(e){
+    console.warn('syncMyCloudEvents failed',e);
+    return 0;
+  }
+}
+
 function renderSavedEvents(){
   const box=$('savedEvents'),count=$('savedCount');if(!box||!count)return;
   const all=events(),ids=savedEventIds().filter(id=>all[id]);
@@ -343,42 +371,62 @@ function renderSavedEvents(){
   });
 }
 async function openSavedEvent(id){
-  const cached=events()[id];
-  if(!cached)return alert('找不到這場賽事的本機快取。');
+  const btn=document.querySelector(`[data-open-id="${CSS.escape(id)}"]`);
+  const oldText=btn?.textContent||'繼續';
+  if(btn){btn.disabled=true;btn.textContent='載入中…'}
 
-  // 測試賽事直接開本機版本
-  if(cached.testOnly){
-    ev=cached;
-    isAdmin=true;
-    $('home').classList.add('hidden');
+  try{
+    const cached=events()[id];
+    if(!cached){
+      // 本機沒有快取時，也嘗試直接從雲端讀取
+      const result=await loadCloudEvent(id);
+      if(result==='ok'){
+        history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
+        return;
+      }
+      alert('目前找不到這場賽事。');
+      return;
+    }
+
+    if(cached.testOnly){
+      ev=cached;
+      isAdmin=true;
+      $('home').classList.add('hidden');
+      $('create').classList.add('hidden');
+      $('admin').classList.remove('hidden');
+      history.replaceState(null,'',location.pathname);
+      renderAdmin();
+      return;
+    }
+
+    const result=await loadCloudEvent(id);
+
+    if(result==='ok'){
+      history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
+      return;
+    }
+
     $('create').classList.add('hidden');
-    $('admin').classList.remove('hidden');
-    history.replaceState(null,'',location.pathname);
-    renderAdmin();
-    return;
+    $('admin').classList.add('hidden');
+    $('home').classList.remove('hidden');
+
+    if(result==='missing'){
+      purgeLocalEvent(id);
+      renderSavedEvents();
+      alert('這場雲端賽事已被刪除，連結與本機保留紀錄都已失效。');
+      return;
+    }
+
+    alert('目前無法載入這場雲端賽事，請稍後再試。');
+  }catch(e){
+    console.error('openSavedEvent failed',e);
+    alert('開啟賽事失敗：'+(e?.message||e));
+  }finally{
+    if(btn && document.body.contains(btn)){
+      btn.disabled=false;
+      btn.textContent=oldText;
+    }
   }
-
-  // 雲端賽事：首頁先保持顯示，等雲端載入成功後再切畫面
-  const result=await loadCloudEvent(id);
-
-  if(result==='ok'){
-    history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
-    return;
-  }
-
-  // 載入失敗時明確回首頁，避免黑畫面
-  $('create').classList.add('hidden');
-  $('admin').classList.add('hidden');
-  $('home').classList.remove('hidden');
-
-  if(result==='missing'){
-    purgeLocalEvent(id);
-    renderSavedEvents();
-    alert('這場雲端賽事已被刪除，連結與本機保留紀錄都已失效。');
-    return;
-  }
-
-  alert('目前無法載入這場雲端賽事，請稍後再試。');
 }
 let pendingDeleteId='';
 function requestDeleteSavedEvent(id){
@@ -469,10 +517,16 @@ async function initCloud(){
     await fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     if(!fbAuth.currentUser)await fbAuth.signInAnonymously();
     fbUser=fbAuth.currentUser;
-    fbAuth.onAuthStateChanged(u=>{
+    fbAuth.onAuthStateChanged(async u=>{
       fbUser=u||null;
       renderHeaderAuth();
-      if($('home')&&!$('home').classList.contains('hidden'))renderHomeSelections();
+      if($('home')&&!$('home').classList.contains('hidden')){
+        renderHomeSelections();
+        if(isGoogleUser()){
+          await syncMyCloudEvents();
+          renderSavedEvents();
+        }
+      }
     });
     cloudReady=true;return true;
   }catch(e){console.error(e);alert('Firebase 連線失敗：'+e.message);return false}
@@ -492,12 +546,17 @@ function adminFlagKey(id){return `bx_cloud_admin_${id}`}
 function adminCodeKey(id){return `bx_cloud_admin_code_${id}`}
 async function refreshAdminState(id){
   isAdmin=false;
-  if(!cloudReady||!fbUser)return false;
+  if(!fbAuth?.currentUser)return false;
   try{
-    const s=await fbDb.ref(`admins/${id}/${fbUser.uid}`).once('value');
-    isAdmin=s.exists();
-    if(isAdmin)localStorage.setItem(adminFlagKey(id),'1'); else localStorage.removeItem(adminFlagKey(id));
-  }catch(e){console.warn(e)}
+    const value=await rtdbRestGet(`admins/${id}/${fbAuth.currentUser.uid}`,8000);
+    isAdmin=value!==null && value!==undefined;
+    if(isAdmin)localStorage.setItem(adminFlagKey(id),'1');
+    else localStorage.removeItem(adminFlagKey(id));
+  }catch(e){
+    console.warn('refreshAdminState REST failed',e);
+    // 讀取管理權失敗時不阻塞賽程表開啟；最多先以觀看模式進入
+    isAdmin=false;
+  }
   return isAdmin;
 }
 function listenCloudEvent(id){
@@ -1383,8 +1442,31 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
 (async function bootstrapCloud(){
   draftStorage=localStorage.getItem(KEEP)==='1'?'test':'cloud';
   await initCloud();
+
+  // Firebase persistence 恢復可能比頁面初始化晚一點，給它一個很短的時間恢復 Google 使用者
+  if(fbAuth && !fbAuth.currentUser){
+    await new Promise(resolve=>{
+      let finished=false;
+      const timer=setTimeout(()=>{if(!finished){finished=true;resolve()}},1200);
+      const off=fbAuth.onAuthStateChanged(()=>{
+        if(finished)return;
+        finished=true;
+        clearTimeout(timer);
+        try{off()}catch{}
+        resolve();
+      });
+    });
+  }
+
   fbUser=fbAuth?.currentUser||fbUser;
-  renderHeaderAuth();renderHomeSelections();renderSavedEvents();
+  renderHeaderAuth();
+  renderHomeSelections();
+
+  if(isGoogleUser()){
+    await syncMyCloudEvents();
+  }
+  renderSavedEvents();
+
   const p=new URLSearchParams(location.search),id=p.get('event');
   if(id){
     const result=await loadCloudEvent(id);
@@ -1394,7 +1476,7 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
       renderSavedEvents();
       alert('這個雲端賽事已被刪除或不存在，分享連結已失效。');
     }else if(result==='error'){
-      alert('目前無法連上雲端，請稍後再試。為避免顯示已刪除的舊賽事，本機快取不會自動開啟。');
+      alert('目前無法連上雲端，請稍後再試。');
     }
   }
 })();
