@@ -676,7 +676,7 @@ function listenCloudEvent(id){
     }finally{
       cloudPollBusy=false;
     }
-  },1000);
+  },3000);
 }
 async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
@@ -829,35 +829,50 @@ async function rtdbRestProbe(timeoutMs=10000){
 }
 
 async function rtdbRestPut(path,value,timeoutMs=12000){
-  if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
-  const token=await fbAuth.currentUser.getIdToken(true);
   const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
   if(!base)throw new Error('Firebase databaseURL 未設定');
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
-  try{
-    const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
-    const res=await fetch(url,{
-      method:'PUT',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(value),
-      signal:ctrl.signal,
-      cache:'no-store'
-    });
-    const text=await res.text();
-    if(!res.ok){
-      let detail=text;
-      try{detail=JSON.parse(text)?.error||text}catch{}
-      const err=new Error(`Firebase REST ${res.status}: ${detail}`);
-      err.code=`HTTP_${res.status}`;
-      throw err;
+
+  const run=async(forceToken=false)=>{
+    const token=await getRestIdToken(forceToken);
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+
+    try{
+      const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
+      const res=await fetch(url,{
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(value),
+        signal:ctrl.signal,
+        cache:'no-store'
+      });
+      const text=await res.text();
+
+      if(!res.ok){
+        let detail=text;
+        try{detail=JSON.parse(text)?.error||text}catch{}
+        const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+        err.code=`HTTP_${res.status}`;
+        throw err;
+      }
+
+      return text?JSON.parse(text):null;
+    }catch(e){
+      if(e?.name==='AbortError')throw new Error('Firebase REST 寫入逾時');
+      throw e;
+    }finally{
+      clearTimeout(timer);
     }
-    return text?JSON.parse(text):null;
+  };
+
+  try{
+    return await run(false);
   }catch(e){
-    if(e?.name==='AbortError')throw new Error('Firebase REST 寫入逾時');
+    if(e?.code==='HTTP_401'){
+      restTokenCache={token:null,ts:0};
+      return await run(true);
+    }
     throw e;
-  }finally{
-    clearTimeout(timer);
   }
 }
 async function rtdbRestDelete(path,timeoutMs=12000){
@@ -926,35 +941,68 @@ async function rtdbRestPatchRoot(updates,timeoutMs=12000){
     clearTimeout(timer);
   }
 }
-async function rtdbRestGet(path,timeoutMs=12000){
+
+let restTokenCache={token:null,ts:0};
+
+async function getRestIdToken(force=false){
   if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
-  const token=await fbAuth.currentUser.getIdToken(true);
+
+  // Firebase ID token 本身約 1 小時有效。
+  // 這裡不再每次 REST 請求都強制刷新，避免大量消耗 Auth quota。
+  const now=Date.now();
+  if(!force && restTokenCache.token && (now-restTokenCache.ts)<45*60*1000){
+    return restTokenCache.token;
+  }
+
+  const token=await fbAuth.currentUser.getIdToken(!!force);
+  restTokenCache={token,ts:now};
+  return token;
+}
+
+async function rtdbRestGet(path,timeoutMs=12000){
   const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
   if(!base)throw new Error('Firebase databaseURL 未設定');
 
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
-  try{
-    const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
-    const res=await fetch(url,{
-      method:'GET',
-      signal:ctrl.signal,
-      cache:'no-store'
-    });
-    const text=await res.text();
-    if(!res.ok){
-      let detail=text;
-      try{detail=JSON.parse(text)?.error||text}catch{}
-      const err=new Error(`Firebase REST ${res.status}: ${detail}`);
-      err.code=`HTTP_${res.status}`;
-      throw err;
+  const run=async(forceToken=false)=>{
+    const token=await getRestIdToken(forceToken);
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+
+    try{
+      const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
+      const res=await fetch(url,{
+        method:'GET',
+        signal:ctrl.signal,
+        cache:'no-store'
+      });
+      const text=await res.text();
+
+      if(!res.ok){
+        let detail=text;
+        try{detail=JSON.parse(text)?.error||text}catch{}
+        const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+        err.code=`HTTP_${res.status}`;
+        throw err;
+      }
+
+      return text?JSON.parse(text):null;
+    }catch(e){
+      if(e?.name==='AbortError')throw new Error('Firebase REST 讀取逾時');
+      throw e;
+    }finally{
+      clearTimeout(timer);
     }
-    return text?JSON.parse(text):null;
+  };
+
+  try{
+    return await run(false);
   }catch(e){
-    if(e?.name==='AbortError')throw new Error('讀取動態驗證碼逾時');
+    // 只有 token 真正失效時才強制刷新一次，不會每秒刷新。
+    if(e?.code==='HTTP_401'){
+      restTokenCache={token:null,ts:0};
+      return await run(true);
+    }
     throw e;
-  }finally{
-    clearTimeout(timer);
   }
 }
 
@@ -1174,7 +1222,15 @@ async function claimRRMatchAs(i){
     openRRMatch(i);
   }catch(e){
     console.error('claimRRMatchAs failed',e);
-    alert('開始執裁失敗：'+(e?.message||e));
+    if(String(e?.message||e).includes('quota-exceeded')){
+      alert('Firebase 驗證請求暫時超過額度。這版已停止每次同步強制刷新登入憑證；請稍後再試一次。');
+    }else{
+      if(String(e?.message||e).includes('quota-exceeded')){
+      alert('Firebase 驗證請求暫時超過額度。這版已停止每次同步強制刷新登入憑證；請稍後再試一次。');
+    }else{
+      alert('開始執裁失敗：'+(e?.message||e));
+    }
+    }
   }finally{
     if(btn&&document.body.contains(btn)){
       btn.disabled=false;
