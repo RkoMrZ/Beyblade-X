@@ -1707,6 +1707,78 @@ function showTab(t){
   if(t==='referee')renderReferee();
   else stopRefereeCodeRotation();
 }
+function renderReferee(){
+  normalizeEvent();
+  const invite=new URLSearchParams(location.search).get('ref')==='1';
+
+  // 主辦方：保留原本完整設定，再加上裁判加入 QR + 動態驗證碼
+  if(isAdmin||ev?.testOnly){
+    const n=ev.refereeCount||2,me=getMyReferee();
+    const names=ev.refereeNames.map((name,i)=>`<div class=player><span class=num>${i+1}</span><input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}"></div>`).join('');
+    const identityButtons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
+
+    const inviteBlock=ev.testOnly?'':`
+      <div class=refInviteBox style="margin-top:18px">
+        <label>裁判加入</label>
+        <div class=cloudNote>把這個 QR 給現場裁判掃描。裁判輸入目前 6 位驗證碼後，只能取得執裁權限，不會取得主辦權限。</div>
+        <div class=organizerGrid style="margin-top:12px">
+          <div>
+            <div class=muted>動態裁判驗證碼</div>
+            <div id=refereeInviteCode class=organizerCode>讀取中…</div>
+            <div id=refereeCodeCountdown class=cloudNote data-expires-at="0" style="text-align:center;margin-top:6px">正在取得驗證碼</div>
+          </div>
+          <div>
+            <div class=muted>裁判 QR</div>
+            <div id=refereeInviteQr class=adminQr></div>
+          </div>
+        </div>
+      </div>`;
+
+    $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 裁判設定</h3>
+      <div class=muted>主辦方設定裁判人數與名稱。裁判掃描下方 QR 取得執裁權限後，只要選一次自己的名稱即可。</div>
+      <div class=refCountRow style="margin-top:14px"><div><label>裁判人數</label><input id=refereeCountInput type=number min=1 max=12 value="${n}" inputmode=numeric></div><div><span class=refCountBadge>目前 ${n} 位</span></div><button onclick=setRefereeCount()>套用人數</button></div>
+      <div style="margin-top:14px"><label>裁判名稱</label>${names}<button style="width:100%;margin-top:8px" onclick=saveRefereeNames()>儲存裁判名稱</button></div>
+      ${inviteBlock}
+      <div style="margin-top:18px"><label>這支手機的裁判身分</label><div class=judgePick>${identityButtons}</div>${me?`<div class=refHint>目前本機：<b>${esc(me)}</b></div>`:`<div class=refHint>尚未選擇。</div>`}</div>
+      <div style="margin-top:12px"><button class=secondary onclick="showTab('bracket')">返回對戰表</button></div>
+    </div>`;
+
+    if(!ev.testOnly){
+      setTimeout(()=>{
+        const q=$('refereeInviteQr');
+        if(q&&window.QRCode){q.innerHTML='';new QRCode(q,{text:refereeUrl(),width:180,height:180})}
+      },0);
+      startRefereeCodeRotation();
+    }
+    return;
+  }
+
+  // 已取得裁判權限：只選主辦方預先設定的名字
+  if(isReferee){
+    const me=getMyReferee();
+    const buttons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
+    $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 選擇裁判身分</h3>
+      <div class=muted>主辦方已設定好裁判名稱。請選擇你是哪一位，之後回對戰表直接點比賽即可開始執裁。</div>
+      <div class=judgePick style="margin-top:16px">${buttons}</div>
+      ${me?`<div class=refHint>目前身分：<b>${esc(me)}</b>。現在可以直接回對戰表執裁。</div>`:`<div class=refHint>尚未選擇裁判身分。</div>`}
+      <button style="width:100%;margin-top:14px" onclick="showTab('bracket')">返回對戰表</button>
+    </div>`;
+    return;
+  }
+
+  // 裁判邀請連結：輸入動態驗證碼
+  if(invite){
+    $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 加入裁判</h3>
+      <div class=muted>輸入主辦方目前顯示的 6 位裁判驗證碼。通過後只會取得執裁權限，不會取得主辦管理權。</div>
+      <label style="margin-top:16px">6 位裁判驗證碼</label>
+      <input id=joinRefereeCode inputmode=numeric maxlength=6 placeholder="例如 583921">
+      <button style="width:100%;margin-top:10px" onclick=claimRefereeAccess()>驗證並加入裁判</button>
+    </div>`;
+    return;
+  }
+
+  $('refereeTab').innerHTML='';
+}
 function renderShare(){
  if(ev?.testOnly){
    $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這場是本機測試賽事，沒有雲端網址，因此不提供 QR 分享或跨手機同步。</div></div>`;
