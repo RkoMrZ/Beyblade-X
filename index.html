@@ -550,6 +550,52 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+@media(max-width:520px){
+  .matchSheet{
+    min-height:520px;
+  }
+
+  .quickScoreBtns button{
+    min-height:36px;
+    font-size:12.5px;
+  }
+
+  .sheetFooter button{
+    min-height:46px;
+    font-size:13.5px;
+  }
+
+  .sheetFooter button:disabled,
+  .quickScoreTotal:disabled,
+  .quickScoreBtns button:disabled{
+    background:#2b3039!important;
+    border-color:#3a414d!important;
+    color:#737b89!important;
+    opacity:.68!important;
+    cursor:not-allowed!important;
+    box-shadow:none!important;
+  }
+}
+
+@media(max-width:520px) and (max-height:760px){
+  .matchSheet{
+    min-height:490px;
+  }
+
+  .quickScoreBtns button{
+    min-height:33px;
+    font-size:11.5px;
+  }
+
+  .sheetFooter button{
+    min-height:42px;
+    font-size:12.5px;
+  }
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -1949,6 +1995,16 @@ function refereeStatusHtml(m,kind,ri,mi){
 }
 let activeScoreTarget=null;
 function openScorePicker(inputId,buttonId){
+  let m=null;
+
+  let mm=inputId.match(/^s(\d+)-(\d+)[ab]$/);
+  if(mm)m=ev?.rounds?.[+mm[1]]?.matches?.[+mm[2]];
+
+  mm=inputId.match(/^rr(\d+)[ab]$/);
+  if(mm)m=ev?.finalRR?.matches?.[+mm[1]];
+
+  if(m && matchReachedFinishThreshold(m))return;
+
   activeScoreTarget={inputId,buttonId};
   $('scorePicker').classList.remove('hidden');
 }
@@ -2110,6 +2166,7 @@ async function quickAddMatchScore(ri,mi,side,points,reason){
   let m=ev.rounds?.[ri]?.matches?.[mi];
   if(!m)return alert('找不到這場比賽資料。');
   if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
+  if(matchReachedFinishThreshold(m))return;
 
   // 進入修改比分時，先把舊的完成狀態暫時取消。
   // 只有按下「記錄比分」且分數達到 4 分以上才重新完成。
@@ -2156,6 +2213,7 @@ async function quickAddRRScore(i,side,points,reason){
   let m=ev.finalRR?.matches?.[i];
   if(!m)return alert('找不到這場循環賽資料。');
   if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
+  if(matchReachedFinishThreshold(m))return;
 
   if(m.winner){
     m._previousWinner=m.winner;
@@ -2193,6 +2251,13 @@ async function quickAddRRScore(i,side,points,reason){
 }
 
 
+
+function matchReachedFinishThreshold(m){
+  const a=Number(m?.sa ?? 0);
+  const b=Number(m?.sb ?? 0);
+  return Math.max(a,b)>=4;
+}
+
 function canCompleteMatch(m){
   const a=Number(m?.sa ?? 0);
   const b=Number(m?.sb ?? 0);
@@ -2215,21 +2280,25 @@ function openMatchEditor(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.rounds[ri].matches[mi];
+
   const scoreEnabled=canEditMatchScore(m);
-  const scoreDisabled=scoreEnabled?'':'disabled';
+  const finishLocked=scoreEnabled && matchReachedFinishThreshold(m);
+  const quickEnabled=scoreEnabled && !finishLocked;
 
   const completeEnabled=scoreEnabled && canCompleteMatch(m);
   const completeDisabled=completeEnabled?'':'disabled';
+  const backDisabled=finishLocked?'disabled':'';
 
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
     <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
-    ${quickScoreHtml(m,'round',ri,mi,scoreEnabled)}
+    ${quickScoreHtml(m,'round',ri,mi,quickEnabled)}
     ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分。</div>`:''}
+    ${finishLocked?`<div class=refHint style="margin:7px 0">已有人達到 4 分以上。請選擇「此場完成」或「重設比分」。</div>`:''}
 
     <div class=sheetFooter style="grid-template-columns:1fr 1fr 1fr">
-      <button class=secondary onclick="backToBracketFromMatch()">回到對戰表</button>
+      <button class=secondary ${backDisabled} onclick="backToBracketFromMatch()">回到對戰表</button>
       <button class=secondary ${completeDisabled} onclick="score(${ri},${mi})">此場完成</button>
-      <button class=danger onclick="resetMatch(${ri},${mi})">重設</button>
+      <button class=danger onclick="resetMatch(${ri},${mi})">重設比分</button>
     </div>`;
 
   $('matchModal').classList.remove('hidden');
@@ -2385,9 +2454,14 @@ function openRRMatch(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.finalRR.matches[i];
+
   const scoreEnabled=canEditMatchScore(m);
+  const finishLocked=scoreEnabled && matchReachedFinishThreshold(m);
+  const quickEnabled=scoreEnabled && !finishLocked;
+
   const completeEnabled=scoreEnabled && canCompleteMatch(m);
   const completeDisabled=completeEnabled?'':'disabled';
+  const backDisabled=finishLocked?'disabled':'';
 
   $('matchSheet').innerHTML=`
     <div class=sheetHandle></div>
@@ -2405,7 +2479,7 @@ function openRRMatch(i){
       ${refereeStatusHtml(m,'rr',0,i)}
     </div>
 
-    ${quickScoreHtml(m,'rr',0,i,scoreEnabled)}
+    ${quickScoreHtml(m,'rr',0,i,quickEnabled)}
 
     ${!scoreEnabled?`
       <div class=refHint style="margin:10px 0">
@@ -2413,10 +2487,16 @@ function openRRMatch(i){
       </div>
     `:''}
 
+    ${finishLocked?`
+      <div class=refHint style="margin:7px 0">
+        已有人達到 4 分以上。請選擇「此場完成」或「重設比分」。
+      </div>
+    `:''}
+
     <div class=sheetFooter style="grid-template-columns:1fr 1fr 1fr">
-      <button class=secondary onclick="backToBracketFromMatch()">回到對戰表</button>
+      <button class=secondary ${backDisabled} onclick="backToBracketFromMatch()">回到對戰表</button>
       <button class=secondary ${completeDisabled} onclick="rrScore(${i})">此場完成</button>
-      <button class=danger onclick="resetRRMatch(${i})">重設</button>
+      <button class=danger onclick="resetRRMatch(${i})">重設比分</button>
     </div>`;
 
   $('matchModal').classList.remove('hidden');
