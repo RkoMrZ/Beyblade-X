@@ -3295,8 +3295,10 @@ async function claimRRMatchAs(i){
     const result=await atomicClaimMatch('rr',0,i,who);
 
     if(!result.ok){
-      if(result.busyBy)return alert(`這場目前由 ${result.busyBy} 執裁中。`);
-      return alert('開始執裁失敗：'+(result.error||'未知錯誤'));
+      if(result.busyBy){
+        return alert(`這場目前由 ${result.busyBy} 執裁中。`);
+      }
+      return alert('開始執裁失敗：'+(result.error||'請再試一次'));
     }
 
     ev.finalRR.matches[i]=result.data;
@@ -4598,33 +4600,99 @@ async function atomicClaimMatch(kind,ri,mi,who){
   if(!(await initCloud()))return {ok:false,error:'Firebase 尚未連線'};
   if(!fbAuth?.currentUser)return {ok:false,error:'尚未取得裁判/主辦寫入權限'};
 
-  const ref=fbDb.ref(matchCloudPath(kind,ri,mi));
+  const localMatch=kind==='rr'
+    ? ev.finalRR?.matches?.[mi]
+    : ev.rounds?.[ri]?.matches?.[mi];
 
-  return await new Promise(resolve=>{
-    ref.transaction(current=>{
-      if(!current)return;
+  if(!localMatch)return {ok:false,error:'找不到這場比賽資料'};
 
-      if(current.refereeActive && current.referee && current.referee!==who){
-        return; // abort
+  const token=await getRestIdToken(false);
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  const rawPath=matchCloudPath(kind,ri,mi);
+  const url=`${base}/${rawPath}.json?auth=${encodeURIComponent(token)}`;
+
+  // 先讀取伺服器最新狀態與 ETag。
+  const ctrl1=new AbortController();
+  const timer1=setTimeout(()=>ctrl1.abort(),5000);
+
+  let current=null;
+  let etag='null_etag';
+
+  try{
+    const res=await fetch(url,{
+      method:'GET',
+      headers:{'X-Firebase-ETag':'true'},
+      signal:ctrl1.signal,
+      cache:'no-store'
+    });
+
+    if(!res.ok){
+      const text=await res.text();
+      throw new Error(`Firebase REST ${res.status}: ${text}`);
+    }
+
+    etag=res.headers.get('ETag')||'null_etag';
+    current=await res.json();
+  }catch(e){
+    if(e?.name==='AbortError')return {ok:false,error:'讀取此場裁判狀態逾時，請再試一次'};
+    return {ok:false,error:e?.message||String(e)};
+  }finally{
+    clearTimeout(timer1);
+  }
+
+  // 如果雲端這一場尚未存在，直接以本機賽程資料為底。
+  if(!current)current={...localMatch};
+
+  // 只有「真的有裁判名稱 + active=true」才算被占用。
+  // refereeActive=true 但 referee 空白視為舊資料殘留，不擋人。
+  if(current.refereeActive===true && current.referee && current.referee!==who){
+    return {ok:false,busyBy:current.referee};
+  }
+
+  current.referee=who;
+  current.refereeActive=true;
+
+  // 用 If-Match 確保兩支手機同時搶同一場時只會一支成功。
+  const ctrl2=new AbortController();
+  const timer2=setTimeout(()=>ctrl2.abort(),5000);
+
+  try{
+    const res=await fetch(url,{
+      method:'PUT',
+      headers:{
+        'Content-Type':'application/json',
+        'if-match':etag
+      },
+      body:JSON.stringify(current),
+      signal:ctrl2.signal,
+      cache:'no-store'
+    });
+
+    if(res.status===412){
+      // 代表剛剛有人在你按下之後先搶到；重新讀一次真正是誰。
+      try{
+        const latest=await rtdbRestGet(rawPath,5000);
+        const busy=(latest?.refereeActive && latest?.referee)?latest.referee:'其他裁判';
+        return {ok:false,busyBy:busy};
+      }catch(e){
+        return {ok:false,busyBy:'其他裁判'};
       }
+    }
 
-      current.referee=who;
-      current.refereeActive=true;
-      return current;
-    },(error,committed,snapshot)=>{
-      if(error){
-        resolve({ok:false,error:error.message||String(error)});
-      }else if(!committed){
-        const current=snapshot?.val?.()||null;
-        resolve({
-          ok:false,
-          busyBy:current?.referee||'其他裁判'
-        });
-      }else{
-        resolve({ok:true,data:snapshot.val()});
-      }
-    },false);
-  });
+    if(!res.ok){
+      const text=await res.text();
+      return {ok:false,error:`Firebase REST ${res.status}: ${text}`};
+    }
+
+    const saved=await res.json();
+    return {ok:true,data:saved||current};
+
+  }catch(e){
+    if(e?.name==='AbortError')return {ok:false,error:'鎖定此場逾時，請再試一次'};
+    return {ok:false,error:e?.message||String(e)};
+  }finally{
+    clearTimeout(timer2);
+  }
 }
 
 async function claimMatchAs(ri,mi){
@@ -4653,12 +4721,13 @@ async function claimMatchAs(ri,mi){
 
     await releaseMyOtherMatchesCloud(who,'round',ri,mi);
 
-    // 原子鎖只讀寫這一場，不先下載整份 event。
     const result=await atomicClaimMatch('round',ri,mi,who);
 
     if(!result.ok){
-      if(result.busyBy)return alert(`這場目前由 ${result.busyBy} 執裁中。`);
-      return alert('開始執裁失敗：'+(result.error||'未知錯誤'));
+      if(result.busyBy){
+        return alert(`這場目前由 ${result.busyBy} 執裁中。`);
+      }
+      return alert('開始執裁失敗：'+(result.error||'請再試一次'));
     }
 
     ev.rounds[ri].matches[mi]=result.data;
