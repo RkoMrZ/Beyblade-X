@@ -133,6 +133,101 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 .refInviteBox{border-top:1px solid #334054;padding-top:16px}
 </style>
 
+
+<style>
+@media(max-width:520px){
+  .matchModal{
+    padding:8px;
+    align-items:flex-end;
+  }
+  .matchSheet{
+    width:100%;
+    max-height:calc(100dvh - 150px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    padding:10px;
+    border-radius:16px 16px 12px 12px;
+  }
+  .sheetHandle{
+    margin-bottom:7px;
+    height:4px;
+  }
+  .sheetTitle{
+    margin-bottom:6px;
+  }
+  .sheetTitle h3{
+    font-size:19px;
+  }
+  .sheetClose{
+    padding:6px 9px;
+    min-height:40px;
+  }
+  .sheetRef{
+    grid-template-columns:78px 1fr;
+    gap:6px;
+    padding:7px 0;
+  }
+  .sheetRefRow{
+    gap:6px;
+  }
+  .sheetRefRow .releaseBtn{
+    padding:6px 9px;
+    min-height:38px;
+  }
+
+  .quickScoreBox{
+    margin:8px 0;
+    padding:8px;
+    border-radius:14px;
+  }
+  .quickScoreTitle{
+    margin-bottom:7px;
+    font-size:13px;
+  }
+  .quickScorePlayers{
+    gap:7px;
+  }
+  .quickScoreSide{
+    padding:8px;
+    border-radius:12px;
+  }
+  .quickScoreHead{
+    margin-bottom:6px;
+  }
+  .quickScoreName{
+    font-size:15px;
+  }
+  .quickScoreTotal{
+    min-width:44px;
+    min-height:40px;
+    font-size:18px;
+    padding:4px 8px;
+  }
+  .quickScoreBtns{
+    gap:5px;
+  }
+  .quickScoreBtns button{
+    min-height:36px;
+    padding:5px 6px;
+    font-size:12px;
+  }
+  .quickScoreHint{
+    margin-top:6px;
+    font-size:11px;
+    line-height:1.4;
+  }
+  .sheetFooter{
+    gap:6px;
+    margin-top:6px;
+  }
+  .sheetFooter button{
+    min-height:44px;
+    padding:8px 10px;
+  }
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
