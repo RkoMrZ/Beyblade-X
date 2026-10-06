@@ -194,7 +194,7 @@ const FIREBASE_CONFIG = {
   measurementId: "G-CPL47L0CV5"
 };
 const STORE='bx_events_v2', CURRENT='bx_current_v2', SAVED='bx_saved_events_v1', KEEP='bx_test_event_v1'; let draftMode='free', draftStorage='cloud', ev=null;
-let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
+let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,cloudPollTimer=null,cloudPollBusy=false,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
 function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
@@ -603,27 +603,64 @@ async function refreshAdminState(id){
 }
 function listenCloudEvent(id){
   if(!cloudReady)return;
+
   if(cloudUnsub)cloudUnsub();
-  const ref=fbDb.ref(`events/${id}`);
-  const cb=s=>{
-    if(!s.exists()){
+  if(cloudPollTimer){clearInterval(cloudPollTimer);cloudPollTimer=null}
+
+  let lastCloudSig='';
+
+  const applyCloudEvent=data=>{
+    if(!data){
       stopAdminCodeRotation();
+      stopRefereeCodeRotation();
       purgeLocalEvent(id);
       if(ev?.id===id)ev=null;
-      if(cloudUnsub){cloudUnsub();cloudUnsub=null}
       ['create','admin'].forEach(x=>$(x).classList.add('hidden'));
       $('home').classList.remove('hidden');
       history.replaceState(null,'',location.pathname);
       renderSavedEvents();
-      alert('這場雲端賽事已被刪除，這支裝置上的本機快取也已清除。');
       return;
     }
-    ev=s.val();localEventSave();
-    $('home').classList.add('hidden');$('create').classList.add('hidden');$('admin').classList.remove('hidden');
-    renderAdmin();
+
+    const sig=JSON.stringify(data);
+    if(sig===lastCloudSig)return;
+    lastCloudSig=sig;
+
+    // 不覆蓋目前正開啟的比分小視窗內容，但更新背景賽程。
+    const modalOpen=$('matchModal')&&!$('matchModal').classList.contains('hidden');
+    ev=data;
+    localEventSave();
+
+    $('home').classList.add('hidden');
+    $('create').classList.add('hidden');
+    $('admin').classList.remove('hidden');
+
+    if(!modalOpen)renderAdmin();
+    else {
+      // 背景對戰表也要更新「執裁中」狀態
+      renderAdmin();
+    }
   };
+
+  // Firebase 即時 listener 保留。
+  const ref=fbDb.ref(`events/${id}`);
+  const cb=s=>applyCloudEvent(s.exists()?s.val():null);
   ref.on('value',cb);
   cloudUnsub=()=>ref.off('value',cb);
+
+  // iOS Safari / Web App 有時 RTDB listener 不穩，補一個 REST 1 秒輪詢。
+  cloudPollTimer=setInterval(async()=>{
+    if(cloudPollBusy||!ev||ev.id!==id)return;
+    cloudPollBusy=true;
+    try{
+      const data=await rtdbRestGet(`events/${id}`,7000);
+      applyCloudEvent(data);
+    }catch(e){
+      console.warn('cloud poll failed',e);
+    }finally{
+      cloudPollBusy=false;
+    }
+  },1000);
 }
 async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
@@ -1027,14 +1064,25 @@ function ensureNext(){
 function pick(ri,mi,side){
  let m=ev.rounds[ri].matches[mi],v=side==='a'?m.a:m.b;if(v==='BYE')return;m.winner=v;m.refereeActive=false;m.referee='';put();ensureNext();put()
 }
-function score(ri,mi){
+async function score(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
- let m=ev.rounds[ri].matches[mi],a=$(`s${ri}-${mi}a`).value,b=$(`s${ri}-${mi}b`).value;
- if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
- m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;m.refereeActive=false;m.referee='';
- put();ensureNext();put();
- closeMatchEditor();showTab('bracket');
- requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+  let m=ev.rounds[ri].matches[mi];
+
+  if(!canEditMatchScore(m)){
+    return alert('請先按「開始執裁」，取得這一場的執裁權限後才能記錄比分。');
+  }
+
+  let a=$(`s${ri}-${mi}a`).value,b=$(`s${ri}-${mi}b`).value;
+  if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
+
+  m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;
+  m.refereeActive=false;m.referee='';
+  ensureNext();
+  await saveEventCloudNow();
+
+  closeMatchEditor();
+  showTab('bracket');
+  requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
 }
 function resetMatch(ri,mi){
   if(!isAdmin&&!ev?.testOnly)return;
@@ -1044,13 +1092,24 @@ function swapPlayers(ri,i,j){
  if(i<0||j<0)return;let r=ev.rounds[ri]; if(r.matches.some(m=>m.winner))return alert('本輪已有結果，請先重設再調整。');
  let flat=r.matches.flatMap(m=>[m.a,m.b]);[flat[i],flat[j]]=[flat[j],flat[i]];r.matches=Array.from({length:Math.ceil(flat.length/2)},(_,k)=>match(flat[k*2],flat[k*2+1]));autoByes(r.matches);put()
 }
-function rrScore(i){
+async function rrScore(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
- let m=ev.finalRR.matches[i],a=$(`rr${i}a`).value,b=$(`rr${i}b`).value;
- if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
- m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;m.refereeActive=false;m.referee='';
- put();closeMatchEditor();showTab('bracket');
- requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
+  let m=ev.finalRR.matches[i];
+
+  if(!canEditMatchScore(m)){
+    return alert('請先按「開始執裁」，取得這一場的執裁權限後才能記錄比分。');
+  }
+
+  let a=$(`rr${i}a`).value,b=$(`rr${i}b`).value;
+  if(a===''||b===''||+a===+b)return alert('請選擇不同的比分。');
+
+  m.sa=a;m.sb=b;m.winner=+a>+b?m.a:m.b;
+  m.refereeActive=false;m.referee='';
+  await saveEventCloudNow();
+
+  closeMatchEditor();
+  showTab('bracket');
+  requestAnimationFrame(()=>{setBracketScale(bracketScale);drawBracketLinks()});
 }
 function stageLabel(ri,r){
   if(ev.mode==='free'&&ev.freeFinal==='rr3'){
@@ -1104,12 +1163,65 @@ function refereeOptionsHtml(kind,ri,mi){
   const action=kind==='rr'?`claimRRMatchAs(${mi},${JSON.stringify(me)})`:`claimMatchAs(${ri},${mi},${JSON.stringify(me)})`;
   return `<div class=pickTitle>本機身分：<b>${esc(me)}</b></div><button type=button onclick='${action}'>⚖ 開始執裁</button>`;
 }
-function refereeStatusHtml(m,kind,ri,mi){
-  if(m.refereeActive){
-    const rel=kind==='rr'?`releaseRRMatchAny(${mi})`:`releaseMatchAny(${ri},${mi})`;
-    return `<div class=sheetRefRow><div class=status>⚖ ${esc(m.referee)} 執裁中</div><button type=button class="danger releaseBtn" onclick="${rel}">釋放</button></div>`;
+
+function currentRefereeName(){
+  return getMyReferee()||'';
+}
+function canEditMatchScore(m){
+  const me=currentRefereeName();
+  return !!(me && m.refereeActive && m.referee===me);
+}
+async function saveEventCloudNow(){
+  localEventSave();
+  renderAdmin();
+  if(ev?.testOnly)return true;
+  if(!cloudReady||!ev?.id)return false;
+  try{
+    await rtdbRestPut(`events/${ev.id}`,ev,10000);
+    return true;
+  }catch(e){
+    console.error('event cloud sync failed',e);
+    const role=isReferee&&!isAdmin?'裁判':'主辦';
+    alert(`${role}雲端同步失敗：${e.message}`);
+    return false;
   }
-  return `<div>尚未有人執裁</div>${refereeOptionsHtml(kind,ri,mi)}`;
+}
+
+function refereeStatusHtml(m,kind,ri,mi){
+  const me=currentRefereeName();
+
+  if(m.refereeActive){
+    const mine=!!me && m.referee===me;
+    const rel=kind==='rr'?`releaseRRMatchAny(${mi})`:`releaseMatchAny(${ri},${mi})`;
+
+    if(mine || isAdmin || ev?.testOnly){
+      return `<div class=sheetRefRow>
+        <div class=status>⚖ ${esc(m.referee)} 執裁中</div>
+        <button type=button class="danger releaseBtn" onclick="${rel}">釋放</button>
+      </div>`;
+    }
+
+    return `<div class=sheetRefRow>
+      <div class=status>⚖ ${esc(m.referee)} 執裁中</div>
+      <button type=button class="secondary releaseBtn" disabled>此場已有人執裁</button>
+    </div>`;
+  }
+
+  if(!me){
+    return `<div class=sheetRefRow>
+      <div>尚未有人執裁</div>
+      <button type=button class=secondary disabled>請先選擇裁判身分</button>
+    </div>`;
+  }
+
+  const start=kind==='rr'
+    ?`claimRRMatchAs(${mi},${JSON.stringify(me)})`
+    :`claimMatchAs(${ri},${mi},${JSON.stringify(me)})`;
+
+  return `<div class=sheetRefRow>
+    <div>尚未有人執裁</div>
+    <button type=button onclick='${start}'>⚖ 開始執裁</button>
+  </div>`;
 }
 let activeScoreTarget=null;
 function openScorePicker(inputId,buttonId){
@@ -1130,21 +1242,17 @@ function chooseScore(v){
 function openMatchEditor(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
   let m=ev.rounds[ri].matches[mi];
-  if(isReferee&&!isAdmin&&!ev?.testOnly){
-    const me=getMyReferee();
-    if(!me)return alert('請先到裁判頁選擇你的裁判名稱。');
-    if(m.refereeActive&&m.referee!==me)return alert(`這場目前由 ${m.referee} 執裁中。`);
-    if(!m.refereeActive&&!m.winner){
-      releaseMyOtherMatches(me);
-      m.referee=me;m.refereeActive=true;
-      put();
-    }
-  }
+  const scoreEnabled=canEditMatchScore(m);
+  const scoreDisabled=scoreEnabled?'':'disabled';
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
-    <div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="s${ri}-${mi}a" value="${m.sa}"><button type=button id="sb${ri}-${mi}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" onclick="openScorePicker('s${ri}-${mi}a','sb${ri}-${mi}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div>
-    <div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="s${ri}-${mi}b" value="${m.sb}"><button type=button id="sb${ri}-${mi}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" onclick="openScorePicker('s${ri}-${mi}b','sb${ri}-${mi}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div>
+    <div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="s${ri}-${mi}a" value="${m.sa}"><button type=button id="sb${ri}-${mi}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('s${ri}-${mi}a','sb${ri}-${mi}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div>
+    <div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="s${ri}-${mi}b" value="${m.sb}"><button type=button id="sb${ri}-${mi}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('s${ri}-${mi}b','sb${ri}-${mi}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div>
     <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
-    <div class=sheetFooter style="${(!isAdmin&&!ev?.testOnly)?'grid-template-columns:1fr':''}"><button class=secondary onclick="score(${ri},${mi})">記錄比分</button>${(isAdmin||ev?.testOnly)?`<button class=danger onclick="resetMatch(${ri},${mi})">重設</button>`:''}</div>`;
+    ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分與記錄比分。</div>`:''}
+    <div class=sheetFooter style="${(!isAdmin&&!ev?.testOnly)?'grid-template-columns:1fr':''}">
+      <button class=secondary ${scoreDisabled} onclick="score(${ri},${mi})">記錄比分</button>
+      ${(isAdmin||ev?.testOnly)?`<button class=danger onclick="resetMatch(${ri},${mi})">重設</button>`:''}
+    </div>`;
   $('matchModal').classList.remove('hidden');
 }
 function closeMatchEditor(){$('matchModal').classList.add('hidden');closeScorePicker()}
@@ -1273,17 +1381,9 @@ function renderRR(){
 function openRRMatch(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
   let m=ev.finalRR.matches[i];
-  if(isReferee&&!isAdmin&&!ev?.testOnly){
-    const me=getMyReferee();
-    if(!me)return alert('請先到裁判頁選擇你的裁判名稱。');
-    if(m.refereeActive&&m.referee!==me)return alert(`這場目前由 ${m.referee} 執裁中。`);
-    if(!m.refereeActive&&!m.winner){
-      releaseMyOtherMatches(me);
-      m.referee=me;m.refereeActive=true;
-      put();
-    }
-  }
-  $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>最後三人循環・第 ${i+1} 場</div><h3>${esc(m.a)} vs ${esc(m.b)}</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div><div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="rr${i}a" value="${m.sa}"><button type=button id="rrb${i}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" onclick="openScorePicker('rr${i}a','rrb${i}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div><div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="rr${i}b" value="${m.sb}"><button type=button id="rrb${i}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" onclick="openScorePicker('rr${i}b','rrb${i}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div><div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'rr',0,i)}</div><div class=sheetFooter style="grid-template-columns:1fr"><button onclick="rrScore(${i})">記錄比分</button></div>`;
+  const scoreEnabled=canEditMatchScore(m);
+  const scoreDisabled=scoreEnabled?'':'disabled';
+  $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>最後三人循環・第 ${i+1} 場</div><h3>${esc(m.a)} vs ${esc(m.b)}</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div><div class=sheetPlayer><b>${esc(m.a)}</b><div><input type=hidden id="rr${i}a" value="${m.sa}"><button type=button id="rrb${i}a" class="scorePickBtn ${m.sa!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('rr${i}a','rrb${i}a')">${m.sa===''?'比分':esc(m.sa)}</button></div></div><div class=sheetPlayer><b>${esc(m.b)}</b><div><input type=hidden id="rr${i}b" value="${m.sb}"><button type=button id="rrb${i}b" class="scorePickBtn ${m.sb!==''?'hasValue':''}" ${scoreDisabled} onclick="openScorePicker('rr${i}b','rrb${i}b')">${m.sb===''?'比分':esc(m.sb)}</button></div></div><div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'rr',0,i)}</div><div class=sheetFooter style="grid-template-columns:1fr"><button onclick="rrScore(${i})">記錄比分</button></div>`;
   $('matchModal').classList.remove('hidden');
 }
 function toggleBracketFull(){document.body.classList.toggle('bracketFullscreen');setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},80)}
@@ -1296,94 +1396,50 @@ function setRefereeCount(){
   ev.refereeNames=Array.from({length:n},(_,i)=>ev.refereeNames[i]||`裁判 ${i+1}`);
   put();showTab('referee');
 }
-function claimMatchAs(ri,mi,who){
+async function claimMatchAs(ri,mi,who){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
   let m=ev.rounds[ri].matches[mi];
   if(m.winner)return alert('這場已完成。');
+
+  // 再讀一次目前狀態，避免兩位裁判幾乎同時按開始。
+  if(!ev.testOnly){
+    try{
+      const latest=await rtdbRestGet(`events/${ev.id}`,8000);
+      const lm=latest?.rounds?.[ri]?.matches?.[mi];
+      if(lm?.refereeActive && lm.referee!==who){
+        ev=latest;localEventSave();renderAdmin();openMatchEditor(ri,mi);
+        return alert(`這場目前由 ${lm.referee} 執裁中。`);
+      }
+    }catch(e){console.warn('pre-claim refresh failed',e)}
+  }
+
+  m=ev.rounds[ri].matches[mi];
   if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
-  releaseMyOtherMatches(who);m.referee=who;m.refereeActive=true;put();openMatchEditor(ri,mi);
+
+  releaseMyOtherMatches(who);
+  m.referee=who;
+  m.refereeActive=true;
+
+  const ok=await saveEventCloudNow();
+  if(ok)openMatchEditor(ri,mi);
 }
-function releaseMatchAny(ri,mi){if(!isAdmin&&!isReferee&&!ev?.testOnly)return;let m=ev.rounds[ri].matches[mi];m.referee='';m.refereeActive=false;put();openMatchEditor(ri,mi)}
-function claimRRMatchAs(i,who){
+async function releaseMatchAny(ri,mi){
+  if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+  let m=ev.rounds[ri].matches[mi];
+  const me=currentRefereeName();
+  if(!isAdmin&&!ev?.testOnly&&m.referee!==me)return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
+  m.referee='';m.refereeActive=false;
+  await saveEventCloudNow();
+  openMatchEditor(ri,mi);
+}
+async function releaseRRMatchAny(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
   let m=ev.finalRR.matches[i];
-  if(m.winner)return alert('這場已完成。');
-  if(m.refereeActive&&m.referee!==who)return alert(`這場目前由 ${m.referee} 執裁中。`);
-  releaseMyOtherMatches(who);m.referee=who;m.refereeActive=true;put();openRRMatch(i);
-}
-function releaseRRMatchAny(i){if(!isAdmin&&!isReferee&&!ev?.testOnly)return;let m=ev.finalRR.matches[i];m.referee='';m.refereeActive=false;put();openRRMatch(i)}
-function releaseMyOtherMatches(who){ev.rounds.forEach(r=>r.matches.forEach(m=>{if(m.refereeActive&&m.referee===who){m.referee='';m.refereeActive=false}}));if(ev.finalRR)ev.finalRR.matches.forEach(m=>{if(m.refereeActive&&m.referee===who){m.referee='';m.refereeActive=false}})}
-function renderReferee(){
-  normalizeEvent();
-  const invite=new URLSearchParams(location.search).get('ref')==='1';
-
-  // 主辦方：保留原本完整設定，再加上裁判加入 QR + 動態驗證碼
-  if(isAdmin||ev?.testOnly){
-    const n=ev.refereeCount||2,me=getMyReferee();
-    const names=ev.refereeNames.map((name,i)=>`<div class=player><span class=num>${i+1}</span><input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}"></div>`).join('');
-    const identityButtons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
-
-    const inviteBlock=ev.testOnly?'':`
-      <div class=refInviteBox style="margin-top:18px">
-        <label>裁判加入</label>
-        <div class=cloudNote>把這個 QR 給現場裁判掃描。裁判輸入目前 6 位驗證碼後，只能取得執裁權限，不會取得主辦權限。</div>
-        <div class=organizerGrid style="margin-top:12px">
-          <div>
-            <div class=muted>動態裁判驗證碼</div>
-            <div id=refereeInviteCode class=organizerCode>讀取中…</div>
-            <div id=refereeCodeCountdown class=cloudNote data-expires-at="0" style="text-align:center;margin-top:6px">正在取得驗證碼</div>
-          </div>
-          <div>
-            <div class=muted>裁判 QR</div>
-            <div id=refereeInviteQr class=adminQr></div>
-          </div>
-        </div>
-      </div>`;
-
-    $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 裁判設定</h3>
-      <div class=muted>主辦方設定裁判人數與名稱。裁判掃描下方 QR 取得執裁權限後，只要選一次自己的名稱即可。</div>
-      <div class=refCountRow style="margin-top:14px"><div><label>裁判人數</label><input id=refereeCountInput type=number min=1 max=12 value="${n}" inputmode=numeric></div><div><span class=refCountBadge>目前 ${n} 位</span></div><button onclick=setRefereeCount()>套用人數</button></div>
-      <div style="margin-top:14px"><label>裁判名稱</label>${names}<button style="width:100%;margin-top:8px" onclick=saveRefereeNames()>儲存裁判名稱</button></div>
-      ${inviteBlock}
-      <div style="margin-top:18px"><label>這支手機的裁判身分</label><div class=judgePick>${identityButtons}</div>${me?`<div class=refHint>目前本機：<b>${esc(me)}</b></div>`:`<div class=refHint>尚未選擇。</div>`}</div>
-      <div style="margin-top:12px"><button class=secondary onclick="showTab('bracket')">返回對戰表</button></div>
-    </div>`;
-
-    if(!ev.testOnly){
-      setTimeout(()=>{
-        const q=$('refereeInviteQr');
-        if(q&&window.QRCode){q.innerHTML='';new QRCode(q,{text:refereeUrl(),width:180,height:180})}
-      },0);
-      startRefereeCodeRotation();
-    }
-    return;
-  }
-
-  // 已取得裁判權限：只選主辦方預先設定的名字
-  if(isReferee){
-    const me=getMyReferee();
-    const buttons=ev.refereeNames.map(name=>`<button type=button class="${me===name?'':'secondary'}" onclick='setMyReferee(${JSON.stringify(name)})'>${me===name?'✓ ':''}⚖ ${esc(name)}</button>`).join('');
-    $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 選擇裁判身分</h3>
-      <div class=muted>主辦方已設定好裁判名稱。請選擇你是哪一位，之後回對戰表直接點比賽即可開始執裁。</div>
-      <div class=judgePick style="margin-top:16px">${buttons}</div>
-      ${me?`<div class=refHint>目前身分：<b>${esc(me)}</b>。現在可以直接回對戰表執裁。</div>`:`<div class=refHint>尚未選擇裁判身分。</div>`}
-      <button style="width:100%;margin-top:14px" onclick="showTab('bracket')">返回對戰表</button>
-    </div>`;
-    return;
-  }
-
-  // 裁判邀請連結：輸入動態驗證碼
-  if(invite){
-    $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 加入裁判</h3>
-      <div class=muted>輸入主辦方目前顯示的 6 位裁判驗證碼。通過後只會取得執裁權限，不會取得主辦管理權。</div>
-      <label style="margin-top:16px">6 位裁判驗證碼</label>
-      <input id=joinRefereeCode inputmode=numeric maxlength=6 placeholder="例如 583921">
-      <button style="width:100%;margin-top:10px" onclick=claimRefereeAccess()>驗證並加入裁判</button>
-    </div>`;
-    return;
-  }
-
-  $('refereeTab').innerHTML='';
+  const me=currentRefereeName();
+  if(!isAdmin&&!ev?.testOnly&&m.referee!==me)return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
+  m.referee='';m.refereeActive=false;
+  await saveEventCloudNow();
+  openRRMatch(i);
 }
 
 
