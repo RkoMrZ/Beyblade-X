@@ -7,7 +7,7 @@
 :root{--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--blue:#56a8ff;--warn:#f4c84b}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif}
 header{position:sticky;top:0;z-index:10;background:#0b0d12eF;backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:14px 16px}
-.wrap{max-width:920px;margin:auto}.brand{display:flex;align-items:center;justify-content:space-between;gap:10px}.brand h1{font-size:19px;margin:0}.brand small{color:var(--muted)}
+.wrap{max-width:920px;margin:auto}.brand{display:flex;align-items:center;justify-content:space-between;gap:10px}.brand h1{font-size:19px;margin:0}.brand small{color:var(--muted)}.headActions{display:flex;align-items:center;gap:8px;flex:0 0 auto}.loginBtn{background:#1d4f91;border:1px solid #3979c9;white-space:nowrap}.loginBtn.logged{background:#153224;border-color:#2e7a52;color:#a9efc8}.loginBtn .miniUser{display:block;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700}.homeBtnText{white-space:nowrap}@media(max-width:520px){.brand{align-items:flex-start}.brand h1{font-size:18px}.headActions{gap:6px}.headActions button{padding:10px 11px}.loginBtn .miniUser{max-width:74px}.homeBtnText{font-size:0}.homeBtnText:after{content:'首頁';font-size:15px}}
 main{padding:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:0 0 14px}.hero{padding:22px}.hero h2{font-size:26px;margin:0 0 8px}.muted{color:var(--muted);font-size:13px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mode{background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:18px;cursor:pointer}.mode:hover{border-color:#657089}.mode h3{margin:8px 0}.icon{font-size:30px}
 button,input,select,textarea{font:inherit}button{border:0;border-radius:12px;padding:11px 14px;background:var(--accent);color:white;font-weight:800;cursor:pointer}.secondary{background:var(--panel2);border:1px solid var(--line)}.ghost{background:transparent;border:1px solid var(--line)}.danger{background:#3a1717;color:#ffb1a5;border:1px solid #71302a}
@@ -63,7 +63,13 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 </style>
 </head>
 <body>
-<header><div class="wrap brand"><div><h1>⚔️ Beyblade X Tournament</h1><small id="headSub">戰鬥陀螺賽程表</small></div><button class="ghost" id="homeBtn" onclick="goHome()">首頁</button></div></header>
+<header><div class="wrap brand">
+  <div><h1>⚔️ Beyblade X Tournament</h1><small id="headSub">戰鬥陀螺賽程表</small></div>
+  <div class="headActions">
+    <button class="loginBtn" id="googleLoginBtn" type="button" onclick="handleHeaderLogin()">Google 登入</button>
+    <button class="ghost homeBtnText" id="homeBtn" type="button" onclick="goHome()">首頁</button>
+  </div>
+</div></header>
 <main class="wrap">
 <section id="home">
  <div class="card hero">
@@ -86,7 +92,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
    </div>
   </div>
 
-  <button class="homeNext" onclick="proceedCreate()">下一步：設定賽事</button>
+  <button id="homeNextBtn" class="homeNext" onclick="proceedCreate()">下一步：設定賽事</button>
   <div id="homeSelectionSummary" class="homeSelectionSummary"></div>
  </div>
 
@@ -148,14 +154,61 @@ function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch
 function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
 function setSavedEventIds(ids){localStorage.setItem(SAVED,JSON.stringify([...new Set(ids)]))}
 function keepLocalEnabled(){return localStorage.getItem(KEEP)==='1'}
+function isGoogleUser(){
+  return !!(fbAuth?.currentUser && fbAuth.currentUser.providerData?.some(p=>p.providerId==='google.com'));
+}
+function renderHeaderAuth(){
+  const b=$('googleLoginBtn'); if(!b)return;
+  if(isGoogleUser()){
+    const u=fbAuth.currentUser;
+    const label=u.displayName||u.email||'Google 帳號';
+    b.classList.add('logged');
+    b.innerHTML=`✓ 已登入<span class="miniUser">${esc(label)}</span>`;
+    b.title='點一下可登出 Google 帳號';
+  }else{
+    b.classList.remove('logged');
+    b.textContent='Google 登入';
+    b.title='主辦方使用 Google 帳號登入';
+  }
+}
+async function handleHeaderLogin(){
+  if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
+  if(isGoogleUser()){
+    if(!confirm('要登出目前的 Google 帳號嗎？'))return;
+    try{
+      await fbAuth.signOut();
+      await fbAuth.signInAnonymously();
+      fbUser=fbAuth.currentUser;
+      renderHeaderAuth();renderHomeSelections();
+    }catch(e){alert('登出失敗：'+e.message)}
+    return;
+  }
+  await requireGoogleLogin();
+}
 function renderHomeSelections(){
   const free=$('choiceFree'),single=$('choiceSingle'),cloud=$('choiceCloud'),test=$('choiceTest');
   if(free)free.classList.toggle('selected',draftMode==='free');
   if(single)single.classList.toggle('selected',draftMode==='single');
   if(cloud)cloud.classList.toggle('selected',draftStorage==='cloud');
   if(test)test.classList.toggle('selected',draftStorage==='test');
-  const s=$('homeSelectionSummary');
-  if(s)s.textContent=`目前選擇：${draftMode==='free'?'自由編排':'單淘汰賽'} ＋ ${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;
+  const s=$('homeSelectionSummary'),next=$('homeNextBtn');
+  const modeText=draftMode==='free'?'自由編排':'單淘汰賽';
+  const storageText=draftStorage==='cloud'?'雲端賽事':'測試賽事';
+  if(s){
+    if(draftStorage==='cloud' && isGoogleUser()){
+      const who=fbAuth.currentUser.email||fbAuth.currentUser.displayName||'Google 帳號';
+      s.textContent=`目前選擇：${modeText} ＋ ${storageText}｜已登入：${who}`;
+    }else if(draftStorage==='cloud'){
+      s.textContent=`目前選擇：${modeText} ＋ ${storageText}｜建立前需登入 Google`;
+    }else{
+      s.textContent=`目前選擇：${modeText} ＋ ${storageText}`;
+    }
+  }
+  if(next){
+    next.textContent=(draftStorage==='cloud'&&!isGoogleUser())
+      ?'使用 Google 登入並設定賽事'
+      :'下一步：設定賽事';
+  }
 }
 function selectHomeMode(mode){
   if(mode!=='free'&&mode!=='single')return;
@@ -168,7 +221,25 @@ function selectStorageMode(mode){
   localStorage.setItem(KEEP,mode==='test'?'1':'0');
   renderHomeSelections();
 }
-function proceedCreate(){
+async function requireGoogleLogin(){
+  if(!(await initCloud()))return false;
+  if(isGoogleUser())return true;
+  localStorage.setItem('bx_google_login_pending','1');
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
+    await fbAuth.signInWithRedirect(provider);
+  }catch(e){
+    console.error(e);
+    alert('Google 登入失敗：'+e.message);
+  }
+  return false;
+}
+async function proceedCreate(){
+  if(draftStorage==='cloud' && !isGoogleUser()){
+    const ok=await requireGoogleLogin();
+    if(!ok)return;
+  }
   $('home').classList.add('hidden');
   $('create').classList.remove('hidden');
   $('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;
@@ -288,14 +359,23 @@ async function deleteSavedEvent(id){
 
 function firebaseConfigured(){return !Object.values(FIREBASE_CONFIG).some(v=>String(v).includes('PASTE_'))}
 async function initCloud(){
-  if(cloudReady)return true;
+  if(cloudReady){
+    fbUser=fbAuth?.currentUser||fbUser;
+    return true;
+  }
   if(!firebaseConfigured())return false;
   try{
     fbApp=firebase.apps.length?firebase.app():firebase.initializeApp(FIREBASE_CONFIG);
     fbAuth=firebase.auth();fbDb=firebase.database();
     await fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     if(!fbAuth.currentUser)await fbAuth.signInAnonymously();
-    fbUser=fbAuth.currentUser;cloudReady=true;return true;
+    fbUser=fbAuth.currentUser;
+    fbAuth.onAuthStateChanged(u=>{
+      fbUser=u||null;
+      renderHeaderAuth();
+      if($('home')&&!$('home').classList.contains('hidden'))renderHomeSelections();
+    });
+    cloudReady=true;return true;
   }catch(e){console.error(e);alert('Firebase 連線失敗：'+e.message);return false}
 }
 function localEventSave(){
@@ -348,7 +428,7 @@ function goHome(){
   ev=null;if(cloudUnsub){cloudUnsub();cloudUnsub=null}
   ['create','admin'].forEach(x=>$(x).classList.add('hidden'));$('home').classList.remove('hidden');
   history.replaceState(null,'',location.pathname);
-  renderHomeSelections();renderSavedEvents();
+  renderHeaderAuth();renderHomeSelections();renderSavedEvents();
 }
 function startCreate(m){selectHomeMode(m);proceedCreate()}
 $('bulkNames').addEventListener('input',updatePreview);
@@ -387,8 +467,10 @@ async function createTournament(){
    return;
  }
 
- if(!(await initCloud()))return alert('Firebase 尚未連線成功。請確認匿名登入與 Realtime Database 已啟用。');
- ev={id:uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),cloudVersion:2,ownerUid:fbUser.uid,testOnly:false};
+ if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
+ if(!isGoogleUser())return alert('建立雲端賽事前，必須先使用 Google 帳號登入。');
+ fbUser=fbAuth.currentUser;
+ ev={id:uid(),name:$('eventName').value.trim()||'Beyblade X Tournament',mode:draftMode,pairing,freeFinal:$('freeFinal').value,roster:r,rounds:[],finalRR:null,created:Date.now(),cloudVersion:3,ownerUid:fbUser.uid,ownerEmail:fbUser.email||'',ownerName:fbUser.displayName||'',testOnly:false};
  buildFirst();
  const code=String(Math.floor(100000+Math.random()*900000));
  try{
@@ -718,6 +800,14 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
 
 (async function bootstrapCloud(){
   draftStorage=localStorage.getItem(KEEP)==='1'?'test':'cloud';
+  await initCloud();
+  try{
+    await fbAuth?.getRedirectResult();
+  }catch(e){
+    console.error('Google redirect result failed',e);
+    alert('Google 登入失敗：'+e.message);
+  }
+  localStorage.removeItem('bx_google_login_pending');
   renderHomeSelections();renderSavedEvents();
   const p=new URLSearchParams(location.search),id=p.get('event');
   if(id){
