@@ -224,16 +224,25 @@ function selectStorageMode(mode){
 async function requireGoogleLogin(){
   if(!(await initCloud()))return false;
   if(isGoogleUser())return true;
-  localStorage.setItem('bx_google_login_pending','1');
   try{
     const provider=new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({prompt:'select_account'});
-    await fbAuth.signInWithRedirect(provider);
+    const result=await fbAuth.signInWithPopup(provider);
+    fbUser=result.user||fbAuth.currentUser;
+    renderHeaderAuth();
+    renderHomeSelections();
+    return isGoogleUser();
   }catch(e){
-    console.error(e);
-    alert('Google 登入失敗：'+e.message);
+    console.error('Google popup login failed',e);
+    if(e?.code==='auth/popup-blocked'){
+      alert('Google 登入視窗被瀏覽器阻擋，請允許彈出式視窗後再試一次。');
+    }else if(e?.code==='auth/popup-closed-by-user'){
+      // 使用者自行關閉，不顯示錯誤。
+    }else{
+      alert('Google 登入失敗：'+(e?.message||e));
+    }
+    return false;
   }
-  return false;
 }
 async function proceedCreate(){
   if(draftStorage==='cloud' && !isGoogleUser()){
@@ -801,14 +810,8 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
 (async function bootstrapCloud(){
   draftStorage=localStorage.getItem(KEEP)==='1'?'test':'cloud';
   await initCloud();
-  try{
-    await fbAuth?.getRedirectResult();
-  }catch(e){
-    console.error('Google redirect result failed',e);
-    alert('Google 登入失敗：'+e.message);
-  }
-  localStorage.removeItem('bx_google_login_pending');
-  renderHomeSelections();renderSavedEvents();
+  fbUser=fbAuth?.currentUser||fbUser;
+  renderHeaderAuth();renderHomeSelections();renderSavedEvents();
   const p=new URLSearchParams(location.search),id=p.get('event');
   if(id){
     const ok=await loadCloudEvent(id);
