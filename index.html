@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：修復 iOS 雲端賽事載入卡住，登入狀態改用 REST timeout -->
+<meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：淺色模式改為 iOS 中性灰白風格，深色模式維持原設計 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1373,6 +1373,296 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+
+<style id="ios-light-theme-overrides">
+/* ===== iPhone / iOS 風格淺色模式 =====
+   深色模式完全不動，只覆蓋 light theme。
+*/
+:root[data-theme="light"]{
+  --bg:#f2f2f7;
+  --panel:#ffffff;
+  --panel2:#f7f7fa;
+  --line:#d1d1d6;
+  --text:#1c1c1e;
+  --muted:#8e8e93;
+  --accent:#ff6247;
+  --green:#34c759;
+  --blue:#0a84ff;
+  --warn:#b77900;
+  color-scheme:light;
+}
+
+:root[data-theme="light"] body,
+:root[data-theme="light"] main{
+  background:#f2f2f7!important;
+  color:#1c1c1e!important;
+}
+
+:root[data-theme="light"] header{
+  background:rgba(249,249,251,.94)!important;
+  border-bottom-color:#d1d1d6!important;
+  box-shadow:0 .5px 0 rgba(0,0,0,.06);
+}
+
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .hero,
+:root[data-theme="light"] .adminHero,
+:root[data-theme="light"] .refCard,
+:root[data-theme="light"] .savedCard,
+:root[data-theme="light"] .bracketShell,
+:root[data-theme="light"] .sharePublicControl,
+:root[data-theme="light"] .raffleStage,
+:root[data-theme="light"] .organizerGrid>div{
+  background:#ffffff!important;
+  color:#1c1c1e!important;
+  border-color:#d9d9de!important;
+  box-shadow:0 1px 2px rgba(0,0,0,.035)!important;
+}
+
+/* 次要區塊統一中性灰，不再使用藍/紫/棕背景 */
+:root[data-theme="light"] .choiceCard,
+:root[data-theme="light"] .mode,
+:root[data-theme="light"] .player,
+:root[data-theme="light"] .savedEvent,
+:root[data-theme="light"] .quickScoreSide,
+:root[data-theme="light"] .judgeStatus,
+:root[data-theme="light"] .liveMatchRow,
+:root[data-theme="light"] .refHint,
+:root[data-theme="light"] .drawChip,
+:root[data-theme="light"] .drawMatch,
+:root[data-theme="light"] .metaChip,
+:root[data-theme="light"] .badge,
+:root[data-theme="light"] .refCountBadge{
+  background:#f7f7fa!important;
+  color:#2c2c2e!important;
+  border-color:#dedee3!important;
+  box-shadow:none!important;
+}
+
+:root[data-theme="light"] .choiceCard.selected,
+:root[data-theme="light"] .mode.selected{
+  background:#fff5f2!important;
+  border-color:#ff8f7c!important;
+  box-shadow:0 0 0 1px rgba(255,98,71,.16) inset!important;
+}
+
+:root[data-theme="light"] .choiceCard.selected:after{
+  background:#ff6247!important;
+}
+
+/* 對戰表改成白底＋iOS 淺灰層次 */
+:root[data-theme="light"] .bracketShell{
+  background:#f7f7fa!important;
+}
+
+:root[data-theme="light"] .bracketTools,
+:root[data-theme="light"] .roundHead{
+  background:rgba(247,247,250,.96)!important;
+  border-color:#dedee3!important;
+}
+
+:root[data-theme="light"] .bracketMatch,
+:root[data-theme="light"] .rrMini,
+:root[data-theme="light"] .rrPanel{
+  background:#ffffff!important;
+  color:#1c1c1e!important;
+  border-color:#d8d8de!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.045)!important;
+}
+
+:root[data-theme="light"] .bracketMatch.done{
+  border-color:#c8c8ce!important;
+  box-shadow:0 0 0 1px #ececf0 inset,0 2px 8px rgba(0,0,0,.04)!important;
+}
+
+:root[data-theme="light"] .bracketMatch.judging,
+:root[data-theme="light"] .rrMini.judging{
+  border-color:#ffb340!important;
+  box-shadow:0 0 0 2px rgba(255,179,64,.18) inset,0 2px 10px rgba(0,0,0,.05)!important;
+  animation:none!important;
+}
+
+:root[data-theme="light"] .bSide.winner{
+  background:#fff4ee!important;
+}
+
+:root[data-theme="light"] .bScore{
+  background:#f2f2f7!important;
+  color:#2c2c2e!important;
+  border-color:#d1d1d6!important;
+}
+
+:root[data-theme="light"] .bSide.winner .bScore{
+  background:#fff0e8!important;
+  color:#c94a2f!important;
+  border-color:#ffc2b5!important;
+}
+
+:root[data-theme="light"] .bracketLinks path{
+  stroke:#b8b8bf!important;
+}
+
+:root[data-theme="light"] .bracketLinks path.live{
+  stroke:#c89543!important;
+}
+
+/* Modal / Sheet */
+:root[data-theme="light"] .matchModal,
+:root[data-theme="light"] .scorePickerPop,
+:root[data-theme="light"] .resetChoiceModal{
+  background:rgba(60,60,67,.22)!important;
+}
+
+:root[data-theme="light"] .matchSheet,
+:root[data-theme="light"] .scorePickerCard,
+:root[data-theme="light"] .resetChoiceCard{
+  background:#ffffff!important;
+  color:#1c1c1e!important;
+  border-color:#d1d1d6!important;
+  box-shadow:0 -8px 30px rgba(0,0,0,.12)!important;
+}
+
+:root[data-theme="light"] .sheetHandle{
+  background:#c7c7cc!important;
+}
+
+/* 表單 */
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea{
+  background:#ffffff!important;
+  color:#1c1c1e!important;
+  border-color:#c7c7cc!important;
+  box-shadow:none!important;
+}
+
+:root[data-theme="light"] input:focus,
+:root[data-theme="light"] select:focus,
+:root[data-theme="light"] textarea:focus{
+  border-color:#8e8e93!important;
+  outline:none!important;
+  box-shadow:0 0 0 2px rgba(142,142,147,.12)!important;
+}
+
+/* 次要按鈕全部中性灰 */
+:root[data-theme="light"] .secondary,
+:root[data-theme="light"] .ghost,
+:root[data-theme="light"] .themeBtn,
+:root[data-theme="light"] .sheetClose,
+:root[data-theme="light"] .viewToggle,
+:root[data-theme="light"] .zoomGroup button{
+  background:#f2f2f7!important;
+  color:#2c2c2e!important;
+  border-color:#d1d1d6!important;
+}
+
+/* 主按鈕仍保留目前品牌橘紅，但只保留在真正的主要動作 */
+:root[data-theme="light"] button:not(.secondary):not(.ghost):not(.danger):not(.loginBtn):not(.themeBtn){
+  background:#ff6247;
+  color:#fff;
+}
+
+/* Google 登入改成較接近 iOS 系統狀態色 */
+:root[data-theme="light"] .loginBtn{
+  background:#ffffff!important;
+  color:#3a3a3c!important;
+  border-color:#d1d1d6!important;
+}
+
+:root[data-theme="light"] .loginBtn.logged{
+  background:#eef8f1!important;
+  color:#267342!important;
+  border-color:#b9ddc4!important;
+}
+
+/* 雲端/測試標籤只做很淡的辨識，不搶畫面 */
+:root[data-theme="light"] .savedType.cloud{
+  background:#eef4fa!important;
+  color:#4b6d8b!important;
+  border-color:#d5e2ed!important;
+}
+
+:root[data-theme="light"] .savedType.test{
+  background:#f3f1f7!important;
+  color:#6c6578!important;
+  border-color:#dfdbe6!important;
+}
+
+/* 狀態文字也降低彩度 */
+:root[data-theme="light"] .savedPublicStatus.on,
+:root[data-theme="light"] .cloudBadge.on{
+  color:#3d7a54!important;
+}
+
+:root[data-theme="light"] .savedPublicStatus.off,
+:root[data-theme="light"] .cloudBadge.off{
+  color:#8e6660!important;
+}
+
+/* 危險操作保留紅色，但使用 iOS 柔和警示色 */
+:root[data-theme="light"] .danger{
+  background:#fff1ef!important;
+  color:#b73a2d!important;
+  border-color:#efc0ba!important;
+}
+
+/* 快速比分保持可辨識，但降低橘色面積 */
+:root[data-theme="light"] .quickScoreBox{
+  background:#fbfbfd!important;
+  border-color:#dedee3!important;
+}
+
+:root[data-theme="light"] .quickScoreTotal{
+  background:#fff7f4!important;
+  color:#c94a2f!important;
+  border-color:#ffc0b2!important;
+}
+
+:root[data-theme="light"] .quickScoreBtns button{
+  background:#f2f2f7!important;
+  color:#2c2c2e!important;
+  border:1px solid #d1d1d6!important;
+}
+
+/* 中性文字 */
+:root[data-theme="light"] .muted,
+:root[data-theme="light"] .cloudNote,
+:root[data-theme="light"] .homeSelectionSummary,
+:root[data-theme="light"] label,
+:root[data-theme="light"] .matchNo,
+:root[data-theme="light"] .roundSub,
+:root[data-theme="light"] .refTag,
+:root[data-theme="light"] .busyWho,
+:root[data-theme="light"] .drawMatchTitle,
+:root[data-theme="light"] .raffleLabel,
+:root[data-theme="light"] .raffleRolling{
+  color:#8e8e93!important;
+}
+
+/* 提示盒也改成 iOS 淺米灰，不再亮黃 */
+:root[data-theme="light"] .notice{
+  background:#faf8ef!important;
+  color:#6f6544!important;
+  border-color:#e6dfbf!important;
+}
+
+:root[data-theme="light"] .drawNotice{
+  background:#faf7f5!important;
+  color:#655b56!important;
+  border-color:#e7ddd8!important;
+}
+
+/* 禁用態 */
+:root[data-theme="light"] button:disabled,
+:root[data-theme="light"] .homeNext:disabled{
+  background:#e9e9ed!important;
+  color:#aaaab0!important;
+  border-color:#d7d7dc!important;
+  opacity:1!important;
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -1462,6 +1752,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
 <script>
+const THEME_KEY='bx_theme';
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyD2PsTKnlcFbHQvkZCYeaM_DIoJcl1c5zk",
   authDomain: "ljt-beyblade-x.firebaseapp.com",
@@ -5838,6 +6129,18 @@ async function copyPublic(){await navigator.clipboard.writeText(publicUrl());ale
 async function nativeShare(){if(navigator.share)await navigator.share({title:ev.name,text:'查看即時對戰表',url:publicUrl()});else copyPublic()}
 
 
+function currentTheme(){
+  const attr=document.documentElement.getAttribute('data-theme');
+  if(attr==='light'||attr==='dark')return attr;
+
+  try{
+    const saved=localStorage.getItem(THEME_KEY);
+    if(saved==='light'||saved==='dark')return saved;
+  }catch(e){}
+
+  return 'dark';
+}
+
 function updateThemeButton(){
   const btn=$('themeToggleBtn');
   if(!btn)return;
@@ -5887,8 +6190,24 @@ function applyTheme(theme,save=true){
 }
 
 function toggleTheme(){
-  const next=currentTheme()==='light'?'dark':'light';
-  applyTheme(next,true);
+  try{
+    const now=currentTheme();
+    const next=now==='light'?'dark':'light';
+    applyTheme(next,true);
+  }catch(e){
+    console.error('toggleTheme failed',e);
+
+    // 最後保險：即使 localStorage 或其他 UI 發生問題，
+    // 仍直接切換 html[data-theme]。
+    const root=document.documentElement;
+    const next=root.getAttribute('data-theme')==='light'?'dark':'light';
+    root.setAttribute('data-theme',next);
+
+    try{localStorage.setItem('bx_theme',next)}catch(_){}
+
+    const btn=document.getElementById('themeToggleBtn');
+    if(btn)btn.textContent=next==='light'?'☀️':'🌙';
+  }
 }
 
 
@@ -5906,7 +6225,16 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 function initThemeUI(){
-  const saved=(()=>{try{return localStorage.getItem(THEME_KEY)||currentTheme()}catch(e){return currentTheme()}})();
+  let saved='dark';
+
+  try{
+    const v=localStorage.getItem(THEME_KEY);
+    if(v==='light'||v==='dark')saved=v;
+    else saved=currentTheme();
+  }catch(e){
+    saved=currentTheme();
+  }
+
   applyTheme(saved,false);
 }
 
