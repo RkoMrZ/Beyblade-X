@@ -1710,6 +1710,25 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 .regPerson{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
 .regPerson input[type=checkbox]{width:22px;height:22px}.regPerson .name{font-weight:850}.regPerson .detail{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}.regNo{font-size:12px;color:var(--muted);text-align:center}
+.regDeadlineLine{margin-top:7px;font-size:12px;font-weight:800;color:#d96b32;line-height:1.45}
+.regAdminInfoGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.regAdminInfoItem{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);min-width:0}
+.regAdminInfoItem .k{font-size:11px;color:var(--muted);margin-bottom:3px}
+.regAdminInfoItem .v{font-size:14px;font-weight:850;line-height:1.35;word-break:break-word}
+.regAdminInfoItem.wide{grid-column:1/-1}
+.regAdminInfoItem.deadline{grid-column:1/-1;border-color:#efb2a4;background:color-mix(in srgb,#ff654d 9%,var(--panel2))}
+.regAdminInfoItem.deadline .k,.regAdminInfoItem.deadline .v{color:#c74936}
+.regManualAdd{margin:12px 0 4px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+.regManualAddHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.regManualAddBody{margin-top:10px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+.regManualAddBody>div{min-width:0}
+.regManualAddBody input{width:100%;max-width:100%;min-width:0;margin:0}
+.regManualAddBody label{margin-top:0}
+@media(max-width:640px){
+ .regAdminInfoGrid{grid-template-columns:1fr 1fr}
+ .regManualAddBody{grid-template-columns:1fr}
+ .regManualAddBody button{width:100%}
+}
 .regStickyTools{position:sticky;bottom:10px;z-index:5;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(10px)}
 .regStickyTools .toolbar{margin-top:8px}.regLinkBox{word-break:break-all;font-size:12px;padding:10px;border:1px dashed var(--line);border-radius:11px;background:var(--panel2);margin-top:8px}
 .importSourceBox{margin-top:10px;padding:11px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
@@ -1869,13 +1888,21 @@ html,body{max-width:100%;overflow-x:hidden}
 
 <section id="registrationAdmin" class="hidden">
  <div class="card">
-  <div class="row"><div><h2 id="regAdminTitle" style="margin:0 0 5px">報名管理</h2><div id="regAdminMeta" class="muted"></div></div><button class="ghost" type="button" onclick="openRegistrationHub()">返回報名系統</button></div>
+  <div class="row"><div style="min-width:0;flex:1"><h2 id="regAdminTitle" style="margin:0 0 5px">報名管理</h2><div id="regAdminMeta" class="regAdminInfoGrid"></div></div><button class="ghost" type="button" onclick="openRegistrationHub()">返回報名系統</button></div>
   <div class="regStatRow"><span id="regTotalStat" class="regStat">報名 0</span><span id="regSelectedStat" class="regStat">已勾選 0</span></div>
   <div id="regShareUrl" class="regLinkBox"></div>
   <div class="toolbar" style="margin-top:10px"><button class="secondary" type="button" onclick="copyRegistrationLink()">複製報名連結</button><button id="regToggleOpenBtn" class="secondary" type="button" onclick="toggleRegistrationOpen()">關閉報名</button></div>
  </div>
  <div class="card">
   <div class="row"><h3 style="margin:0">報名名單</h3><button class="secondary" type="button" onclick="loadRegistrationAdmin(activeRegistrationFormId)">重新整理</button></div>
+  <div class="regManualAdd">
+   <div class="regManualAddHead"><div><b>＋ 管理者手動新增選手</b><div class="muted" style="font-size:12px;margin-top:3px">會自動補進目前最前面的空缺名額。</div></div></div>
+   <div class="regManualAddBody">
+    <div><label>選手名稱 *</label><input id="regManualName" maxlength="40" placeholder="比賽現場使用名稱"></div>
+    <div><label>手機後三碼 *</label><input id="regManualPhone" type="tel" inputmode="numeric" maxlength="3" pattern="[0-9]{3}" placeholder="例如：168"></div>
+    <button id="regManualAddBtn" class="secondary" type="button" onclick="manualAddRegistration()">新增選手</button>
+   </div>
+  </div>
   <div id="registrationList" class="regList"></div>
   <div class="regStickyTools">
    <div id="regSelectedPreview" class="muted">尚未勾選選手。</div>
@@ -2257,7 +2284,7 @@ async function getCloudEventCountFromServer(timeoutMs=2500){
 }
 
 
-const PUBLIC_WINDOW_MS=2*60*60*1000;
+const PUBLIC_WINDOW_MS=4*60*60*1000;
 
 function cloudEventIdsForCurrentGoogle(){
   if(!isGoogleUser())return [];
@@ -2370,7 +2397,7 @@ async function extendPublicEvent(id){
     buttons.forEach((btn,i)=>{
       if(document.body.contains(btn)){
         btn.disabled=false;
-        btn.textContent=oldTexts[i]||'增加 2 小時';
+        btn.textContent=oldTexts[i]||'增加 4 小時';
       }
     });
   }
@@ -2467,7 +2494,7 @@ function renderSavedEvents(){
       <div class=savedEventActions>
         <button type="button" data-open-id="${id}">繼續</button>
         ${ownerControls?`
-          <button type="button" class="secondary" data-extend-id="${id}">增加 2 小時</button>
+          <button type="button" class="secondary" data-extend-id="${id}">增加 4 小時</button>
           <button type="button" class="secondary" data-close-public-id="${id}" ${e.publicOpen===false?'disabled':''}>關閉公開連結</button>
         `:''}
         <button type="button" class="danger" data-delete-id="${id}">${isTest?'刪除本機':'刪除雲端'}</button>
@@ -3105,11 +3132,17 @@ async function loadCloudEvent(id){
     console.error('loadCloudEvent failed',e);
     const msg=String(e?.message||e);
 
+    const code=String(e?.code||'');
     if(
       msg.includes('PERMISSION_DENIED') ||
       msg.includes('permission_denied') ||
+      msg.includes('Permission denied') ||
+      msg.includes('Firebase REST 401') ||
+      msg.includes('Firebase REST 403') ||
       msg.includes('HTTP_401') ||
-      msg.includes('HTTP_403')
+      msg.includes('HTTP_403') ||
+      code==='HTTP_401' ||
+      code==='HTTP_403'
     ){
       return 'expired';
     }
@@ -3149,6 +3182,42 @@ async function publicRestPut(path,value,timeoutMs=8000){
     if(!res.ok)throw new Error(`Firebase ${res.status}: ${text}`);
     return text?JSON.parse(text):null;
   }finally{clearTimeout(timer)}
+}
+
+async function rtdbRestPutIfEmpty(path,value,timeoutMs=6000){
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  if(!base)throw new Error('Firebase databaseURL 未設定');
+  const token=await getRestIdToken(false);
+  const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
+
+  const getCtrl=new AbortController();
+  const getTimer=setTimeout(()=>getCtrl.abort(),timeoutMs);
+  let etag='null_etag', current=null;
+  try{
+    const res=await fetch(url,{method:'GET',headers:{'X-Firebase-ETag':'true'},signal:getCtrl.signal,cache:'no-store'});
+    const body=await res.text();
+    if(!res.ok)throw new Error(`Firebase REST ${res.status}: ${body}`);
+    etag=res.headers.get('ETag')||'null_etag';
+    current=body?JSON.parse(body):null;
+  }finally{clearTimeout(getTimer)}
+
+  if(current!==null)return {ok:false,reason:'occupied'};
+
+  const putCtrl=new AbortController();
+  const putTimer=setTimeout(()=>putCtrl.abort(),timeoutMs);
+  try{
+    const res=await fetch(url,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','if-match':etag},
+      body:JSON.stringify(value),
+      signal:putCtrl.signal,
+      cache:'no-store'
+    });
+    const body=await res.text();
+    if(res.status===412)return {ok:false,reason:'race'};
+    if(!res.ok)throw new Error(`Firebase REST ${res.status}: ${body}`);
+    return {ok:true,value:body?JSON.parse(body):value};
+  }finally{clearTimeout(putTimer)}
 }
 async function openRegistrationHub(){
   if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
@@ -3374,7 +3443,7 @@ async function loadMyRegistrationForms(){
     }
     rows.sort((a,b)=>(b.created||0)-(a.created||0));
     badge.textContent=rows.length+' 份';
-    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">${f.eventDate?`📅 比賽日期 ${esc(f.eventDate)}｜`:''}正選 ${Number(f.maxPlayers)||0} 人${Number(f.waitlistMax)>0?`｜備選 ${Number(f.waitlistMax)} 人`:''}｜${f.open!==false?'🟢 報名中':'⚪ 已關閉'}${f.deadline?`｜報名截止 ${esc(formatRegDate(f.deadline))}`:''}</div></div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有報名表。</div>';
+    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">${f.eventDate?`📅 比賽日期 ${esc(f.eventDate)}｜`:''}正選 ${Number(f.maxPlayers)||0} 人${Number(f.waitlistMax)>0?`｜備選 ${Number(f.waitlistMax)} 人`:''}｜${f.open!==false?'🟢 報名中':'⚪ 已關閉'}</div>${f.deadline?`<div class="regDeadlineLine">⏰ 報名截止 ${esc(formatRegDate(f.deadline))}</div>`:''}</div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有報名表。</div>';
   }catch(e){box.innerHTML=`<div class="notice">讀取失敗：${esc(e?.message||e)}</div>`}
 }
 async function deleteRegistrationForm(id){
@@ -3428,7 +3497,14 @@ async function loadRegistrationAdmin(id){
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份報名表的建立者。');
     activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
     $('regAdminTitle').textContent=form.title;
-    $('regAdminMeta').textContent=`${form.eventDate?`比賽日期 ${form.eventDate}｜`:''}${form.checkInTime?`報到 ${form.checkInTime}｜`:''}${form.startTime?`比賽 ${form.startTime}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${Number.isFinite(Number(form.fee))?`｜報名費 ${Number(form.fee)===0?'免費':`NT$ ${Number(form.fee)} / 人`}`:''}${form.deadline?`｜報名截止 ${formatRegDate(form.deadline)}`:''}`;
+    $('regAdminMeta').innerHTML=[
+      form.eventDate?`<div class="regAdminInfoItem"><div class="k">📅 比賽日期</div><div class="v">${esc(form.eventDate)}</div></div>`:'',
+      form.checkInTime?`<div class="regAdminInfoItem"><div class="k">🕘 報到時間</div><div class="v">${esc(form.checkInTime)}</div></div>`:'',
+      form.startTime?`<div class="regAdminInfoItem"><div class="k">🕤 比賽時間</div><div class="v">${esc(form.startTime)}</div></div>`:'',
+      `<div class="regAdminInfoItem"><div class="k">👥 名額</div><div class="v">正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}</div></div>`,
+      form.address?`<div class="regAdminInfoItem wide"><div class="k">📍 舉辦地點 / 店面名稱</div><div class="v">${esc(form.address)}</div></div>`:'',
+      form.deadline?`<div class="regAdminInfoItem deadline"><div class="k">⏰ 報名截止</div><div class="v">${esc(formatRegDate(form.deadline))}</div></div>`:''
+    ].join('');
     $('regShareUrl').textContent=regPublicUrl(id);
     $('regToggleOpenBtn').textContent=form.open!==false?'關閉報名':'重新開放';
     renderRegistrationList();
@@ -3454,6 +3530,85 @@ function updateRegistrationSelectedUI(){
 async function deleteRegistration(id){
   if(!confirm('確定刪除這筆報名嗎？'))return;
   try{await rtdbRestDelete(`registrations/${activeRegistrationFormId}/${id}`,5000);delete activeRegistrations[id];registrationSelected.delete(id);renderRegistrationList()}catch(e){alert('刪除失敗：'+(e?.message||e))}
+}
+
+let manualRegistrationBusy=false;
+async function manualAddRegistration(){
+  if(manualRegistrationBusy)return;
+  if(!activeRegistrationFormId||!activeRegistrationForm)return alert('目前沒有可管理的報名表。');
+  if(!fbAuth?.currentUser || activeRegistrationForm.ownerUid!==fbAuth.currentUser.uid)return alert('只有這份報名表的建立者可以手動新增選手。');
+
+  const nameEl=$('regManualName'), phoneEl=$('regManualPhone'), btn=$('regManualAddBtn');
+  const playerName=(nameEl?.value||'').trim();
+  const phoneLast3=(phoneEl?.value||'').trim();
+
+  if(!playerName)return alert('請輸入選手名稱。');
+  if(!/^\d{3}$/.test(phoneLast3))return alert('請輸入手機後三碼（3 位數字）。');
+
+  const maxPlayers=Number(activeRegistrationForm.maxPlayers)||0;
+  const waitlistMax=Number(activeRegistrationForm.waitlistMax)||0;
+  const totalCapacity=maxPlayers+waitlistMax;
+  if(totalCapacity<=0)return alert('這份報名表尚未設定可用名額。');
+
+  manualRegistrationBusy=true;
+  const oldText=btn?.textContent||'新增選手';
+  if(btn){btn.disabled=true;btn.textContent='新增中…';}
+
+  try{
+    // 先讀最新雲端名單，避免用到舊畫面資料。
+    const latest=(await rtdbRestGet(`registrations/${activeRegistrationFormId}`,6000))||{};
+    activeRegistrations=latest;
+
+    const sameName=Object.values(latest).some(r=>r?.playerName && String(r.playerName).trim().toLocaleLowerCase()===playerName.toLocaleLowerCase());
+    if(sameName){
+      throw new Error('名稱重複，請更改選手名稱。');
+    }
+
+    let assigned=null;
+    let assignedId='';
+    for(let position=1;position<=totalCapacity;position++){
+      const slotId=`S${String(position).padStart(4,'0')}`;
+      if(latest[slotId])continue;
+
+      const isMain=position<=maxPlayers;
+      const entryNo=isMain?position:position-maxPlayers;
+      const row={
+        playerName,
+        phoneLast3,
+        entryLabel:isMain?`正選 ${entryNo}`:`備選 ${entryNo}`,
+        entryNo,
+        entryType:isMain?'main':'waitlist',
+        created:Date.now()
+      };
+
+      const result=await rtdbRestPutIfEmpty(`registrations/${activeRegistrationFormId}/${slotId}`,row,6000);
+      if(result.ok){
+        assigned=row;
+        assignedId=slotId;
+        break;
+      }
+      if(result.reason==='occupied'||result.reason==='race'){
+        // 有人剛好搶先取得這個名額，繼續找下一格。
+        continue;
+      }
+    }
+
+    if(!assigned){
+      await loadRegistrationAdmin(activeRegistrationFormId);
+      throw new Error('正選與備選名額都已滿。若要再新增，請先刪除一筆或調整報名表名額。');
+    }
+
+    activeRegistrations[assignedId]=assigned;
+    nameEl.value='';
+    phoneEl.value='';
+    renderRegistrationList();
+    alert(`已新增「${playerName}」｜${assigned.entryLabel}`);
+  }catch(e){
+    alert('新增選手失敗：'+(e?.message||e));
+  }finally{
+    manualRegistrationBusy=false;
+    if(btn){btn.disabled=false;btn.textContent=oldText;}
+  }
 }
 async function toggleRegistrationOpen(){
   if(!activeRegistrationForm)return;
@@ -6720,12 +6875,12 @@ function renderShare(){
         <div>
           <div class=sharePublicLabel>公開狀態</div>
           <div class=sharePublicTime>${esc(statusText)}</div>
-          <div class=cloudNote>公開時間最多維持到現在起 2 小時；按「增加 2 小時」後，公開期限最多仍只會到現在起 2 小時，不會疊加成 4 小時以上。</div>
+          <div class=cloudNote>公開時間最多維持到現在起 4 小時；按「增加 4 小時」後，公開期限最多仍只會到現在起 4 小時，不會疊加成 8 小時以上。</div>
         </div>
 
         ${ownerControls?`
           <div class=sharePublicActions>
-            <button type=button data-extend-id="${ev.id}">增加 2 小時</button>
+            <button type=button data-extend-id="${ev.id}">增加 4 小時</button>
             <button type=button class="secondary" data-close-public-id="${ev.id}" ${ev.publicOpen===false?'disabled':''}>關閉公開連結</button>
           </div>
         `:''}
@@ -7090,7 +7245,7 @@ async function bootstrapCloud(){
     }else if(result==='expired'){
       clearActiveView();
       history.replaceState(null,'',location.pathname);
-      alert('這場賽事的公開觀看已關閉或有效時間已到期。');
+      alert('此公開連結已失效或已過期。\n\n請向主辦取得新的公開連結。');
       goHome();
     }else if(result==='error'){
       alert('目前無法連上 Firebase。V2 不會使用本機舊雲端資料代替，請檢查網路後重新整理。');
