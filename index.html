@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：雲端只存 Firebase、測試只存本機、3-slot 原子上限、裁判身分資料隔離 -->
+<meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：修復 iOS 雲端賽事載入卡住，登入狀態改用 REST timeout -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -2034,16 +2034,21 @@ async function openSavedEvent(id){
       ev=local;
       isAdmin=true;
       isReferee=false;
+
       $('home').classList.add('hidden');
       $('create').classList.add('hidden');
       $('admin').classList.remove('hidden');
+
       history.replaceState(null,'',location.pathname);
       renderAdmin();
       showTab('bracket');
       return;
     }
 
-    const result=await loadCloudEvent(id);
+    const result=await Promise.race([
+      loadCloudEvent(id),
+      new Promise(resolve=>setTimeout(()=>resolve('timeout'),9000))
+    ]);
 
     if(result==='ok'){
       history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}&tab=${encodeURIComponent(currentAdminTab||'bracket')}`);
@@ -2058,7 +2063,11 @@ async function openSavedEvent(id){
     }
 
     if(result==='expired'){
-      return alert('這場賽事的公開觀看已關閉或有效時間已到期。');
+      return alert('目前無法讀取這場賽事。若你是主辦，請確認仍登入建立這場賽事的 Google 帳號。');
+    }
+
+    if(result==='timeout'){
+      return alert('載入超過 9 秒仍未完成。已停止等待，不會再卡在「載入中」。請確認網路後再按一次。');
     }
 
     alert('目前無法從 Firebase 載入這場賽事，請檢查網路後再試。');
@@ -2339,7 +2348,6 @@ async function refreshAdminState(id){
     return false;
   }
 
-  // 賽事建立者本身就是最高主辦權限，不需要再依 admins/$uid 節點判定。
   if(ev?.id===id && ev?.ownerUid===fbAuth.currentUser.uid){
     isAdmin=true;
     localStorage.setItem(adminFlagKey(id),'1');
@@ -2349,23 +2357,14 @@ async function refreshAdminState(id){
   isAdmin=false;
 
   try{
-    const snap=await fbDb.ref(`admins/${id}/${fbAuth.currentUser.uid}`).once('value');
-    const value=snap.exists()?snap.val():null;
-
-    isAdmin=value!==null && value!==undefined;
+    const value=await rtdbRestGet(`admins/${id}/${fbAuth.currentUser.uid}`,4000);
+    isAdmin=value!==null && value!==undefined && value!==false;
 
     if(isAdmin)localStorage.setItem(adminFlagKey(id),'1');
     else localStorage.removeItem(adminFlagKey(id));
   }catch(e){
     console.warn('refreshAdminState failed',e);
-
-    // 網路/權限查詢失敗時，如果本機賽事資料確認自己就是 owner，仍保留主辦權限。
-    if(ev?.id===id && ev?.ownerUid===fbAuth.currentUser.uid){
-      isAdmin=true;
-      localStorage.setItem(adminFlagKey(id),'1');
-    }else{
-      isAdmin=false;
-    }
+    isAdmin=false;
   }
 
   return isAdmin;
@@ -2575,7 +2574,22 @@ async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
 
   try{
-    const data=await publicCloudGet(`events/${id}`,9000);
+    let data=null;
+
+    // 登入狀態下優先走帶 token 的 REST。
+    // 這條路徑有明確 timeout，避免 iOS Safari Firebase SDK once() 偶發一直等待，
+    // 造成首頁「載入中…」永遠卡住。
+    if(fbAuth?.currentUser){
+      try{
+        data=await rtdbRestGet(`events/${id}`,6000);
+      }catch(authErr){
+        console.warn('authenticated event read failed, fallback public read',authErr);
+        data=await publicCloudGet(`events/${id}`,7000);
+      }
+    }else{
+      data=await publicCloudGet(`events/${id}`,7000);
+    }
+
     if(!data)return 'missing';
 
     ev=data;
@@ -2586,8 +2600,16 @@ async function loadCloudEvent(id){
     isReferee=false;
 
     if(fbAuth?.currentUser){
-      try{await refreshAdminState(id)}catch(e){console.warn('refreshAdminState failed',e)}
-      try{await refreshRefereeState(id)}catch(e){console.warn('refreshRefereeState failed',e)}
+      // owner 判斷完全本地完成；非 owner 才查 admin/referee。
+      if(data.ownerUid===fbAuth.currentUser.uid){
+        isAdmin=true;
+        localStorage.setItem(adminFlagKey(id),'1');
+      }else{
+        await Promise.all([
+          refreshAdminState(id),
+          refreshRefereeState(id)
+        ]);
+      }
     }
 
     $('home').classList.add('hidden');
@@ -2598,6 +2620,7 @@ async function loadCloudEvent(id){
     listenCloudEvent(id);
 
     const params=new URLSearchParams(location.search);
+
     if(params.get('admin')==='1'){
       showTab('organizer');
     }else if(params.get('ref')==='1'){
@@ -2613,9 +2636,16 @@ async function loadCloudEvent(id){
   }catch(e){
     console.error('loadCloudEvent failed',e);
     const msg=String(e?.message||e);
-    if(msg.includes('PERMISSION_DENIED')||msg.includes('permission_denied')||msg.includes('401')){
+
+    if(
+      msg.includes('PERMISSION_DENIED') ||
+      msg.includes('permission_denied') ||
+      msg.includes('HTTP_401') ||
+      msg.includes('HTTP_403')
+    ){
       return 'expired';
     }
+
     return 'error';
   }
 }
@@ -5210,12 +5240,18 @@ async function refreshRefereeState(id){
   isReferee=false;
   if(!fbAuth?.currentUser)return false;
 
+  // Owner 本身已有最高權限，不需要再等 refereeUsers 查詢。
+  if(ev?.id===id && ev?.ownerUid===fbAuth.currentUser.uid){
+    isReferee=false;
+    return false;
+  }
+
   try{
-    const snap=await fbDb.ref(`refereeUsers/${id}/${fbAuth.currentUser.uid}`).once('value');
-    const v=snap.exists()?snap.val():null;
+    const v=await rtdbRestGet(`refereeUsers/${id}/${fbAuth.currentUser.uid}`,4000);
     isReferee=v!==null && v!==undefined && v!==false;
   }catch(e){
     console.warn('refreshRefereeState failed',e);
+    isReferee=false;
   }
 
   return isReferee;
@@ -5928,7 +5964,17 @@ function restoreCachedEventImmediately(id,tab){
 
 async function backgroundRefreshCurrentEvent(id){
   try{
-    const data=await publicCloudGet(`events/${id}`,8000);
+    let data=null;
+
+    if(fbAuth?.currentUser){
+      try{
+        data=await rtdbRestGet(`events/${id}`,5000);
+      }catch(e){
+        data=await publicCloudGet(`events/${id}`,6000);
+      }
+    }else{
+      data=await publicCloudGet(`events/${id}`,6000);
+    }
 
     if(!data){
       if(ev?.id===id){
@@ -5938,6 +5984,7 @@ async function backgroundRefreshCurrentEvent(id){
         $('home')?.classList.remove('hidden');
         history.replaceState(null,'',location.pathname);
       }
+
       delete cloudEventsCache[id];
       cloudEventIds=cloudEventIds.filter(x=>x!==id);
       renderSavedEvents();
@@ -5948,11 +5995,19 @@ async function backgroundRefreshCurrentEvent(id){
 
     const keepTab=currentAdminTab||'bracket';
     ev=data;
+    ev.refereeClaims=ev.refereeClaims||{};
     cloudEventsCache[id]=data;
 
     if(fbAuth?.currentUser){
-      try{await refreshAdminState(id)}catch(e){}
-      try{await refreshRefereeState(id)}catch(e){}
+      if(data.ownerUid===fbAuth.currentUser.uid){
+        isAdmin=true;
+        isReferee=false;
+      }else{
+        await Promise.all([
+          refreshAdminState(id),
+          refreshRefereeState(id)
+        ]);
+      }
     }
 
     renderAdmin();
