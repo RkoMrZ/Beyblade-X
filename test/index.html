@@ -1804,26 +1804,17 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
    <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time"></div>
    <div><label>開賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time"></div>
    <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160" placeholder="例如：漁藏／新北市淡水區中山北路 255 號"></div>
-   <div><label>報名費（選填）</label><input id="regFormFee" maxlength="60" placeholder="例如：NT$ 300／人 或 免費"></div>
+   <div><label>報名費/人<span class="requiredMark">*</span></label><input id="regFormFee" required type="number" min="0" max="999999" step="1" inputmode="numeric" placeholder="例如：300"><div class="fieldHint">0 = 免費</div></div>
    <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
    <div><label>備選人數上限（選填）</label><input id="regFormWaitlistMax" type="number" min="0" max="256" placeholder="例如：8；不需要備選可留空"></div>
    <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local"></div>
   </div>
-  <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="10" maxlength="3000" placeholder="例如：
-🏆【大會獎項】
-第一名：...
-第二名：...
+  <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="8" maxlength="3000" placeholder="例如：
+🏆 大會獎項
+⚠️ 注意事項
+📣 其他活動說明
 
-📅 比賽日期：2026/10/08
-🕘 報到時間：21:00 - 21:30
-🕤 開賽時間：21:30
-📍 比賽地點：新北市淡水區...
-💰 報名費用：NT$ 300／人
-⚠️ 注意事項：
-1. ...
-2. ...
-
-可直接貼上平常在 LINE 群組使用的完整宣傳內容。"></textarea>
+可直接貼上平常在 LINE 群組使用的宣傳內容。"></textarea>
   <div class="toolbar" style="margin-top:12px">
    <button type="button" class="secondary" onclick="openRegistrationHub()">取消</button>
    <button type="button" onclick="createRegistrationForm()">建立報名表</button>
@@ -3171,7 +3162,10 @@ async function createRegistrationForm(){
   if(!startTime)return alert('請設定開賽時間。');
   const address=$('regFormAddress').value.trim();
   if(!address)return alert('請輸入舉辦地址 or 店面名稱。');
-  const fee=$('regFormFee').value.trim();
+  const feeRaw=$('regFormFee').value.trim();
+  if(feeRaw==='')return alert('請輸入報名費/人；免費請輸入 0。');
+  const fee=Number(feeRaw);
+  if(!Number.isInteger(fee)||fee<0||fee>999999)return alert('報名費/人請輸入 0～999999 的整數。');
   const maxRaw=$('regFormMax').value.trim();
   if(!maxRaw)return alert('請輸入正選人數上限。');
   const maxPlayers=Number(maxRaw);
@@ -3269,7 +3263,7 @@ async function loadRegistrationAdmin(id){
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份報名表的建立者。');
     activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
     $('regAdminTitle').textContent=form.title;
-    $('regAdminMeta').textContent=`${form.eventDate?`比賽日期 ${form.eventDate}｜`:''}${form.checkInTime?`報到 ${form.checkInTime}｜`:''}${form.startTime?`開賽 ${form.startTime}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${form.fee?`｜報名費 ${form.fee}`:''}${form.deadline?`｜報名截止 ${formatRegDate(form.deadline)}`:''}`;
+    $('regAdminMeta').textContent=`${form.eventDate?`比賽日期 ${form.eventDate}｜`:''}${form.checkInTime?`報到 ${form.checkInTime}｜`:''}${form.startTime?`開賽 ${form.startTime}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${Number.isFinite(Number(form.fee))?`｜報名費 ${Number(form.fee)===0?'免費':`NT$ ${Number(form.fee)} / 人`}`:''}${form.deadline?`｜報名截止 ${formatRegDate(form.deadline)}`:''}`;
     $('regShareUrl').textContent=regPublicUrl(id);
     $('regToggleOpenBtn').textContent=form.open!==false?'關閉報名':'重新開放';
     renderRegistrationList();
@@ -3334,7 +3328,7 @@ async function openPublicRegistration(formId){
     const addr=$('regPublicAddress');
     addr.classList.toggle('hidden',!f.address);addr.textContent=f.address?`📍 舉辦地點 / 店面名稱：${f.address}`:'';
     const feeBox=$('regPublicFee');
-    feeBox.classList.toggle('hidden',!f.fee);feeBox.textContent=f.fee?`💰 報名費：${f.fee}`:'';
+    feeBox.classList.toggle('hidden',f.fee===undefined||f.fee===null||f.fee==='');feeBox.textContent=(f.fee===undefined||f.fee===null||f.fee==='')?'':`💰 報名費：${Number(f.fee)===0?'免費':`NT$ ${Number(f.fee)} / 人`}`;
     const descWrap=$('regPublicDescWrap');
     descWrap.classList.toggle('hidden',!f.description);
     $('regPublicDesc').textContent=f.description||'';
