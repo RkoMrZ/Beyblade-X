@@ -1702,6 +1702,13 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 </div></header>
 <main class="wrap">
 <section id="home">
+ <div class="registrationLaunch">
+  <div class="registrationLaunchTop">
+   <div><h3>📝 線上報名系統</h3><div class="muted">獨立建立報名表，收到名單後再匯入賽事，不會直接綁住賽程。</div></div>
+   <button class="secondary" type="button" onclick="openRegistrationHub()">開啟報名系統</button>
+  </div>
+ </div>
+
  <div class="card hero">
   <h2>建立新賽事</h2>
   <div class="muted">先選擇賽制，再選擇這場要使用雲端同步或只在本機測試。</div>
@@ -1727,12 +1734,6 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
  </div>
 
 
- <div class="registrationLaunch">
-  <div class="registrationLaunchTop">
-   <div><h3>📝 線上報名系統</h3><div class="muted">獨立建立報名表，收到名單後再匯入賽事，不會直接綁住賽程。</div></div>
-   <button class="secondary" type="button" onclick="openRegistrationHub()">開啟報名系統</button>
-  </div>
- </div>
 
  <div class="card savedCard"><div class="row"><h3 style="margin:0">📌 我的賽事</h3><span id="savedCount" class="badge">0 場</span></div><div id="savedEvents" class="savedList"></div></div>
 </section>
@@ -1757,10 +1758,25 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 
 <section id="registrationHub" class="hidden">
  <div class="card">
-  <div class="row"><div><h2 style="margin:0 0 6px">📝 線上報名系統</h2><div class="muted">報名資料與賽程完全分開；建立賽事時再選擇匯入。</div></div><button class="ghost" type="button" onclick="goHome()">返回首頁</button></div>
+  <div><h2 style="margin:0 0 6px">📝 線上報名系統</h2><div class="muted">報名資料與賽程完全分開；建立賽事時再選擇匯入。</div></div>
  </div>
  <div class="card">
-  <h3 style="margin-top:0">建立新報名表</h3>
+  <div class="row"><h3 style="margin:0">我的報名表</h3><span id="myRegFormCount" class="badge">0 份</span></div>
+  <div id="myRegForms" class="regList"><div class="muted">登入 Google 後會顯示你的報名表。</div></div>
+ </div>
+ <div class="registrationLaunch" role="button" tabindex="0" onclick="openRegistrationCreate()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRegistrationCreate()}">
+  <div class="registrationLaunchTop">
+   <div><h3>＋ 建立新報名表</h3><div class="muted">建立一份新的線上報名表，設定地址、正選、備選與截止時間。</div></div>
+   <button class="secondary" type="button" onclick="event.stopPropagation();openRegistrationCreate()">開始建立</button>
+  </div>
+ </div>
+</section>
+
+<section id="registrationCreate" class="hidden">
+ <div class="card">
+  <div><h2 style="margin:0 0 6px">＋ 建立新報名表</h2><div class="muted">填寫完成後就會建立獨立報名頁，並回到管理畫面。</div></div>
+ </div>
+ <div class="card">
   <div class="regGrid">
    <div><label>活動 / 賽事名稱</label><input id="regFormTitle" placeholder="例如：Beyblade X 秋季盃"></div>
    <div><label>舉辦地址</label><input id="regFormAddress" maxlength="160" placeholder="例如：新北市淡水區○○路 123 號"></div>
@@ -1769,11 +1785,10 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   </div>
   <label>報名截止時間（可留空）</label><input id="regFormDeadline" type="datetime-local">
   <label>報名說明（可留空）</label><textarea id="regFormDesc" rows="3" placeholder="例如：請填寫比賽現場使用名稱；正選額滿後自動進入備選。"></textarea>
-  <div class="toolbar" style="margin-top:12px"><button type="button" onclick="createRegistrationForm()">＋ 建立報名表</button></div>
- </div>
- <div class="card">
-  <div class="row"><h3 style="margin:0">我的報名表</h3><span id="myRegFormCount" class="badge">0 份</span></div>
-  <div id="myRegForms" class="regList"><div class="muted">登入 Google 後會顯示你的報名表。</div></div>
+  <div class="toolbar" style="margin-top:12px">
+   <button type="button" class="secondary" onclick="openRegistrationHub()">取消</button>
+   <button type="button" onclick="createRegistrationForm()">建立報名表</button>
+  </div>
  </div>
 </section>
 
@@ -3043,7 +3058,7 @@ async function loadCloudEvent(id){
 
 // ===== 線上報名系統 V1 =====
 function hideMainSections(){
-  ['home','create','admin','registrationHub','registrationPublic','registrationAdmin'].forEach(id=>$(id)?.classList.add('hidden'));
+  ['home','create','admin','registrationHub','registrationCreate','registrationPublic','registrationAdmin'].forEach(id=>$(id)?.classList.add('hidden'));
 }
 function regPublicUrl(formId){
   return `${location.origin}${location.pathname}?signup=${encodeURIComponent(formId)}`;
@@ -3084,6 +3099,17 @@ async function openRegistrationHub(){
   await loadMyRegistrationForms();
   window.scrollTo({top:0,behavior:'instant'});
 }
+async function openRegistrationCreate(){
+  if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
+  if(!isGoogleUser()){
+    const ok=await requireGoogleLogin();
+    if(!ok)return;
+  }
+  hideMainSections();
+  $('registrationCreate').classList.remove('hidden');
+  history.replaceState(null,'',`${location.pathname}?reg=create`);
+  window.scrollTo({top:0,behavior:'instant'});
+}
 async function createRegistrationForm(){
   if(!(await initCloud())||!isGoogleUser())return alert('請先登入 Google。');
   const title=$('regFormTitle').value.trim();
@@ -3101,8 +3127,12 @@ async function createRegistrationForm(){
   try{
     await cloudUpdate({[`registrationForms/${id}`]:form,[`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`]:true},7000);
     registrationFormCache[id]=form;
-    $('regFormTitle').value='';$('regFormAddress').value='';$('regFormDesc').value='';
-    await loadMyRegistrationForms();
+    $('regFormTitle').value='';
+    $('regFormAddress').value='';
+    $('regFormDesc').value='';
+    $('regFormDeadline').value='';
+    $('regFormMax').value='24';
+    $('regFormWaitlistMax').value='8';
     await openRegistrationAdmin(id);
   }catch(e){alert('建立報名表失敗：'+(e?.message||e)+'\n\n請確認已套用這版附帶的 Firebase Rules。')}
 }
@@ -3318,7 +3348,7 @@ function goHome(){
     cloudUnsub=null;
   }
 
-  ['create','admin','registrationHub','registrationPublic','registrationAdmin'].forEach(x=>$(x)?.classList.add('hidden'));
+  ['create','admin','registrationHub','registrationCreate','registrationPublic','registrationAdmin'].forEach(x=>$(x)?.classList.add('hidden'));
   $('registrationImportModal')?.classList.add('hidden');
   $('home').classList.remove('hidden');
 
@@ -6802,6 +6832,11 @@ async function bootstrapCloud(){
     if(isGoogleUser()){await openRegistrationAdmin(regAdmin);return}
     const ok=await requireGoogleLogin();
     if(ok){await openRegistrationAdmin(regAdmin);return}
+  }
+
+  if(regHub==='create'){
+    await openRegistrationCreate();
+    return;
   }
 
   if(regHub==='hub'){
