@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：淺色模式改為 iOS 中性灰白風格，深色模式維持原設計 -->
-<title>[TEST] Beyblade X Tournament</title>
+<title>[TEST] Beyblade X Tournament + Registration</title>
 
 <script>
 (function(){
@@ -1665,13 +1665,35 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 
 
 <style>
+/* ===== 報名系統 V1 ===== */
+.registrationLaunch{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:16px;background:var(--panel)}
+.registrationLaunchTop{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.registrationLaunch h3{margin:0 0 5px}.registrationLaunch button{white-space:nowrap}
+.regGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.regList{display:grid;gap:9px;margin-top:12px}
+.regItem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+.regItemName{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.regMeta{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+.regActions{display:flex;gap:7px;flex-wrap:wrap}.regActions button{padding:8px 10px;font-size:13px}.regStatRow{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.regStat{padding:6px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:12px;color:var(--muted)}
+.regPublicHero{text-align:center;padding:24px 16px}.regPublicHero h2{margin:0 0 8px}.regPublicForm{max-width:620px;margin:0 auto}.regPublicForm textarea{min-height:90px}
+.regPerson{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
+.regPerson input[type=checkbox]{width:22px;height:22px}.regPerson .name{font-weight:850}.regPerson .detail{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}.regNo{font-size:12px;color:var(--muted);text-align:center}
+.regStickyTools{position:sticky;bottom:10px;z-index:5;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(10px)}
+.regStickyTools .toolbar{margin-top:8px}.regLinkBox{word-break:break-all;font-size:12px;padding:10px;border:1px dashed var(--line);border-radius:11px;background:var(--panel2);margin-top:8px}
+.importSourceBox{margin-top:10px;padding:11px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
+.importModal{position:fixed;inset:0;z-index:110;background:#0009;display:flex;align-items:flex-end;justify-content:center;padding:12px}.importCard{width:min(620px,100%);max-height:82dvh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:20px 20px 14px 14px;padding:14px;box-shadow:0 20px 60px #0008}
+:root[data-theme="light"] .registrationLaunch,:root[data-theme="light"] .regItem,:root[data-theme="light"] .regPerson,:root[data-theme="light"] .importSourceBox,:root[data-theme="light"] .regLinkBox{background:#fff}
+@media(max-width:640px){.regGrid{grid-template-columns:1fr}.registrationLaunchTop{align-items:flex-start}.regItem{grid-template-columns:1fr}.regActions{width:100%}.regActions button{flex:1}.regPerson{grid-template-columns:30px minmax(0,1fr)}.regPerson>button{grid-column:2}.registrationLaunch{padding:14px}}
+</style>
+
+
+<style>
 .testEnvBadge{position:fixed;right:10px;bottom:10px;z-index:9999;padding:7px 10px;border-radius:999px;background:#7a3cff;color:#fff;font-size:11px;font-weight:900;box-shadow:0 4px 16px #0005;pointer-events:none}
 </style>
 </head>
 <body>
-<div class="testEnvBadge">🧪 TEST Firebase</div>
+<div class="testEnvBadge">🧪 TEST + 報名系統</div>
 <header><div class="wrap brand">
-  <div><h1>🧪 Beyblade X Tournament</h1><small id="headSub">測試環境・不影響正式網站</small></div>
+  <div><h1>🧪 Beyblade X Tournament</h1><small id="headSub">測試環境・含線上報名系統</small></div>
   <div class="headActions">
     <button class="themeBtn secondary" id="themeToggleBtn" type="button" onclick="toggleTheme()" aria-label="切換深淺模式">🌙</button>
     <button class="loginBtn" id="googleLoginBtn" type="button" onclick="handleHeaderLogin()">Google 登入</button>
@@ -1704,6 +1726,14 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   <div id="homeSelectionSummary" class="homeSelectionSummary"></div>
  </div>
 
+
+ <div class="registrationLaunch">
+  <div class="registrationLaunchTop">
+   <div><h3>📝 線上報名系統</h3><div class="muted">獨立建立報名表，收到名單後再匯入賽事，不會直接綁住賽程。</div></div>
+   <button class="secondary" type="button" onclick="openRegistrationHub()">開啟報名系統</button>
+  </div>
+ </div>
+
  <div class="card savedCard"><div class="row"><h3 style="margin:0">📌 我的賽事</h3><span id="savedCount" class="badge">0 場</span></div><div id="savedEvents" class="savedList"></div></div>
 </section>
 
@@ -1712,6 +1742,10 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   <label>賽事名稱</label><input id="eventName" placeholder="例如：Beyblade X 秋季盃">
   <label>配對方式</label><select id="pairMode"><option value="ordered">依序配對</option><option value="random">隨機抽籤</option><option value="manual">手動編排（建立後可交換）</option></select>
   <div id="freeOpts" class="hidden"><label>自由編排目標</label><select id="freeFinal"><option value="rr3">一路兩兩淘汰，剩 3 人後三人循環</option><option value="champ">一路兩兩淘汰至冠軍</option></select></div>
+
+  <div class="importSourceBox">
+   <div class="row"><div><b>名單來源</b><div id="importSourceInfo" class="muted" style="margin-top:4px">目前：手動輸入</div></div><button type="button" class="secondary" onclick="openImportRegistration()">📥 從報名表匯入</button></div>
+  </div>
   <label>參賽名單（每行一位）</label><textarea id="bulkNames" rows="10" placeholder="王小明&#10;陳小華&#10;選手 C"></textarea>
   <div class="row"><button class="secondary" onclick="makeDemo()">產生測試名單</button><input id="demoCount" type="number" min="2" value="24" style="max-width:95px"></div>
  </div>
@@ -1719,6 +1753,63 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   <div class="toolbar" style="margin-top:12px"><button data-create-tournament="1" onclick="createTournament()">建立對戰表</button></div>
  </div>
 </section>
+
+
+<section id="registrationHub" class="hidden">
+ <div class="card">
+  <div class="row"><div><h2 style="margin:0 0 6px">📝 線上報名系統</h2><div class="muted">報名資料與賽程完全分開；建立賽事時再選擇匯入。</div></div><button class="ghost" type="button" onclick="goHome()">返回首頁</button></div>
+ </div>
+ <div class="card">
+  <h3 style="margin-top:0">建立新報名表</h3>
+  <div class="regGrid">
+   <div><label>活動 / 賽事名稱</label><input id="regFormTitle" placeholder="例如：Beyblade X 秋季盃"></div>
+   <div><label>正取人數上限</label><input id="regFormMax" type="number" min="2" max="256" value="24"></div>
+  </div>
+  <label>報名截止時間（可留空）</label><input id="regFormDeadline" type="datetime-local">
+  <label>報名說明（可留空）</label><textarea id="regFormDesc" rows="3" placeholder="例如：請填寫比賽使用名稱；超過正取人數後自動顯示候補。"></textarea>
+  <div class="toolbar" style="margin-top:12px"><button type="button" onclick="createRegistrationForm()">＋ 建立報名表</button></div>
+ </div>
+ <div class="card">
+  <div class="row"><h3 style="margin:0">我的報名表</h3><span id="myRegFormCount" class="badge">0 份</span></div>
+  <div id="myRegForms" class="regList"><div class="muted">登入 Google 後會顯示你的報名表。</div></div>
+ </div>
+</section>
+
+<section id="registrationPublic" class="hidden">
+ <div class="card regPublicHero"><div class="muted">Beyblade X 線上報名</div><h2 id="regPublicTitle">報名表</h2><div id="regPublicStatus" class="muted"></div></div>
+ <div class="card regPublicForm">
+  <div id="regPublicDesc" class="notice hidden" style="margin-bottom:12px"></div>
+  <label>選手名稱 *</label><input id="regPlayerName" maxlength="40" placeholder="比賽現場使用的名稱">
+  <label>LINE 顯示名稱（可選）</label><input id="regLineName" maxlength="60" placeholder="方便主辦辨識">
+  <label>備註（可選）</label><textarea id="regNote" maxlength="300" placeholder="例如：第一次參賽、同行者資訊"></textarea>
+  <button id="regSubmitBtn" type="button" style="width:100%;margin-top:14px;padding:14px" onclick="submitRegistration()">送出報名</button>
+  <div id="regSubmitResult" class="muted center" style="margin-top:12px"></div>
+ </div>
+</section>
+
+<section id="registrationAdmin" class="hidden">
+ <div class="card">
+  <div class="row"><div><h2 id="regAdminTitle" style="margin:0 0 5px">報名管理</h2><div id="regAdminMeta" class="muted"></div></div><button class="ghost" type="button" onclick="openRegistrationHub()">返回報名系統</button></div>
+  <div class="regStatRow"><span id="regTotalStat" class="regStat">報名 0</span><span id="regSelectedStat" class="regStat">已勾選 0</span></div>
+  <div id="regShareUrl" class="regLinkBox"></div>
+  <div class="toolbar" style="margin-top:10px"><button class="secondary" type="button" onclick="copyRegistrationLink()">複製報名連結</button><button id="regToggleOpenBtn" class="secondary" type="button" onclick="toggleRegistrationOpen()">關閉報名</button></div>
+ </div>
+ <div class="card">
+  <div class="row"><h3 style="margin:0">報名名單</h3><button class="secondary" type="button" onclick="loadRegistrationAdmin(activeRegistrationFormId)">重新整理</button></div>
+  <div id="registrationList" class="regList"></div>
+  <div class="regStickyTools">
+   <div id="regSelectedPreview" class="muted">尚未勾選選手。</div>
+   <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已勾選名單</button><button type="button" onclick="importSelectedToTournament()">📥 匯入建立賽事</button></div>
+  </div>
+ </div>
+</section>
+
+<div id="registrationImportModal" class="importModal hidden" onclick="if(event.target===this)closeImportRegistration()"><div class="importCard">
+ <div class="row"><div><h3 style="margin:0">從報名表匯入</h3><div class="muted">選擇報名表，再勾選要放進參賽名單的人。</div></div><button class="ghost" type="button" onclick="closeImportRegistration()">關閉</button></div>
+ <label>選擇報名表</label><select id="importRegFormSelect" onchange="loadImportRegistrations(this.value)"></select>
+ <div id="importRegList" class="regList" style="margin-top:12px"></div>
+ <div class="regStickyTools"><div id="importRegCount" class="muted">已選 0 人</div><div class="toolbar"><button class="secondary" type="button" onclick="selectAllImportRegs(true)">全選</button><button class="secondary" type="button" onclick="selectAllImportRegs(false)">取消全選</button><button type="button" onclick="applyImportRegistrations()">匯入參賽名單</button></div></div>
+</div></div>
 
 <section id="admin" class="hidden">
  <div class="adminTabs"><button class="secondary" data-tab-btn="bracket" onclick="showTab('bracket')">🏆 對戰表</button><button id="drawTopBtn" class="secondary" data-tab-btn="draw" onclick="showTab('draw')">🎁 抽籤</button><button class="secondary" data-tab-btn="share" onclick="showTab('share')">🔗 QR／分享</button><button id="rosterTopBtn" class="secondary" data-tab-btn="roster" onclick="showTab('roster')">👥 參賽名單</button></div>
@@ -1773,6 +1864,7 @@ const LEGACY_STORE='bx_testenv_legacy_disabled';
 let draftMode=null, draftStorage=null, ev=null;
 let cloudEventsCache={}, cloudEventIds=[], cloudEventSlots={};
 let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
+let activeRegistrationFormId='',activeRegistrationForm=null,activeRegistrations={},registrationSelected=new Set(),importRegistrationRows={},importRegistrationSelected=new Set(),registrationFormCache={};
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function events(){
   let localTests={};
@@ -2945,6 +3037,199 @@ async function loadCloudEvent(id){
     return 'error';
   }
 }
+
+
+// ===== 線上報名系統 V1 =====
+function hideMainSections(){
+  ['home','create','admin','registrationHub','registrationPublic','registrationAdmin'].forEach(id=>$(id)?.classList.add('hidden'));
+}
+function regPublicUrl(formId){
+  return `${location.origin}${location.pathname}?signup=${encodeURIComponent(formId)}`;
+}
+function formatRegDate(ts){
+  if(!ts)return '未設定';
+  try{return new Date(Number(ts)).toLocaleString('zh-TW',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return '未設定'}
+}
+async function publicRestGet(path,timeoutMs=8000){
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const res=await fetch(`${base}/${path}.json`,{method:'GET',signal:ctrl.signal,cache:'no-store'});
+    const text=await res.text();
+    if(!res.ok)throw new Error(`Firebase ${res.status}: ${text}`);
+    return text?JSON.parse(text):null;
+  }finally{clearTimeout(timer)}
+}
+async function publicRestPut(path,value,timeoutMs=8000){
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const res=await fetch(`${base}/${path}.json`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(value),signal:ctrl.signal,cache:'no-store'});
+    const text=await res.text();
+    if(!res.ok)throw new Error(`Firebase ${res.status}: ${text}`);
+    return text?JSON.parse(text):null;
+  }finally{clearTimeout(timer)}
+}
+async function openRegistrationHub(){
+  if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
+  if(!isGoogleUser()){
+    const ok=await requireGoogleLogin();
+    if(!ok)return;
+  }
+  hideMainSections();
+  $('registrationHub').classList.remove('hidden');
+  history.replaceState(null,'',location.pathname);
+  await loadMyRegistrationForms();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+async function createRegistrationForm(){
+  if(!(await initCloud())||!isGoogleUser())return alert('請先登入 Google。');
+  const title=$('regFormTitle').value.trim();
+  if(!title)return alert('請輸入活動 / 賽事名稱。');
+  const maxPlayers=Math.max(2,Math.min(256,Number($('regFormMax').value)||24));
+  const d=$('regFormDeadline').value;
+  const deadline=d?new Date(d).getTime():0;
+  if(deadline && deadline<=Date.now())return alert('截止時間必須在未來。');
+  const id='REG-'+uid()+uid().slice(0,3);
+  const now=Date.now();
+  const form={id,title,description:$('regFormDesc').value.trim(),maxPlayers,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
+  try{
+    await cloudUpdate({[`registrationForms/${id}`]:form,[`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`]:true},7000);
+    registrationFormCache[id]=form;
+    $('regFormTitle').value='';$('regFormDesc').value='';
+    await loadMyRegistrationForms();
+    await openRegistrationAdmin(id);
+  }catch(e){alert('建立報名表失敗：'+(e?.message||e)+'\n\n請確認已套用這版附帶的 Firebase Rules。')}
+}
+async function loadMyRegistrationForms(){
+  const box=$('myRegForms'), badge=$('myRegFormCount');
+  if(!box)return;
+  if(!isGoogleUser()){box.innerHTML='<div class="muted">請先登入 Google。</div>';return}
+  box.innerHTML='<div class="muted">載入中…</div>';
+  try{
+    const ids=(await rtdbRestGet(`userRegistrationForms/${fbAuth.currentUser.uid}`,6000))||{};
+    const rows=[];
+    for(const id of Object.keys(ids)){
+      try{const f=await rtdbRestGet(`registrationForms/${id}`,5000);if(f?.id){registrationFormCache[id]=f;rows.push(f)}}catch{}
+    }
+    rows.sort((a,b)=>(b.created||0)-(a.created||0));
+    badge.textContent=rows.length+' 份';
+    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">上限 ${Number(f.maxPlayers)||0} 人｜${f.open!==false?'🟢 報名中':'⚪ 已關閉'}${f.deadline?`｜截止 ${esc(formatRegDate(f.deadline))}`:''}</div></div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="secondary" type="button" onclick="copyText(regPublicUrl('${esc(f.id)}'),'已複製報名連結')">分享</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有報名表。</div>';
+  }catch(e){box.innerHTML=`<div class="notice">讀取失敗：${esc(e?.message||e)}</div>`}
+}
+async function openRegistrationAdmin(id){
+  if(!isGoogleUser())return openRegistrationHub();
+  hideMainSections();$('registrationAdmin').classList.remove('hidden');
+  await loadRegistrationAdmin(id);
+  window.scrollTo({top:0,behavior:'instant'});
+}
+async function loadRegistrationAdmin(id){
+  if(!id)return;activeRegistrationFormId=id;registrationSelected=new Set();
+  try{
+    const [form,regs]=await Promise.all([rtdbRestGet(`registrationForms/${id}`,6000),rtdbRestGet(`registrations/${id}`,6000).catch(()=>null)]);
+    if(!form)return alert('找不到這份報名表。');
+    if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份報名表的建立者。');
+    activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
+    $('regAdminTitle').textContent=form.title;
+    $('regAdminMeta').textContent=`上限 ${Number(form.maxPlayers)||0} 人${form.deadline?`｜截止 ${formatRegDate(form.deadline)}`:'｜未設定截止時間'}`;
+    $('regShareUrl').textContent=regPublicUrl(id);
+    $('regToggleOpenBtn').textContent=form.open!==false?'關閉報名':'重新開放';
+    renderRegistrationList();
+  }catch(e){alert('讀取報名資料失敗：'+(e?.message||e))}
+}
+function orderedRegistrationEntries(){
+  return Object.entries(activeRegistrations||{}).filter(([,r])=>r&&r.playerName).sort((a,b)=>(a[1].created||0)-(b[1].created||0));
+}
+function renderRegistrationList(){
+  const rows=orderedRegistrationEntries(), box=$('registrationList');
+  $('regTotalStat').textContent=`報名 ${rows.length}`;
+  if(!rows.length){box.innerHTML='<div class="savedEmpty">目前還沒有人報名。</div>';updateRegistrationSelectedUI();return}
+  const max=Number(activeRegistrationForm?.maxPlayers)||0;
+  box.innerHTML=rows.map(([id,r],i)=>{const state=i<max?'正取':`候補 ${i-max+1}`;return `<div class="regPerson"><input type="checkbox" data-reg-check="${esc(id)}" onchange="toggleRegistrationSelected('${esc(id)}',this.checked)"><div><div class="name">${esc(r.playerName)} <span class="badge">${state}</span></div><div class="detail">${r.lineName?`LINE：${esc(r.lineName)}<br>`:''}${r.note?`備註：${esc(r.note)}<br>`:''}${esc(formatRegDate(r.created))}</div></div><button class="danger" type="button" onclick="deleteRegistration('${esc(id)}')">刪除</button></div>`}).join('');
+  updateRegistrationSelectedUI();
+}
+function toggleRegistrationSelected(id,on){if(on)registrationSelected.add(id);else registrationSelected.delete(id);updateRegistrationSelectedUI()}
+function updateRegistrationSelectedUI(){
+  const names=[...registrationSelected].map(id=>activeRegistrations[id]?.playerName).filter(Boolean);
+  $('regSelectedStat').textContent=`已勾選 ${names.length}`;
+  $('regSelectedPreview').textContent=names.length?`已選：${names.join('、')}`:'尚未勾選選手。';
+}
+async function deleteRegistration(id){
+  if(!confirm('確定刪除這筆報名嗎？'))return;
+  try{await rtdbRestDelete(`registrations/${activeRegistrationFormId}/${id}`,5000);delete activeRegistrations[id];registrationSelected.delete(id);renderRegistrationList()}catch(e){alert('刪除失敗：'+(e?.message||e))}
+}
+async function toggleRegistrationOpen(){
+  if(!activeRegistrationForm)return;
+  const next=activeRegistrationForm.open===false;
+  try{await rtdbRestPut(`registrationForms/${activeRegistrationFormId}/open`,next,5000);activeRegistrationForm.open=next;registrationFormCache[activeRegistrationFormId]=activeRegistrationForm;$('regToggleOpenBtn').textContent=next?'關閉報名':'重新開放'}catch(e){alert('更新失敗：'+(e?.message||e))}
+}
+function copyText(textValue,msg='已複製'){
+  if(navigator.clipboard?.writeText)navigator.clipboard.writeText(textValue).then(()=>alert(msg)).catch(()=>fallbackCopy(textValue,msg));else fallbackCopy(textValue,msg);
+}
+function fallbackCopy(t,msg){const ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();alert(msg)}
+function copyRegistrationLink(){copyText(regPublicUrl(activeRegistrationFormId),'已複製報名連結。')}
+function selectedRegistrationNames(){return [...registrationSelected].map(id=>activeRegistrations[id]?.playerName).filter(Boolean)}
+function copySelectedRegistrationNames(){const n=selectedRegistrationNames();if(!n.length)return alert('請先勾選選手。');copyText(n.join('\n'),`已複製 ${n.length} 位選手。`)}
+function importSelectedToTournament(){
+  const n=selectedRegistrationNames();if(!n.length)return alert('請先勾選選手。');
+  draftMode=draftMode||'free';draftStorage=draftStorage||'cloud';
+  hideMainSections();$('create').classList.remove('hidden');$('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;$('freeOpts').classList.toggle('hidden',draftMode!=='free');
+  $('eventName').value=$('eventName').value||activeRegistrationForm?.title||'';$('bulkNames').value=n.join('\n');$('importSourceInfo').textContent=`來源：${activeRegistrationForm?.title||'報名表'}｜${n.length} 人`;updatePreview();history.replaceState(null,'',location.pathname);window.scrollTo({top:0,behavior:'instant'});
+}
+async function openPublicRegistration(formId){
+  hideMainSections();$('registrationPublic').classList.remove('hidden');activeRegistrationFormId=formId;
+  try{
+    const f=await publicRestGet(`registrationForms/${formId}`,7000);
+    if(!f)throw new Error('報名表不存在或已刪除');activeRegistrationForm=f;
+    $('regPublicTitle').textContent=f.title||'報名表';
+    const closed=f.open===false || (Number(f.deadline||0)>0 && Number(f.deadline)<Date.now());
+    $('regPublicStatus').textContent=closed?'報名已截止':`${f.deadline?`截止：${formatRegDate(f.deadline)}｜`:''}正取上限 ${Number(f.maxPlayers)||0} 人`;
+    $('regPublicDesc').classList.toggle('hidden',!f.description);$('regPublicDesc').textContent=f.description||'';
+    $('regSubmitBtn').disabled=closed;$('regSubmitBtn').textContent=closed?'報名已截止':'送出報名';
+    $('regSubmitResult').textContent='';
+  }catch(e){$('regPublicStatus').textContent='無法讀取報名表';$('regSubmitBtn').disabled=true;$('regSubmitResult').textContent=e?.message||e}
+}
+async function submitRegistration(){
+  const f=activeRegistrationForm;if(!f)return;
+  if(f.open===false || (Number(f.deadline||0)>0&&Number(f.deadline)<Date.now()))return alert('這份報名表已截止。');
+  const playerName=$('regPlayerName').value.trim();if(!playerName)return alert('請輸入選手名稱。');
+  const btn=$('regSubmitBtn'), old=btn.textContent;btn.disabled=true;btn.textContent='送出中…';
+  const rid='R-'+Date.now().toString(36).toUpperCase()+'-'+uid().slice(0,5);
+  const row={playerName,lineName:$('regLineName').value.trim(),note:$('regNote').value.trim(),created:Date.now()};
+  try{
+    await publicRestPut(`registrations/${activeRegistrationFormId}/${rid}`,row,8000);
+    $('regSubmitResult').textContent=`✅ 報名完成｜報名編號 ${rid}`;$('regPlayerName').value='';$('regLineName').value='';$('regNote').value='';
+  }catch(e){$('regSubmitResult').textContent='送出失敗：'+(e?.message||e)+'；請通知主辦確認 Firebase Rules。'}finally{btn.disabled=false;btn.textContent=old}
+}
+async function openImportRegistration(){
+  if(!(await initCloud())||!isGoogleUser()){const ok=await requireGoogleLogin();if(!ok)return}
+  $('registrationImportModal').classList.remove('hidden');const sel=$('importRegFormSelect');sel.innerHTML='<option>載入中…</option>';$('importRegList').innerHTML='';
+  try{
+    const ids=(await rtdbRestGet(`userRegistrationForms/${fbAuth.currentUser.uid}`,6000))||{};const forms=[];
+    for(const id of Object.keys(ids)){const f=registrationFormCache[id]||await rtdbRestGet(`registrationForms/${id}`,5000).catch(()=>null);if(f?.id){registrationFormCache[id]=f;forms.push(f)}}
+    forms.sort((a,b)=>(b.created||0)-(a.created||0));
+    if(!forms.length){sel.innerHTML='<option value="">目前沒有報名表</option>';$('importRegList').innerHTML='<div class="savedEmpty">請先到「線上報名系統」建立報名表。</div>';return}
+    sel.innerHTML=forms.map(f=>`<option value="${esc(f.id)}">${esc(f.title)}</option>`).join('');await loadImportRegistrations(forms[0].id);
+  }catch(e){sel.innerHTML='<option value="">讀取失敗</option>';$('importRegList').innerHTML=`<div class="notice">${esc(e?.message||e)}</div>`}
+}
+function closeImportRegistration(){$('registrationImportModal').classList.add('hidden')}
+async function loadImportRegistrations(formId){
+  importRegistrationSelected=new Set();importRegistrationRows={};if(!formId)return;
+  const box=$('importRegList');box.innerHTML='<div class="muted">載入報名名單…</div>';
+  try{
+    const regs=(await rtdbRestGet(`registrations/${formId}`,6000))||{};importRegistrationRows=regs;
+    const rows=Object.entries(regs).filter(([,r])=>r?.playerName).sort((a,b)=>(a[1].created||0)-(b[1].created||0));
+    box.innerHTML=rows.length?rows.map(([id,r],i)=>`<label class="regPerson"><input type="checkbox" data-import-check="${esc(id)}" onchange="toggleImportReg('${esc(id)}',this.checked)"><div><div class="name">${esc(r.playerName)}</div><div class="detail">#${i+1}${r.lineName?`｜LINE：${esc(r.lineName)}`:''}</div></div></label>`).join(''):'<div class="savedEmpty">這份報名表目前沒有報名者。</div>';updateImportCount();
+  }catch(e){box.innerHTML=`<div class="notice">${esc(e?.message||e)}</div>`}
+}
+function toggleImportReg(id,on){if(on)importRegistrationSelected.add(id);else importRegistrationSelected.delete(id);updateImportCount()}
+function updateImportCount(){$('importRegCount').textContent=`已選 ${importRegistrationSelected.size} 人`}
+function selectAllImportRegs(on){document.querySelectorAll('[data-import-check]').forEach(cb=>{cb.checked=on;const id=cb.dataset.importCheck;if(on)importRegistrationSelected.add(id);else importRegistrationSelected.delete(id)});updateImportCount()}
+function applyImportRegistrations(){
+  const names=[...importRegistrationSelected].map(id=>importRegistrationRows[id]?.playerName).filter(Boolean);if(!names.length)return alert('請先勾選要匯入的選手。');
+  $('bulkNames').value=names.join('\n');const form=registrationFormCache[$('importRegFormSelect').value];$('importSourceInfo').textContent=`來源：${form?.title||'報名表'}｜${names.length} 人`;updatePreview();closeImportRegistration();
+}
+
 function goHome(){
   stopAdminCodeRotation();
 
@@ -2958,7 +3243,8 @@ function goHome(){
     cloudUnsub=null;
   }
 
-  ['create','admin'].forEach(x=>$(x).classList.add('hidden'));
+  ['create','admin','registrationHub','registrationPublic','registrationAdmin'].forEach(x=>$(x)?.classList.add('hidden'));
+  $('registrationImportModal')?.classList.add('hidden');
   $('home').classList.remove('hidden');
 
   history.replaceState(null,'',location.pathname);
@@ -3809,7 +4095,7 @@ function renderBracketMatch(m,ri,mi){
     <div class="bSide ${m.winner===m.a?'winner':''}"><span class=bName>${m.winner===m.a?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.a)}</span></span><span class=bScore>${esc(scoreA)}</span></div>
     <div class="bSide ${m.winner===m.b?'winner':''}"><span class=bName>${m.winner===m.b?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.b)}</span></span><span class=bScore>${esc(scoreB)}</span></div>${m.refereeActive?`<span class="refTag live">⚖ 執裁中：${esc(m.referee)}</span>`:''}</button>`;
 }
-function refereeIdentityKey(){return `bx_testenv_ref_identity_${ev?.id||'default'}`}
+function refereeIdentityKey(){return `bx_ref_identity_${ev?.id||'default'}`}
 function getMyReferee(){return localStorage.getItem(refereeIdentityKey())||''}
 
 function normalizeRefereeClaims(){
@@ -6427,7 +6713,13 @@ async function bootstrapCloud(){
 
   const params=new URLSearchParams(location.search);
   const saved=readActiveView();
+  const signupForm=params.get('signup');
   const urlEvent=params.get('event');
+
+  if(signupForm){
+    await openPublicRegistration(signupForm);
+    return;
+  }
 
   if(urlEvent){
     const result=await loadCloudEvent(urlEvent);
