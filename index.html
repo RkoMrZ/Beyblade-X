@@ -1397,7 +1397,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
   <div id="homeSelectionSummary" class="homeSelectionSummary"></div>
  </div>
 
- <div class="card savedCard"><div class="row"><h3 style="margin:0">📌 本機保留的賽事</h3><span id="savedCount" class="badge">0 場</span></div><div id="savedEvents" class="savedList"></div></div>
+ <div class="card savedCard"><div class="row"><h3 style="margin:0">📌 我的賽事</h3><span id="savedCount" class="badge">0 場</span></div><div id="savedEvents" class="savedList"></div></div>
 </section>
 
 <section id="create" class="hidden">
@@ -1854,35 +1854,71 @@ async function extendPublicEvent(id){
 async function syncMyCloudEvents(){
   if(!isGoogleUser())return 0;
 
-  try{
-    const uid=fbAuth.currentUser.uid;
+  const uid=fbAuth.currentUser.uid;
 
-    // 只讀取自己的雲端賽事索引，不再讀整個 /events（Firebase Rules 不允許父層列出全部賽事）
-    const index=(await rtdbRestGet(`userEvents/${uid}`,10000))||{};
-    const ids=Object.keys(index).filter(id=>index[id]);
+  try{
+    const index=(await rtdbRestGet(`userEvents/${uid}`,8000))||{};
+    const remoteIds=Object.keys(index).filter(id=>index[id]);
+    const remoteSet=new Set(remoteIds);
 
     const local=events();
     const saved=new Set(savedEventIds());
+
+    // 重要：雲端賽事以 Firebase userEvents 為唯一來源。
+    // 同一 Google 帳號在不同瀏覽器，不再各自保留不同的舊雲端卡片。
+    for(const [id,e] of Object.entries(local)){
+      if(!e || e.testOnly)continue;
+      if(e.ownerUid!==uid)continue;
+
+      if(!remoteSet.has(id)){
+        delete local[id];
+        saved.delete(id);
+
+        localStorage.removeItem(adminFlagKey(id));
+        localStorage.removeItem(adminCodeKey(id));
+        localStorage.removeItem(`bx_ref_identity_${id}`);
+
+        if(localStorage.getItem(CURRENT)===id){
+          localStorage.removeItem(CURRENT);
+        }
+      }
+    }
+
     let count=0;
 
-    for(const id of ids){
+    // 最多只有 3 場，逐場抓最新資料，確保兩個瀏覽器看到完全相同。
+    for(const id of remoteIds){
       try{
-        const e=await rtdbRestGet(`events/${id}`,10000);
+        const e=await rtdbRestGet(`events/${id}`,8000);
+
         if(e && e.id){
-          local[e.id]=e;
-          saved.add(e.id);
+          local[id]=e;
+          saved.add(id);
           count++;
         }else{
-          // 索引殘留但賽事已不存在，清掉索引
-          try{await rtdbRestDelete(`userEvents/${uid}/${id}`,8000)}catch{}
+          // 索引殘留但 event 已不存在：清掉索引，所有瀏覽器都會跟著消失。
+          try{await rtdbRestDelete(`userEvents/${uid}/${id}`,5000)}catch(err){
+            console.warn('remove stale userEvent index failed',id,err);
+          }
+          saved.delete(id);
+          delete local[id];
         }
-      }catch(e){
-        console.warn('sync event failed',id,e);
+      }catch(err){
+        console.warn('sync event failed',id,err);
+
+        // 單一 event 暫時讀不到時，不要把它誤刪；
+        // 保留已存在的本機快取，等下一次 listener / 手動同步。
+        if(local[id])saved.add(id);
       }
     }
 
     localStorage.setItem(STORE,JSON.stringify(local));
-    setSavedEventIds([...saved]);
+
+    // 本機測試賽事保留；雲端賽事則只留下 remoteIds。
+    const testIds=[...saved].filter(id=>local[id]?.testOnly);
+    const orderedCloud=remoteIds.filter(id=>local[id]);
+    setSavedEventIds([...orderedCloud,...testIds]);
+
     return count;
   }catch(e){
     console.warn('syncMyCloudEvents failed',e);
@@ -1892,33 +1928,12 @@ async function syncMyCloudEvents(){
 
 
 async function backfillMyCloudEventIndex(){
-  if(!isGoogleUser())return;
-
-  const uid=fbAuth.currentUser.uid;
-  const all=events();
-  let ownedCount=0;
-
-  for(const e of Object.values(all)){
-    if(!e || e.testOnly || !e.id)continue;
-    if(e.ownerUid!==uid)continue;
-
-    ownedCount++;
-
-    try{
-      await rtdbRestPut(`userEvents/${uid}/${e.id}`,true,8000);
-    }catch(err){
-      console.warn('backfill userEvents failed',e.id,err);
-    }
-  }
-
-  // 舊版本沒有 userEventCounts，登入時補一次目前已知的數量。
-  try{
-    const remoteIndex=(await rtdbRestGet(`userEvents/${uid}`,8000))||{};
-    const remoteCount=Object.keys(remoteIndex).filter(id=>remoteIndex[id]).length;
-    await rtdbRestPut(`userEventCounts/${uid}`,remoteCount,8000);
-  }catch(err){
-    console.warn('backfill userEventCounts failed',err);
-  }
+  // v30 起停止「從瀏覽器 localStorage 反向補回 Firebase userEvents」。
+  // 原因：不同瀏覽器可能各自留著舊賽事，反向補索引會把已刪除/過期的賽事重新復活，
+  // 造成同一 Google 帳號在不同瀏覽器看到不同清單。
+  //
+  // 新規則：userEvents 才是雲端賽事清單唯一來源；本機只做快取。
+  return;
 }
 
 function renderSavedEvents(){
@@ -2116,13 +2131,14 @@ async function deleteSavedEvent(id){
 
   if(cached.testOnly){
     purgeLocalEvent(id);
-    clearActiveView?.();
+    if(typeof clearActiveView==='function')clearActiveView();
     closeDeleteConfirm();
     renderSavedEvents();
     return;
   }
 
   const btn=$('deleteOkBtn');
+  let deleteStep='確認主辦身分';
 
   try{
     if(btn){
@@ -2135,7 +2151,6 @@ async function deleteSavedEvent(id){
     fbUser=fbAuth.currentUser;
     if(!fbUser)throw new Error('目前沒有 Firebase 登入狀態');
 
-    // 先抓伺服器上的 event，避免只靠本機 cached.ownerUid。
     let remote=null;
     try{
       remote=await rtdbRestGet(`events/${id}`,6000);
@@ -2143,52 +2158,57 @@ async function deleteSavedEvent(id){
       console.warn('delete event owner check failed',e);
     }
 
-    if(remote?.ownerUid && remote.ownerUid!==fbUser.uid){
-      throw new Error('只有建立這場賽事的 Google 主辦帳號可以刪除。');
-    }
+    const ownerUid=remote?.ownerUid || cached.ownerUid || '';
 
-    const ownerUid=remote?.ownerUid || cached.ownerUid || fbUser.uid;
-
-    if(ownerUid!==fbUser.uid){
+    if(!ownerUid || ownerUid!==fbUser.uid){
       throw new Error('目前登入的 Google 帳號不是這場賽事的建立者。');
     }
 
-    if(btn)btn.textContent='刪除權限資料…';
+    // 先確認 owner 的 userEvents 索引存在。
+    // 新 Rules 會用這個索引作為「刪除依賴節點」的穩定授權依據，
+    // 不再依賴稍後可能被刪掉的 event / admins 節點。
+    deleteStep='確認主辦賽事索引';
+    let ownerIndex=false;
+    try{
+      ownerIndex=!!(await rtdbRestGet(`userEvents/${ownerUid}/${id}`,5000));
+    }catch(e){
+      console.warn('owner index check failed',e);
+    }
 
-    // 重要：不要再用一個 root PATCH 同時把 event + 權限節點全部刪掉。
-    // Firebase Rules 在多路徑刪除時會產生相依權限判斷，容易得到 401。
-    // 改成「event 還存在時」先清除依賴 ownerUid 的權限節點。
+    if(!ownerIndex){
+      // 舊賽事可能沒有索引，主辦本人可先補回。
+      await rtdbRestPut(`userEvents/${ownerUid}/${id}`,true,5000);
+    }
+
     const dependentPaths=[
-      `refereeUsers/${id}`,
-      `refereeSecrets/${id}`,
-      `secrets/${id}`,
-      `admins/${id}`
+      ['裁判登入權限',`refereeUsers/${id}`],
+      ['裁判驗證碼',`refereeSecrets/${id}`],
+      ['主辦驗證碼',`secrets/${id}`],
+      ['共同主辦權限',`admins/${id}`]
     ];
 
-    for(const path of dependentPaths){
+    for(const [label,path] of dependentPaths){
+      deleteStep=`刪除${label}`;
+      if(btn)btn.textContent=`${deleteStep}…`;
+
       try{
-        await rtdbRestDelete(path,7000);
+        await rtdbRestDelete(path,6000);
       }catch(e){
-        // 不存在的節點通常 DELETE 仍成功；真正的權限錯誤要往外丟。
-        console.warn('delete dependent node failed',path,e);
+        e.deleteStep=deleteStep;
         throw e;
       }
     }
 
+    deleteStep='刪除賽事本體';
     if(btn)btn.textContent='刪除賽事…';
-
-    // 最後才刪 event 本體，避免前面的 Rules 因 ownerUid 消失而失敗。
     await rtdbRestDelete(`events/${id}`,7000);
 
+    // userEvents 最後才刪，因為前面的 Rules 都以它作為 owner 的刪除授權。
+    deleteStep='刪除主辦賽事索引';
     if(btn)btn.textContent='整理賽事清單…';
+    await rtdbRestDelete(`userEvents/${ownerUid}/${id}`,5000);
 
-    // 使用者自己的索引與計數最後處理。
-    try{
-      await rtdbRestDelete(`userEvents/${ownerUid}/${id}`,5000);
-    }catch(e){
-      console.warn('delete userEvents index failed',e);
-    }
-
+    deleteStep='更新賽事數量';
     try{
       const index=(await rtdbRestGet(`userEvents/${ownerUid}`,5000))||{};
       const realCount=Object.keys(index).filter(k=>index[k]).length;
@@ -2205,7 +2225,7 @@ async function deleteSavedEvent(id){
 
     if(ev?.id===id){
       stopAdminCodeRotation();
-      stopRefereeCodeRotation?.();
+      if(typeof stopRefereeCodeRotation==='function')stopRefereeCodeRotation();
 
       ev=null;
 
@@ -2224,15 +2244,16 @@ async function deleteSavedEvent(id){
     alert('雲端賽事已完整刪除，分享連結、主辦權限與裁判權限都已失效。');
 
   }catch(e){
-    console.error('deleteSavedEvent failed',e);
+    console.error('deleteSavedEvent failed',deleteStep,e);
 
     const code=e?.code?`\n錯誤代碼：${e.code}`:'';
     const msg=String(e?.message||e);
+    const step=e?.deleteStep||deleteStep;
 
     let extra='';
 
     if(e?.code==='HTTP_401'||e?.code==='HTTP_403'||msg.includes('Permission denied')){
-      extra='\n\n目前 Firebase Rules 沒有允許主辦刪除整個裁判權限節點。請發布這一版對應的 Rules。';
+      extra=`\n\n失敗步驟：${step}\n請確認已發布 v2 刪除規則。`;
     }
 
     alert('刪除雲端賽事失敗：'+msg+code+extra);
@@ -2277,12 +2298,14 @@ async function initCloud(){
         // 只有真的停在首頁時才同步清單，避免賽事頁重整時同時發出多組請求。
         if(isGoogleUser()){
           try{
-            await backfillMyCloudEventIndex();
             await syncMyCloudEvents();
             renderSavedEvents();
+            listenMyCloudEventIndex();
           }catch(e){
             console.warn('auth home sync skipped',e);
           }
+        }else{
+          stopMyCloudEventIndexListener();
         }
       }
     });
@@ -2618,6 +2641,11 @@ function goHome(){
   renderHeaderAuth();
   renderHomeSelections();
   renderSavedEvents();
+  if(isGoogleUser()){
+    refreshCloudListOnHome();
+    listenMyCloudEventIndex();
+  }
+
 }
 function startCreate(m){selectHomeMode(m);proceedCreate()}
 $('bulkNames').addEventListener('input',updatePreview);
@@ -5774,6 +5802,20 @@ if(document.readyState==='loading'){
   initThemeUI();
 }
 
+
+window.addEventListener('pageshow',()=>{
+  if($('home') && !$('home').classList.contains('hidden') && isGoogleUser()){
+    refreshCloudListOnHome();
+    listenMyCloudEventIndex();
+  }
+});
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && $('home') && !$('home').classList.contains('hidden') && isGoogleUser()){
+    refreshCloudListOnHome();
+  }
+});
+
 window.addEventListener('resize',()=>{clearTimeout(window.__bxResize);window.__bxResize=setTimeout(()=>{setBracketScale(bracketScale);drawBracketLinks()},120)});
 
 
@@ -5837,6 +5879,57 @@ async function backgroundRefreshCurrentEvent(id){
   }catch(e){
     // 暫時連線失敗時留在本機快取畫面，不再把使用者踢回首頁或彈干擾訊息。
     console.warn('backgroundRefreshCurrentEvent transient failure',e);
+  }
+}
+
+
+function stopMyCloudEventIndexListener(){
+  if(ownerIndexUnsub){
+    try{ownerIndexUnsub()}catch(e){}
+    ownerIndexUnsub=null;
+  }
+}
+
+function listenMyCloudEventIndex(){
+  stopMyCloudEventIndexListener();
+
+  if(!isGoogleUser() || !fbDb)return;
+
+  const uid=fbAuth.currentUser.uid;
+  const ref=fbDb.ref(`userEvents/${uid}`);
+
+  const handler=async()=>{
+    if(ownerIndexSyncBusy)return;
+    ownerIndexSyncBusy=true;
+
+    try{
+      await syncMyCloudEvents();
+
+      if($('home') && !$('home').classList.contains('hidden')){
+        renderSavedEvents();
+      }
+    }catch(e){
+      console.warn('owner index live sync failed',e);
+    }finally{
+      ownerIndexSyncBusy=false;
+    }
+  };
+
+  ref.on('value',handler,err=>{
+    console.warn('owner index listener error',err);
+  });
+
+  ownerIndexUnsub=()=>ref.off('value',handler);
+}
+
+async function refreshCloudListOnHome(){
+  if(!isGoogleUser())return;
+
+  try{
+    await syncMyCloudEvents();
+    renderSavedEvents();
+  }catch(e){
+    console.warn('refreshCloudListOnHome failed',e);
   }
 }
 
@@ -5917,13 +6010,15 @@ async function bootstrapCloud(){
   if(isGoogleUser()){
     Promise.resolve().then(async()=>{
       try{
-        await backfillMyCloudEventIndex();
         await syncMyCloudEvents();
         renderSavedEvents();
+        listenMyCloudEventIndex();
       }catch(e){
         console.warn('home cloud list sync skipped',e);
       }
     });
+  }else{
+    stopMyCloudEventIndexListener();
   }
 
   renderSavedEvents();
