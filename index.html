@@ -2116,57 +2116,127 @@ async function deleteSavedEvent(id){
 
   if(cached.testOnly){
     purgeLocalEvent(id);
+    clearActiveView?.();
     closeDeleteConfirm();
     renderSavedEvents();
     return;
   }
 
   const btn=$('deleteOkBtn');
+
   try{
-    if(btn){btn.disabled=true;btn.textContent='刪除中…'}
+    if(btn){
+      btn.disabled=true;
+      btn.textContent='確認身分…';
+    }
 
     if(!(await initCloud()))throw new Error('目前無法初始化 Firebase');
+
     fbUser=fbAuth.currentUser;
     if(!fbUser)throw new Error('目前沒有 Firebase 登入狀態');
 
-    // 一次原子刪除三個節點，避免分段刪除造成權限條件改變或殘留資料
-    const updates={};
-    const ownerUid=cached.ownerUid||fbUser.uid;
-    const currentCount=ownerUid===fbUser.uid?await getCloudEventCountFromServer():0;
-
-    updates[`events/${id}`]=null;
-    updates[`secrets/${id}`]=null;
-    updates[`admins/${id}`]=null;
-    updates[`userEvents/${ownerUid}/${id}`]=null;
-    if(ownerUid===fbUser.uid){
-      updates[`userEventCounts/${ownerUid}`]=Math.max(0,currentCount-1);
+    // 先抓伺服器上的 event，避免只靠本機 cached.ownerUid。
+    let remote=null;
+    try{
+      remote=await rtdbRestGet(`events/${id}`,6000);
+    }catch(e){
+      console.warn('delete event owner check failed',e);
     }
 
-    await rtdbRestPatchRoot(updates,12000);
+    if(remote?.ownerUid && remote.ownerUid!==fbUser.uid){
+      throw new Error('只有建立這場賽事的 Google 主辦帳號可以刪除。');
+    }
+
+    const ownerUid=remote?.ownerUid || cached.ownerUid || fbUser.uid;
+
+    if(ownerUid!==fbUser.uid){
+      throw new Error('目前登入的 Google 帳號不是這場賽事的建立者。');
+    }
+
+    if(btn)btn.textContent='刪除權限資料…';
+
+    // 重要：不要再用一個 root PATCH 同時把 event + 權限節點全部刪掉。
+    // Firebase Rules 在多路徑刪除時會產生相依權限判斷，容易得到 401。
+    // 改成「event 還存在時」先清除依賴 ownerUid 的權限節點。
+    const dependentPaths=[
+      `refereeUsers/${id}`,
+      `refereeSecrets/${id}`,
+      `secrets/${id}`,
+      `admins/${id}`
+    ];
+
+    for(const path of dependentPaths){
+      try{
+        await rtdbRestDelete(path,7000);
+      }catch(e){
+        // 不存在的節點通常 DELETE 仍成功；真正的權限錯誤要往外丟。
+        console.warn('delete dependent node failed',path,e);
+        throw e;
+      }
+    }
+
+    if(btn)btn.textContent='刪除賽事…';
+
+    // 最後才刪 event 本體，避免前面的 Rules 因 ownerUid 消失而失敗。
+    await rtdbRestDelete(`events/${id}`,7000);
+
+    if(btn)btn.textContent='整理賽事清單…';
+
+    // 使用者自己的索引與計數最後處理。
+    try{
+      await rtdbRestDelete(`userEvents/${ownerUid}/${id}`,5000);
+    }catch(e){
+      console.warn('delete userEvents index failed',e);
+    }
+
+    try{
+      const index=(await rtdbRestGet(`userEvents/${ownerUid}`,5000))||{};
+      const realCount=Object.keys(index).filter(k=>index[k]).length;
+      await rtdbRestPut(`userEventCounts/${ownerUid}`,Math.min(CLOUD_EVENT_LIMIT,realCount),5000);
+    }catch(e){
+      console.warn('recount userEventCounts failed',e);
+    }
 
     purgeLocalEvent(id);
+    if(typeof clearActiveView==='function')clearActiveView();
+
     closeDeleteConfirm();
     renderSavedEvents();
 
     if(ev?.id===id){
       stopAdminCodeRotation();
+      stopRefereeCodeRotation?.();
+
       ev=null;
-      if(cloudUnsub){cloudUnsub();cloudUnsub=null}
+
+      if(cloudUnsub){
+        cloudUnsub();
+        cloudUnsub=null;
+      }
+
       $('admin')?.classList.add('hidden');
       $('create')?.classList.add('hidden');
       $('home')?.classList.remove('hidden');
+
       history.replaceState(null,'',location.pathname);
     }
 
-    alert('雲端賽事已完整刪除，分享連結與管理連結都已失效。');
+    alert('雲端賽事已完整刪除，分享連結、主辦權限與裁判權限都已失效。');
+
   }catch(e){
     console.error('deleteSavedEvent failed',e);
+
     const code=e?.code?`\n錯誤代碼：${e.code}`:'';
+    const msg=String(e?.message||e);
+
     let extra='';
-    if(e?.code==='HTTP_401'||e?.code==='HTTP_403'){
-      extra='\n\n這代表 Firebase Rules 拒絕刪除，請更新我提供的 Rules。';
+
+    if(e?.code==='HTTP_401'||e?.code==='HTTP_403'||msg.includes('Permission denied')){
+      extra='\n\n目前 Firebase Rules 沒有允許主辦刪除整個裁判權限節點。請發布這一版對應的 Rules。';
     }
-    alert('刪除雲端賽事失敗：'+(e?.message||e)+code+extra);
+
+    alert('刪除雲端賽事失敗：'+msg+code+extra);
+
   }finally{
     if(btn){
       btn.disabled=false;
@@ -2683,37 +2753,52 @@ async function rtdbRestPut(path,value,timeoutMs=12000){
     throw e;
   }
 }
-async function rtdbRestDelete(path,timeoutMs=12000){
+async function rtdbRestDelete(path,timeoutMs=7000){
   if(!fbAuth?.currentUser)throw new Error('尚未登入 Firebase');
-  const token=await fbAuth.currentUser.getIdToken(true);
+
   const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
   if(!base)throw new Error('Firebase databaseURL 未設定');
 
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  const run=async(forceToken=false)=>{
+    const token=await getRestIdToken(forceToken);
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+
+    try{
+      const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
+      const res=await fetch(url,{
+        method:'DELETE',
+        signal:ctrl.signal,
+        cache:'no-store'
+      });
+
+      const text=await res.text();
+
+      if(!res.ok){
+        let detail=text;
+        try{detail=JSON.parse(text)?.error||text}catch{}
+        const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+        err.code=`HTTP_${res.status}`;
+        throw err;
+      }
+
+      return true;
+    }catch(e){
+      if(e?.name==='AbortError')throw new Error('Firebase REST DELETE 逾時');
+      throw e;
+    }finally{
+      clearTimeout(timer);
+    }
+  };
 
   try{
-    const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
-    const res=await fetch(url,{
-      method:'DELETE',
-      signal:ctrl.signal,
-      cache:'no-store'
-    });
-
-    const text=await res.text();
-    if(!res.ok){
-      let detail=text;
-      try{detail=JSON.parse(text)?.error||text}catch{}
-      const err=new Error(`Firebase REST ${res.status}: ${detail}`);
-      err.code=`HTTP_${res.status}`;
-      throw err;
-    }
-    return true;
+    return await run(false);
   }catch(e){
-    if(e?.name==='AbortError')throw new Error('刪除雲端賽事逾時');
+    if(e?.code==='HTTP_401'){
+      restTokenCache={token:null,ts:0};
+      return await run(true);
+    }
     throw e;
-  }finally{
-    clearTimeout(timer);
   }
 }
 async function rtdbRestPatchRoot(updates,timeoutMs=12000){
