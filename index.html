@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- 多人現場優化版 v25：新建完成進裁判頁時強制回頁面最上方 -->
+<meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：雲端只存 Firebase、測試只存本機、3-slot 原子上限、裁判身分資料隔離 -->
 <title>Beyblade X Tournament</title>
 
 <script>
@@ -1460,13 +1460,65 @@ const FIREBASE_CONFIG = {
   appId: "1:811309004070:web:2e246f0a0ac7dae2e8fde7",
   measurementId: "G-CPL47L0CV5"
 };
-const STORE='bx_events_v2', CURRENT='bx_current_v2', SAVED='bx_saved_events_v1', KEEP='bx_test_event_v1'; let draftMode=null, draftStorage=null, ev=null;
+const STORE='bx_test_events_v3', CURRENT='bx_test_current_v3', SAVED='bx_test_saved_events_v3', KEEP='bx_test_event_v1';
+const LEGACY_STORE='bx_events_v2';
+let draftMode=null, draftStorage=null, ev=null;
+let cloudEventsCache={}, cloudEventIds=[], cloudEventSlots={};
 let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-function events(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
-function savedEventIds(){try{return JSON.parse(localStorage.getItem(SAVED)||'[]')}catch{return []}}
-function setSavedEventIds(ids){localStorage.setItem(SAVED,JSON.stringify([...new Set(ids)]))}
+function events(){
+  let localTests={};
+  try{
+    const raw=JSON.parse(localStorage.getItem(STORE)||'{}');
+    for(const [id,e] of Object.entries(raw||{})){
+      if(e?.testOnly)localTests[id]=e;
+    }
+  }catch(e){}
+  return {...localTests,...cloudEventsCache};
+}
+function savedEventIds(){
+  let testIds=[];
+  try{
+    testIds=JSON.parse(localStorage.getItem(SAVED)||'[]');
+    if(!Array.isArray(testIds))testIds=[];
+  }catch(e){testIds=[]}
+
+  const all=events();
+  testIds=testIds.filter(id=>all[id]?.testOnly);
+  return [...new Set([...cloudEventIds,...testIds])];
+}
+function setSavedEventIds(ids){
+  const all=events();
+  const testIds=[...new Set(ids)].filter(id=>all[id]?.testOnly);
+  localStorage.setItem(SAVED,JSON.stringify(testIds));
+}
 function keepLocalEnabled(){return localStorage.getItem(KEEP)==='1'}
+
+
+function migrateLegacyTestEvents(){
+  try{
+    const current=JSON.parse(localStorage.getItem(STORE)||'{}');
+    if(current && Object.keys(current).length)return;
+
+    const legacy=JSON.parse(localStorage.getItem(LEGACY_STORE)||'{}');
+    const tests={};
+    const ids=[];
+
+    for(const [id,e] of Object.entries(legacy||{})){
+      if(e?.testOnly){
+        tests[id]=e;
+        ids.push(id);
+      }
+    }
+
+    if(ids.length){
+      localStorage.setItem(STORE,JSON.stringify(tests));
+      localStorage.setItem(SAVED,JSON.stringify(ids));
+    }
+  }catch(e){
+    console.warn('legacy test migration skipped',e);
+  }
+}
 
 async function ensureRefereeAuth(){
   if(!(await initCloud()))return false;
@@ -1656,17 +1708,40 @@ async function proceedCreate(){
 }
 function markEventSaved(id){
   if(!id)return;
-  const ids=savedEventIds().filter(x=>x!==id);ids.unshift(id);setSavedEventIds(ids.slice(0,30));
+  const e=(ev?.id===id?ev:events()[id]);
+
+  if(e?.testOnly){
+    let current=[];
+    try{current=JSON.parse(localStorage.getItem(SAVED)||'[]')}catch(e){}
+    if(!Array.isArray(current))current=[];
+    const ids=current.filter(x=>x!==id);
+    ids.unshift(id);
+    localStorage.setItem(SAVED,JSON.stringify(ids.slice(0,30)));
+    return;
+  }
+
+  cloudEventIds=[id,...cloudEventIds.filter(x=>x!==id)];
 }
 function unmarkEventSaved(id){
-  setSavedEventIds(savedEventIds().filter(x=>x!==id));
+  cloudEventIds=cloudEventIds.filter(x=>x!==id);
+  let ids=[];
+  try{ids=JSON.parse(localStorage.getItem(SAVED)||'[]')}catch(e){}
+  if(!Array.isArray(ids))ids=[];
+  localStorage.setItem(SAVED,JSON.stringify(ids.filter(x=>x!==id)));
 }
 function purgeLocalEvent(id){
-  const all=events();
-  if(all[id]){
-    delete all[id];
-    localStorage.setItem(STORE,JSON.stringify(all));
-  }
+  try{
+    const tests=JSON.parse(localStorage.getItem(STORE)||'{}');
+    if(tests?.[id]){
+      delete tests[id];
+      localStorage.setItem(STORE,JSON.stringify(tests));
+    }
+  }catch(e){}
+
+  delete cloudEventsCache[id];
+  cloudEventIds=cloudEventIds.filter(x=>x!==id);
+  delete cloudEventSlots[id];
+
   unmarkEventSaved(id);
   localStorage.removeItem(adminFlagKey(id));
   localStorage.removeItem(adminCodeKey(id));
@@ -1707,9 +1782,7 @@ const PUBLIC_WINDOW_MS=2*60*60*1000;
 function cloudEventIdsForCurrentGoogle(){
   if(!isGoogleUser())return [];
   const uid=fbAuth.currentUser.uid;
-  return Object.values(events())
-    .filter(e=>e && !e.testOnly && e.ownerUid===uid)
-    .map(e=>e.id);
+  return cloudEventIds.filter(id=>cloudEventsCache[id]?.ownerUid===uid);
 }
 
 function cloudEventCountForCurrentGoogle(){
@@ -1734,12 +1807,10 @@ function publicStatusText(e){
 }
 
 async function closePublicEvent(id){
-  const all=events();
-  const e=all[id];
+  const e=cloudEventsCache[id] || (ev?.id===id?ev:null);
+  if(!e||e.testOnly)return;
 
-  if(!e || e.testOnly)return;
-
-  if(!isGoogleUser() || e.ownerUid!==fbAuth.currentUser.uid){
+  if(!isGoogleUser()||e.ownerUid!==fbAuth.currentUser.uid){
     return alert('只有這場賽事的主辦帳號可以關閉公開連結。');
   }
 
@@ -1747,32 +1818,25 @@ async function closePublicEvent(id){
   const oldTexts=buttons.map(b=>b.textContent);
 
   try{
-    buttons.forEach(btn=>{
-      btn.disabled=true;
-      btn.textContent='關閉中…';
-    });
-
+    buttons.forEach(btn=>{btn.disabled=true;btn.textContent='關閉中…'});
     const now=Date.now();
 
-    await rtdbRestPatchRoot({
+    await cloudUpdate({
       [`events/${id}/publicOpen`]:false,
       [`events/${id}/publicUntil`]:now
-    },10000);
+    },5000);
 
     e.publicOpen=false;
     e.publicUntil=now;
-    all[id]=e;
-    localStorage.setItem(STORE,JSON.stringify(all));
+    cloudEventsCache[id]=e;
 
     if(ev?.id===id){
       ev.publicOpen=false;
       ev.publicUntil=now;
-      localEventSave();
       const keepTab=currentAdminTab;
       renderAdmin();
       if(keepTab)showTab(keepTab);
     }
-
     renderSavedEvents();
   }catch(err){
     console.error('closePublicEvent failed',err);
@@ -1788,12 +1852,10 @@ async function closePublicEvent(id){
 }
 
 async function extendPublicEvent(id){
-  const all=events();
-  const e=all[id];
+  const e=cloudEventsCache[id] || (ev?.id===id?ev:null);
+  if(!e||e.testOnly)return;
 
-  if(!e || e.testOnly)return;
-
-  if(!isGoogleUser() || e.ownerUid!==fbAuth.currentUser.uid){
+  if(!isGoogleUser()||e.ownerUid!==fbAuth.currentUser.uid){
     return alert('只有這場賽事的主辦帳號可以延長公開時間。');
   }
 
@@ -1802,45 +1864,28 @@ async function extendPublicEvent(id){
   const keepTab=currentAdminTab||'share';
 
   try{
-    buttons.forEach(btn=>{
-      btn.disabled=true;
-      btn.textContent='增加中…';
-    });
-
+    buttons.forEach(btn=>{btn.disabled=true;btn.textContent='增加中…'});
     const nextUntil=Date.now()+PUBLIC_WINDOW_MS;
 
-    await rtdbRestPatchRoot({
+    await cloudUpdate({
       [`events/${id}/publicOpen`]:true,
       [`events/${id}/publicUntil`]:nextUntil
-    },10000);
+    },5000);
 
     e.publicOpen=true;
     e.publicUntil=nextUntil;
-    all[id]=e;
-    localStorage.setItem(STORE,JSON.stringify(all));
+    cloudEventsCache[id]=e;
 
     if(ev?.id===id){
       ev.publicOpen=true;
       ev.publicUntil=nextUntil;
-
-      // 建立者持續保持主辦權限。
-      if(isEventOwner())isAdmin=true;
-
-      localEventSave();
       renderAdmin();
       showTab(keepTab);
     }
-
     renderSavedEvents();
   }catch(err){
     console.error('extendPublicEvent failed',err);
-
-    const msg=String(err?.message||err);
-    if(msg.includes('401')||msg.includes('403')||msg.includes('Permission denied')){
-      alert('增加公開時間失敗：Firebase Rules 拒絕寫入。請確認目前登入的是這場賽事原本的 Google 主辦帳號。');
-    }else{
-      alert('增加公開時間失敗：'+msg);
-    }
+    alert('增加公開時間失敗：'+(err?.message||err));
   }finally{
     buttons.forEach((btn,i)=>{
       if(document.body.contains(btn)){
@@ -1852,110 +1897,86 @@ async function extendPublicEvent(id){
 }
 
 async function syncMyCloudEvents(){
-  if(!isGoogleUser())return 0;
+  if(!isGoogleUser()){
+    cloudEventsCache={};
+    cloudEventIds=[];
+    cloudEventSlots={};
+    return 0;
+  }
 
   const uid=fbAuth.currentUser.uid;
 
   try{
-    const index=(await rtdbRestGet(`userEvents/${uid}`,8000))||{};
-    const remoteIds=Object.keys(index).filter(id=>index[id]);
-    const remoteSet=new Set(remoteIds);
+    const slots=(await rtdbRestGet(`userEvents/${uid}`,6000))||{};
+    const slotEntries=Object.entries(slots)
+      .filter(([slot,id])=>['0','1','2'].includes(String(slot)) && typeof id==='string' && id);
 
-    const local=events();
-    const saved=new Set(savedEventIds());
+    const nextCache={};
+    const nextIds=[];
+    const nextSlots={};
 
-    // 重要：雲端賽事以 Firebase userEvents 為唯一來源。
-    // 同一 Google 帳號在不同瀏覽器，不再各自保留不同的舊雲端卡片。
-    for(const [id,e] of Object.entries(local)){
-      if(!e || e.testOnly)continue;
-      if(e.ownerUid!==uid)continue;
-
-      if(!remoteSet.has(id)){
-        delete local[id];
-        saved.delete(id);
-
-        localStorage.removeItem(adminFlagKey(id));
-        localStorage.removeItem(adminCodeKey(id));
-        localStorage.removeItem(`bx_ref_identity_${id}`);
-
-        if(localStorage.getItem(CURRENT)===id){
-          localStorage.removeItem(CURRENT);
-        }
-      }
-    }
-
-    let count=0;
-
-    // 最多只有 3 場，逐場抓最新資料，確保兩個瀏覽器看到完全相同。
-    for(const id of remoteIds){
+    for(const [slot,id] of slotEntries){
       try{
-        const e=await rtdbRestGet(`events/${id}`,8000);
-
-        if(e && e.id){
-          local[id]=e;
-          saved.add(id);
-          count++;
+        const data=await rtdbRestGet(`events/${id}`,6000);
+        if(data?.id){
+          nextCache[id]=data;
+          nextIds.push(id);
+          nextSlots[id]=String(slot);
         }else{
-          // 索引殘留但 event 已不存在：清掉索引，所有瀏覽器都會跟著消失。
-          try{await rtdbRestDelete(`userEvents/${uid}/${id}`,5000)}catch(err){
-            console.warn('remove stale userEvent index failed',id,err);
-          }
-          saved.delete(id);
-          delete local[id];
+          try{await rtdbRestDelete(`userEvents/${uid}/${slot}`,4000)}catch(e){}
         }
-      }catch(err){
-        console.warn('sync event failed',id,err);
-
-        // 單一 event 暫時讀不到時，不要把它誤刪；
-        // 保留已存在的本機快取，等下一次 listener / 手動同步。
-        if(local[id])saved.add(id);
+      }catch(e){
+        console.warn('sync cloud event failed',id,e);
       }
     }
 
-    localStorage.setItem(STORE,JSON.stringify(local));
-
-    // 本機測試賽事保留；雲端賽事則只留下 remoteIds。
-    const testIds=[...saved].filter(id=>local[id]?.testOnly);
-    const orderedCloud=remoteIds.filter(id=>local[id]);
-    setSavedEventIds([...orderedCloud,...testIds]);
-
-    return count;
+    cloudEventsCache=nextCache;
+    cloudEventIds=nextIds;
+    cloudEventSlots=nextSlots;
+    return nextIds.length;
   }catch(e){
     console.warn('syncMyCloudEvents failed',e);
-    return 0;
+    return cloudEventIds.length;
   }
 }
 
 
 async function backfillMyCloudEventIndex(){
-  // v30 起停止「從瀏覽器 localStorage 反向補回 Firebase userEvents」。
-  // 原因：不同瀏覽器可能各自留著舊賽事，反向補索引會把已刪除/過期的賽事重新復活，
-  // 造成同一 Google 帳號在不同瀏覽器看到不同清單。
-  //
-  // 新規則：userEvents 才是雲端賽事清單唯一來源；本機只做快取。
   return;
 }
 
 function renderSavedEvents(){
-  const box=$('savedEvents'),count=$('savedCount');if(!box||!count)return;
+  const box=$('savedEvents'),count=$('savedCount');
+  if(!box||!count)return;
 
-  const all=events(),ids=savedEventIds().filter(id=>all[id]);
-  if(ids.length!==savedEventIds().length)setSavedEventIds(ids);
+  const all=events();
+  const ids=savedEventIds().filter(id=>all[id]);
+  const cloudCount=isGoogleUser()?cloudEventIds.length:0;
+  const testCount=ids.filter(id=>all[id]?.testOnly).length;
 
-  const cloudCount=isGoogleUser()?ids.map(id=>all[id]).filter(e=>e&&!e.testOnly&&e.ownerUid===fbAuth.currentUser.uid).length:0;
-  count.textContent=isGoogleUser()?`${cloudCount}/${CLOUD_EVENT_LIMIT} 場雲端`:`${ids.length} 場`;
+  count.textContent=isGoogleUser()
+    ? `${cloudCount}/${CLOUD_EVENT_LIMIT} 場雲端・${testCount} 場測試`
+    : `${testCount} 場測試`;
 
   if(!ids.length){
-    box.innerHTML='<div class=savedEmpty>目前沒有保留的賽事。建立新賽事後會顯示在這裡。</div>';
+    box.innerHTML='<div class=savedEmpty>目前沒有賽事。雲端賽事只從 Firebase 讀取；測試賽事只存在這支手機。</div>';
     return;
   }
 
   box.innerHTML=ids.map(id=>{
-    const e=all[id],mode=e.mode==='free'?'自由編排':'單淘汰',when=formatSavedTime(e.created),isTest=!!e.testOnly;
-    const typeHtml=isTest?'<span class="savedType test">🧪 測試賽事</span>':'<span class="savedType cloud">☁️ 雲端賽事</span>';
-    const delLabel=isTest?'刪除本機':'刪除雲端';
+    const e=all[id];
+    if(!e)return '';
+
+    const mode=e.mode==='free'?'自由編排':'單淘汰';
+    const when=formatSavedTime(e.created);
+    const isTest=!!e.testOnly;
+    const typeHtml=isTest
+      ? '<span class="savedType test">🧪 測試賽事</span>'
+      : '<span class="savedType cloud">☁️ 雲端賽事</span>';
     const ownerControls=!isTest && isGoogleUser() && e.ownerUid===fbAuth.currentUser.uid;
-    const status=!isTest?`<div class="savedPublicStatus ${e.publicOpen===false||Number(e.publicUntil||0)<=Date.now()?'off':'on'}">${publicStatusText(e)}</div>`:'';
+    const status=!isTest
+      ? `<div class="savedPublicStatus ${e.publicOpen===false||Number(e.publicUntil||0)<=Date.now()?'off':'on'}">${publicStatusText(e)}</div>`
+      : '';
 
     return `<div class="savedEvent ${isTest?'test':'cloud'}">
       <div>
@@ -1965,60 +1986,24 @@ function renderSavedEvents(){
       </div>
       <div class=savedEventActions>
         <button type="button" data-open-id="${id}">繼續</button>
-        ${ownerControls?`<button type="button" class="secondary" data-extend-id="${id}">增加 2 小時</button>
-        <button type="button" class="secondary" data-close-public-id="${id}" ${e.publicOpen===false?'disabled':''}>關閉公開連結</button>`:''}
-        <button type="button" class="danger" data-delete-id="${id}">${delLabel}</button>
+        ${ownerControls?`
+          <button type="button" class="secondary" data-extend-id="${id}">增加 2 小時</button>
+          <button type="button" class="secondary" data-close-public-id="${id}" ${e.publicOpen===false?'disabled':''}>關閉公開連結</button>
+        `:''}
+        <button type="button" class="danger" data-delete-id="${id}">${isTest?'刪除本機':'刪除雲端'}</button>
       </div>
     </div>`;
   }).join('');
 
-  box.querySelectorAll('[data-open-id]').forEach(btn=>{
-    btn.addEventListener('click',()=>openSavedEvent(btn.dataset.openId));
-  });
-  box.querySelectorAll('[data-delete-id]').forEach(btn=>{
-    btn.addEventListener('click',()=>requestDeleteSavedEvent(btn.dataset.deleteId));
-  });
-  box.querySelectorAll('[data-extend-id]').forEach(btn=>{
-    btn.addEventListener('click',()=>extendPublicEvent(btn.dataset.extendId));
-  });
-  box.querySelectorAll('[data-close-public-id]').forEach(btn=>{
-    btn.addEventListener('click',()=>closePublicEvent(btn.dataset.closePublicId));
-  });
+  box.querySelectorAll('[data-open-id]').forEach(btn=>btn.addEventListener('click',()=>openSavedEvent(btn.dataset.openId)));
+  box.querySelectorAll('[data-extend-id]').forEach(btn=>btn.addEventListener('click',()=>extendPublicEvent(btn.dataset.extendId)));
+  box.querySelectorAll('[data-close-public-id]').forEach(btn=>btn.addEventListener('click',()=>closePublicEvent(btn.dataset.closePublicId)));
+  box.querySelectorAll('[data-delete-id]').forEach(btn=>btn.addEventListener('click',()=>requestDeleteSavedEvent(btn.dataset.deleteId)));
 }
 
 async function openCachedOwnerEvent(cached){
-  if(!cached || cached.testOnly || !isGoogleUser())return false;
-  if(cached.ownerUid!==fbAuth.currentUser.uid)return false;
-
-  ev=cached;
-  currentAdminTab='bracket';
-  isAdmin=true;
-  isReferee=false;
-
-  // 先立即進入主辦畫面，不等待 Firebase 權限檢查。
-  // 這樣即使公開觀看已到期、網路稍慢，也不會卡在「載入中」。
-  $('home').classList.add('hidden');
-  $('create').classList.add('hidden');
-  $('admin').classList.remove('hidden');
-
-  history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(cached.id)}`);
-
-  renderAdmin();
-  showTab('bracket');
-
-  // 背景恢復雲端角色與即時同步，不阻塞主辦操作。
-  Promise.resolve().then(async()=>{
-    try{ await refreshAdminState(cached.id); }catch(e){ console.warn('refreshAdminState failed',e); }
-    try{ await refreshRefereeState(cached.id); }catch(e){ console.warn('refreshRefereeState failed',e); }
-
-    // owner 本人永遠保留主辦身分。
-    isAdmin=true;
-
-    try{ listenCloudEvent(cached.id); }
-    catch(e){ console.warn('listenCloudEvent failed',e); }
-  });
-
-  return true;
+  if(!cached?.id)return false;
+  return (await loadCloudEvent(cached.id))==='ok';
 }
 
 async function openSavedEvent(id){
@@ -2031,76 +2016,45 @@ async function openSavedEvent(id){
   }
 
   try{
-    const cached=events()[id];
+    const local=events()[id];
 
-    if(!cached){
-      const result=await loadCloudEvent(id);
-
-      if(result==='ok'){
-        history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
-        return;
-      }
-
-      if(result==='expired'){
-        alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
-        return;
-      }
-
-      alert('目前找不到這場賽事。');
-      return;
-    }
-
-    if(cached.testOnly){
-      ev=cached;
+    if(local?.testOnly){
+      ev=local;
       isAdmin=true;
-
+      isReferee=false;
       $('home').classList.add('hidden');
       $('create').classList.add('hidden');
       $('admin').classList.remove('hidden');
-
       history.replaceState(null,'',location.pathname);
-
       renderAdmin();
       showTab('bracket');
-      return;
-    }
-
-    // 只要是原本 Google owner，就直接從本機快取進入。
-    // 公開觀看是否過期與主辦能不能管理是兩件事。
-    if(isGoogleUser() && cached.ownerUid===fbAuth.currentUser.uid){
-      await openCachedOwnerEvent(cached);
       return;
     }
 
     const result=await loadCloudEvent(id);
 
     if(result==='ok'){
-      history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}`);
+      history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(id)}&tab=${encodeURIComponent(currentAdminTab||'bracket')}`);
       return;
     }
 
-    $('create').classList.add('hidden');
-    $('admin').classList.add('hidden');
-    $('home').classList.remove('hidden');
-
     if(result==='missing'){
-      purgeLocalEvent(id);
+      delete cloudEventsCache[id];
+      cloudEventIds=cloudEventIds.filter(x=>x!==id);
       renderSavedEvents();
-      alert('這場雲端賽事已被刪除，連結與本機保留紀錄都已失效。');
-      return;
+      return alert('這場雲端賽事已不存在。');
     }
 
     if(result==='expired'){
-      alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
-      return;
+      return alert('這場賽事的公開觀看已關閉或有效時間已到期。');
     }
 
-    alert('目前無法載入這場雲端賽事，請稍後再試。');
+    alert('目前無法從 Firebase 載入這場賽事，請檢查網路後再試。');
   }catch(e){
     console.error('openSavedEvent failed',e);
     alert('開啟賽事失敗：'+(e?.message||e));
   }finally{
-    if(btn && document.body.contains(btn)){
+    if(btn&&document.body.contains(btn)){
       btn.disabled=false;
       btn.textContent=oldText;
     }
@@ -2126,8 +2080,8 @@ function closeDeleteConfirm(){
   $('deleteConfirmModal')?.classList.add('hidden');
 }
 async function deleteSavedEvent(id){
-  const all=events(),cached=all[id];
-  if(!cached)return alert('找不到這場賽事的本機資料。');
+  const cached=events()[id];
+  if(!cached)return alert('找不到這場賽事資料。');
 
   if(cached.testOnly){
     purgeLocalEvent(id);
@@ -2141,123 +2095,65 @@ async function deleteSavedEvent(id){
   let deleteStep='確認主辦身分';
 
   try{
-    if(btn){
-      btn.disabled=true;
-      btn.textContent='確認身分…';
-    }
+    if(btn){btn.disabled=true;btn.textContent='確認身分…'}
 
     if(!(await initCloud()))throw new Error('目前無法初始化 Firebase');
+    if(!isGoogleUser())throw new Error('請先登入建立這場賽事的 Google 帳號');
 
-    fbUser=fbAuth.currentUser;
-    if(!fbUser)throw new Error('目前沒有 Firebase 登入狀態');
+    const remote=await rtdbRestGet(`events/${id}`,5000);
+    if(!remote)throw new Error('這場雲端賽事已不存在');
+    if(remote.ownerUid!==fbAuth.currentUser.uid)throw new Error('目前登入帳號不是這場賽事的建立者');
 
-    let remote=null;
-    try{
-      remote=await rtdbRestGet(`events/${id}`,6000);
-    }catch(e){
-      console.warn('delete event owner check failed',e);
-    }
+    const uid=fbAuth.currentUser.uid;
+    const slots=(await rtdbRestGet(`userEvents/${uid}`,5000))||{};
+    const slot=Object.keys(slots).find(k=>slots[k]===id);
+    if(slot===undefined)throw new Error('找不到這場賽事的 owner slot，請重新整理後再試');
 
-    const ownerUid=remote?.ownerUid || cached.ownerUid || '';
-
-    if(!ownerUid || ownerUid!==fbUser.uid){
-      throw new Error('目前登入的 Google 帳號不是這場賽事的建立者。');
-    }
-
-    // 先確認 owner 的 userEvents 索引存在。
-    // 新 Rules 會用這個索引作為「刪除依賴節點」的穩定授權依據，
-    // 不再依賴稍後可能被刪掉的 event / admins 節點。
-    deleteStep='確認主辦賽事索引';
-    let ownerIndex=false;
-    try{
-      ownerIndex=!!(await rtdbRestGet(`userEvents/${ownerUid}/${id}`,5000));
-    }catch(e){
-      console.warn('owner index check failed',e);
-    }
-
-    if(!ownerIndex){
-      // 舊賽事可能沒有索引，主辦本人可先補回。
-      await rtdbRestPut(`userEvents/${ownerUid}/${id}`,true,5000);
-    }
-
-    const dependentPaths=[
+    const deps=[
+      ['裁判身分領取',`refereeClaims/${id}`],
       ['裁判登入權限',`refereeUsers/${id}`],
       ['裁判驗證碼',`refereeSecrets/${id}`],
       ['主辦驗證碼',`secrets/${id}`],
       ['共同主辦權限',`admins/${id}`]
     ];
 
-    for(const [label,path] of dependentPaths){
+    for(const [label,path] of deps){
       deleteStep=`刪除${label}`;
       if(btn)btn.textContent=`${deleteStep}…`;
-
-      try{
-        await rtdbRestDelete(path,6000);
-      }catch(e){
-        e.deleteStep=deleteStep;
-        throw e;
-      }
+      await rtdbRestDelete(path,5000);
     }
 
     deleteStep='刪除賽事本體';
     if(btn)btn.textContent='刪除賽事…';
-    await rtdbRestDelete(`events/${id}`,7000);
+    await rtdbRestDelete(`events/${id}`,5000);
 
-    // userEvents 最後才刪，因為前面的 Rules 都以它作為 owner 的刪除授權。
-    deleteStep='刪除主辦賽事索引';
-    if(btn)btn.textContent='整理賽事清單…';
-    await rtdbRestDelete(`userEvents/${ownerUid}/${id}`,5000);
+    deleteStep='釋放雲端名額';
+    await rtdbRestDelete(`userEvents/${uid}/${slot}`,5000);
 
-    deleteStep='更新賽事數量';
-    try{
-      const index=(await rtdbRestGet(`userEvents/${ownerUid}`,5000))||{};
-      const realCount=Object.keys(index).filter(k=>index[k]).length;
-      await rtdbRestPut(`userEventCounts/${ownerUid}`,Math.min(CLOUD_EVENT_LIMIT,realCount),5000);
-    }catch(e){
-      console.warn('recount userEventCounts failed',e);
-    }
+    delete cloudEventsCache[id];
+    cloudEventIds=cloudEventIds.filter(x=>x!==id);
+    delete cloudEventSlots[id];
 
-    purgeLocalEvent(id);
     if(typeof clearActiveView==='function')clearActiveView();
-
     closeDeleteConfirm();
-    renderSavedEvents();
 
     if(ev?.id===id){
       stopAdminCodeRotation();
       if(typeof stopRefereeCodeRotation==='function')stopRefereeCodeRotation();
-
       ev=null;
-
-      if(cloudUnsub){
-        cloudUnsub();
-        cloudUnsub=null;
-      }
-
+      if(cloudUnsub){cloudUnsub();cloudUnsub=null}
       $('admin')?.classList.add('hidden');
       $('create')?.classList.add('hidden');
       $('home')?.classList.remove('hidden');
-
       history.replaceState(null,'',location.pathname);
     }
 
-    alert('雲端賽事已完整刪除，分享連結、主辦權限與裁判權限都已失效。');
+    renderSavedEvents();
+    alert('雲端賽事已完整刪除。');
 
   }catch(e){
     console.error('deleteSavedEvent failed',deleteStep,e);
-
-    const code=e?.code?`\n錯誤代碼：${e.code}`:'';
-    const msg=String(e?.message||e);
-    const step=e?.deleteStep||deleteStep;
-
-    let extra='';
-
-    if(e?.code==='HTTP_401'||e?.code==='HTTP_403'||msg.includes('Permission denied')){
-      extra=`\n\n失敗步驟：${step}\n請確認已發布 v2 刪除規則。`;
-    }
-
-    alert('刪除雲端賽事失敗：'+msg+code+extra);
-
+    alert(`刪除雲端賽事失敗：${e?.message||e}\n\n失敗步驟：${deleteStep}`);
   }finally{
     if(btn){
       btn.disabled=false;
@@ -2319,25 +2215,109 @@ async function initCloud(){
   }
 }
 function localEventSave(){
-  let x=events();x[ev.id]=ev;localStorage.setItem(STORE,JSON.stringify(x));localStorage.setItem(CURRENT,ev.id);
-  if((ev&&ev.testOnly) || savedEventIds().includes(ev.id))markEventSaved(ev.id);
+  if(!ev)return;
+
+  if(ev.testOnly){
+    let tests={};
+    try{tests=JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){}
+    tests[ev.id]=ev;
+    localStorage.setItem(STORE,JSON.stringify(tests));
+    localStorage.setItem(CURRENT,ev.id);
+    markEventSaved(ev.id);
+    return;
+  }
+
+  cloudEventsCache[ev.id]=ev;
+  if(isGoogleUser() && ev.ownerUid===fbAuth?.currentUser?.uid && !cloudEventIds.includes(ev.id)){
+    cloudEventIds.unshift(ev.id);
+  }
 }
+
+function cloudOrganizerUpdatesFromEvent(){
+  if(!ev||ev.testOnly)return {};
+  const base=`events/${ev.id}`;
+  const fields=['name','mode','pairing','freeFinal','roster','rounds','finalRR','refereeNames','refereeCount','raffleState'];
+  const updates={};
+
+  for(const field of fields){
+    if(ev[field]===undefined)continue;
+    updates[`${base}/${field}`]=cloneJson(ev[field]);
+  }
+
+  updates[`${base}/syncVersion`]=Date.now();
+  return updates;
+}
+
+function addDeepDiff(updates,before,after,path){
+  if(before===after)return;
+
+  const beforeObj=before!==null && typeof before==='object';
+  const afterObj=after!==null && typeof after==='object';
+
+  if(!beforeObj || !afterObj || Array.isArray(before)!==Array.isArray(after)){
+    updates[path]=after===undefined?null:cloneJson(after);
+    return;
+  }
+
+  const keys=new Set([...Object.keys(before||{}),...Object.keys(after||{})]);
+  for(const k of keys){
+    const nextPath=`${path}/${k}`;
+    if(!(k in (after||{}))){
+      updates[nextPath]=null;
+    }else if(!(k in (before||{}))){
+      updates[nextPath]=cloneJson(after[k]);
+    }else{
+      addDeepDiff(updates,before[k],after[k],nextPath);
+    }
+  }
+}
+
+async function syncBracketDiff(beforeEvent,afterEvent=ev){
+  if(!afterEvent)return false;
+  if(afterEvent.testOnly){
+    localEventSave();
+    return true;
+  }
+
+  const updates={};
+  addDeepDiff(updates,beforeEvent?.rounds||[],afterEvent.rounds||[],`events/${afterEvent.id}/rounds`);
+  addDeepDiff(updates,beforeEvent?.finalRR??null,afterEvent.finalRR??null,`events/${afterEvent.id}/finalRR`);
+
+  const beforeShape=JSON.stringify((beforeEvent?.rounds||[]).map(r=>[r?.name,(r?.matches||[]).length]))+'|'+JSON.stringify((beforeEvent?.finalRR?.matches||[]).length);
+  const afterShape=JSON.stringify((afterEvent?.rounds||[]).map(r=>[r?.name,(r?.matches||[]).length]))+'|'+JSON.stringify((afterEvent?.finalRR?.matches||[]).length);
+
+  if(beforeShape!==afterShape){
+    afterEvent.syncVersion=Date.now();
+    updates[`events/${afterEvent.id}/syncVersion`]=afterEvent.syncVersion;
+  }
+
+  localEventSave();
+  if(!Object.keys(updates).length)return true;
+
+  try{
+    await cloudUpdate(updates,5000);
+    return true;
+  }catch(e){
+    console.error('syncBracketDiff failed',e);
+    alert('雲端同步失敗，將重新載入 Firebase 最新賽程，避免本機舊資料覆蓋其他裁判。');
+    await backgroundRefreshCurrentEvent(afterEvent.id);
+    return false;
+  }
+}
+
 function put(){
-  // put() 只保留給低頻設定/結構操作。
-  if(ev && !ev.testOnly)ev.syncVersion=Date.now();
+  if(!ev)return;
 
   localEventSave();
   renderAdmin();
 
-  if(ev?.testOnly)return;
+  if(ev.testOnly)return;
+  if(!hasOrganizerAccess())return;
 
-  if(cloudReady&&ev?.id&&(isAdmin||isReferee)&&fbAuth?.currentUser){
-    cloudSet(`events/${ev.id}`,ev).catch(e=>{
-      console.error('event cloud sync failed',e);
-      const role=isReferee&&!isAdmin?'裁判':'主辦';
-      alert(`${role}雲端同步失敗：${e.message}`);
-    });
-  }
+  cloudUpdate(cloudOrganizerUpdatesFromEvent(),5000).catch(e=>{
+    console.error('organizer structure sync failed',e);
+    alert('主辦雲端同步失敗：'+(e?.message||e));
+  });
 }
 function adminFlagKey(id){return `bx_cloud_admin_${id}`}
 function adminCodeKey(id){return `bx_cloud_admin_code_${id}`}
@@ -2393,7 +2373,7 @@ function listenCloudEvent(id){
 
     renderTimer=setTimeout(()=>{
       renderTimer=null;
-      localEventSave();
+      if(ev?.id)cloudEventsCache[ev.id]=ev;
 
       if($('admin')&&!$('admin').classList.contains('hidden')){
         // 比賽編輯彈窗開著時，不要因 listener echo 把整個賽事 DOM 重建。
@@ -2458,7 +2438,7 @@ function listenCloudEvent(id){
       }
 
       ev=latest;
-      localEventSave();
+      cloudEventsCache[id]=latest;
       renderAdmin();
 
       // 重新綁定新一輪的 child listeners。
@@ -2516,7 +2496,28 @@ function listenCloudEvent(id){
     }
   });
 
-  // 結構版號只有在整份 event 低頻寫入時才改變。
+  if(isAdmin||isReferee){
+    onValue(`refereeClaims/${id}`,s=>{
+      ev.refereeClaims=s.exists()?(s.val()||{}):{};
+      scheduleRender();
+    });
+  }else{
+    ev.refereeClaims={};
+  }
+
+  onValue(`events/${id}/raffleState`,s=>{
+    ev.raffleState=s.exists()?s.val():null;
+    if(currentAdminTab==='draw')scheduleRender();
+  });
+
+  onValue(`events/${id}/publicOpen`,s=>{
+    if(s.exists())ev.publicOpen=!!s.val();
+  });
+
+  onValue(`events/${id}/publicUntil`,s=>{
+    if(s.exists())ev.publicUntil=Number(s.val())||0;
+  });
+
   onValue(`events/${id}/syncVersion`,s=>{
     const v=s.exists()?s.val():null;
 
@@ -2562,43 +2563,29 @@ async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
 
   try{
-    const data=await publicCloudGet(`events/${id}`,10000);
-
+    const data=await publicCloudGet(`events/${id}`,9000);
     if(!data)return 'missing';
 
     ev=data;
-    localEventSave();
+    ev.refereeClaims={};
+    cloudEventsCache[id]=data;
 
     isAdmin=false;
     isReferee=false;
 
     if(fbAuth?.currentUser){
-      try{ await refreshAdminState(id); }
-      catch(e){ console.warn('refreshAdminState failed',e); }
-
-      try{ await refreshRefereeState(id); }
-      catch(e){ console.warn('refreshRefereeState failed',e); }
+      try{await refreshAdminState(id)}catch(e){console.warn('refreshAdminState failed',e)}
+      try{await refreshRefereeState(id)}catch(e){console.warn('refreshRefereeState failed',e)}
     }
 
     $('home').classList.add('hidden');
     $('create').classList.add('hidden');
     $('admin').classList.remove('hidden');
 
-    try{
-      renderAdmin();
-    }catch(e){
-      console.error('renderAdmin failed',e);
-      $('admin').classList.add('hidden');
-      $('home').classList.remove('hidden');
-      alert('賽程資料已讀取，但畫面顯示失敗：'+(e?.message||e));
-      return 'error';
-    }
-
+    renderAdmin();
     listenCloudEvent(id);
 
     const params=new URLSearchParams(location.search);
-
-    // 管理/裁判邀請連結優先；一般重新整理則回到原本的 tab。
     if(params.get('admin')==='1'){
       showTab('organizer');
     }else if(params.get('ref')==='1'){
@@ -2614,7 +2601,7 @@ async function loadCloudEvent(id){
   }catch(e){
     console.error('loadCloudEvent failed',e);
     const msg=String(e?.message||e);
-    if(msg.includes('PERMISSION_DENIED')||msg.includes('permission_denied')){
+    if(msg.includes('PERMISSION_DENIED')||msg.includes('permission_denied')||msg.includes('401')){
       return 'expired';
     }
     return 'error';
@@ -2902,44 +2889,56 @@ async function getRestIdToken(force=false){
 async function publicCloudGet(path,timeoutMs=10000){
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
 
-  const sdkWait=Math.min(4000,timeoutMs);
+  const sdkWait=Math.min(3500,timeoutMs);
 
   try{
     const ref=fbDb.ref(path);
     const snap=await Promise.race([
       ref.once('value'),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase SDK 公開讀取逾時')),sdkWait))
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase SDK 讀取逾時')),sdkWait))
     ]);
-
     return snap.exists()?snap.val():null;
   }catch(sdkErr){
     console.warn('publicCloudGet SDK failed/timeout, fallback REST',sdkErr);
-
     const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
     if(!base)throw sdkErr;
 
-    const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),Math.max(4000,timeoutMs-sdkWait));
-
-    try{
-      const url=`${base}/${path}.json`;
-      const res=await fetch(url,{method:'GET',signal:ctrl.signal,cache:'no-store'});
-      const text=await res.text();
-
-      if(!res.ok){
-        let detail=text;
-        try{detail=JSON.parse(text)?.error||text}catch{}
-        const err=new Error(`Firebase REST ${res.status}: ${detail}`);
-        err.code=`HTTP_${res.status}`;
-        throw err;
+    const doFetch=async(forceToken=false)=>{
+      let authQuery='';
+      if(fbAuth?.currentUser){
+        const token=await getRestIdToken(forceToken);
+        authQuery=`?auth=${encodeURIComponent(token)}`;
       }
 
-      return text?JSON.parse(text):null;
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(),Math.max(3500,timeoutMs-sdkWait));
+      try{
+        const res=await fetch(`${base}/${path}.json${authQuery}`,{method:'GET',signal:ctrl.signal,cache:'no-store'});
+        const text=await res.text();
+        if(!res.ok){
+          let detail=text;
+          try{detail=JSON.parse(text)?.error||text}catch{}
+          const err=new Error(`Firebase REST ${res.status}: ${detail}`);
+          err.code=`HTTP_${res.status}`;
+          throw err;
+        }
+        return text?JSON.parse(text):null;
+      }catch(e){
+        if(e?.name==='AbortError')throw new Error('Firebase REST 讀取逾時');
+        throw e;
+      }finally{
+        clearTimeout(timer);
+      }
+    };
+
+    try{
+      return await doFetch(false);
     }catch(e){
-      if(e?.name==='AbortError')throw new Error('Firebase 公開讀取逾時');
+      if(e?.code==='HTTP_401' && fbAuth?.currentUser){
+        restTokenCache={token:null,ts:0};
+        return await doFetch(true);
+      }
       throw e;
-    }finally{
-      clearTimeout(timer);
     }
   }
 }
@@ -2996,70 +2995,89 @@ async function rtdbRestGet(path,timeoutMs=12000){
 
 
 
-async function reserveCloudEventSlot(){
+async function reserveCloudEventSlot(eventId){
   if(!isGoogleUser())throw new Error('尚未登入 Google');
+  if(!eventId)throw new Error('缺少 eventId');
 
   const uid=fbAuth.currentUser.uid;
+  const token=await getRestIdToken(false);
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
 
-  // iOS Safari 下 Firebase transaction 偶爾會一直等待，
-  // 改成低頻 REST 讀取 + REST PUT，兩邊都有 timeout。
-  let count=0;
+  for(let attempt=0;attempt<2;attempt++){
+    for(let slot=0;slot<CLOUD_EVENT_LIMIT;slot++){
+      const path=`userEvents/${uid}/${slot}`;
+      const url=`${base}/${path}.json?auth=${encodeURIComponent(token)}`;
 
-  try{
-    const raw=await rtdbRestGet(`userEventCounts/${uid}`,5000);
-    count=Number(raw||0);
-  }catch(e){
-    console.warn('讀取 userEventCounts 失敗，改用 userEvents 索引估算',e);
+      const getCtrl=new AbortController();
+      const getTimer=setTimeout(()=>getCtrl.abort(),4000);
+      let current=null,etag='null_etag';
 
-    try{
-      const index=(await rtdbRestGet(`userEvents/${uid}`,5000))||{};
-      count=Object.keys(index).filter(id=>index[id]).length;
-    }catch(e2){
-      console.warn('讀取 userEvents 索引也失敗，改用本機數量',e2);
-      count=cloudEventCountForCurrentGoogle();
+      try{
+        const res=await fetch(url,{method:'GET',headers:{'X-Firebase-ETag':'true'},signal:getCtrl.signal,cache:'no-store'});
+        if(!res.ok)throw new Error(`Firebase REST ${res.status}: ${await res.text()}`);
+        etag=res.headers.get('ETag')||'null_etag';
+        current=await res.json();
+      }finally{
+        clearTimeout(getTimer);
+      }
+
+      if(current===eventId){
+        cloudEventSlots[eventId]=String(slot);
+        return {ok:true,slot:String(slot),already:true};
+      }
+      if(current!==null)continue;
+
+      const putCtrl=new AbortController();
+      const putTimer=setTimeout(()=>putCtrl.abort(),4000);
+      try{
+        const res=await fetch(url,{
+          method:'PUT',
+          headers:{'Content-Type':'application/json','if-match':etag},
+          body:JSON.stringify(eventId),
+          signal:putCtrl.signal,
+          cache:'no-store'
+        });
+        if(res.status===412)continue;
+        if(!res.ok)throw new Error(`Firebase REST ${res.status}: ${await res.text()}`);
+        cloudEventSlots[eventId]=String(slot);
+        return {ok:true,slot:String(slot)};
+      }finally{
+        clearTimeout(putTimer);
+      }
     }
   }
 
-  if(!Number.isFinite(count)||count<0)count=0;
-
-  if(count>=CLOUD_EVENT_LIMIT){
-    return {ok:false,count};
-  }
-
-  const next=count+1;
-
-  await rtdbRestPut(`userEventCounts/${uid}`,next,8000);
-
-  return {ok:true,count:next,previous:count};
+  return {ok:false,count:CLOUD_EVENT_LIMIT};
 }
 
-async function releaseCloudEventSlot(){
+async function releaseCloudEventSlot(slot,eventId){
   if(!isGoogleUser())return;
-
   const uid=fbAuth.currentUser.uid;
+  let targetSlot=slot;
+
+  if(targetSlot===undefined || targetSlot===null){
+    try{
+      const slots=(await rtdbRestGet(`userEvents/${uid}`,5000))||{};
+      targetSlot=Object.keys(slots).find(k=>slots[k]===eventId);
+    }catch(e){}
+  }
+
+  if(targetSlot===undefined || targetSlot===null)return;
 
   try{
-    let count=0;
-
-    try{
-      const raw=await rtdbRestGet(`userEventCounts/${uid}`,5000);
-      count=Number(raw||0);
-    }catch(e){
-      count=cloudEventCountForCurrentGoogle();
-    }
-
-    const next=Math.max(0,(Number.isFinite(count)?count:0)-1);
-    await rtdbRestPut(`userEventCounts/${uid}`,next,8000);
+    await rtdbRestDelete(`userEvents/${uid}/${targetSlot}`,5000);
   }catch(e){
     console.warn('releaseCloudEventSlot failed',e);
   }
+
+  if(eventId)delete cloudEventSlots[eventId];
 }
 
 async function createTournament(){
   const createBtn=document.querySelector('[data-create-tournament="1"]');
   const oldText=createBtn?.textContent||'建立賽程表';
 
-  let slotReserved=false;
+  let reservedSlot=null;
   let createdEventId='';
 
   if(createBtn){
@@ -3090,49 +3108,32 @@ async function createTournament(){
         finalRR:null,
         created:Date.now(),
         testOnly:true,
-        cloudVersion:0
+        cloudVersion:2
       };
 
       buildFirst();
       isAdmin=true;
+      isReferee=false;
       localEventSave();
-      markEventSaved(ev.id);
 
       $('create').classList.add('hidden');
       $('admin').classList.remove('hidden');
       history.replaceState(null,'',location.pathname);
 
       renderAdmin();
-
-      // 只有「剛建立完成」時先帶主辦到裁判頁設定裁判資料。
       showTab('referee');
       forcePageTopStable();
       return;
     }
 
-    if(createBtn)createBtn.textContent='確認雲端名額…';
-
     if(!(await initCloud())){
       alert('Firebase 尚未連線成功。');
       return;
     }
-
     if(!isGoogleUser()){
       alert('建立雲端賽事前，必須先使用 Google 帳號登入。');
       return;
     }
-
-    // 先用 transaction 原子保留 1 個名額。
-    // 這樣 Rules 在建立 events/$eventId 時已能看到 userEventCounts=1~3，
-    // 不會再因 null / 同步寫入順序而被 PERMISSION_DENIED。
-    const slot=await reserveCloudEventSlot();
-
-    if(!slot.ok){
-      alert(`這個 Google 帳號已達 ${CLOUD_EVENT_LIMIT} 場雲端賽事上限，請先刪除一場舊賽事。`);
-      return;
-    }
-
-    slotReserved=true;
 
     fbUser=fbAuth.currentUser;
     const now=Date.now();
@@ -3147,45 +3148,46 @@ async function createTournament(){
       rounds:[],
       finalRR:null,
       created:now,
-      cloudVersion:5,
+      cloudVersion:2,
       ownerUid:fbUser.uid,
-      ownerEmail:fbUser.email||'',
-      ownerName:fbUser.displayName||'',
       publicOpen:true,
       publicUntil:now+PUBLIC_WINDOW_MS,
-      testOnly:false
+      testOnly:false,
+      raffleState:null,
+      syncVersion:now
     };
 
     buildFirst();
     createdEventId=ev.id;
 
+    if(createBtn)createBtn.textContent='保留雲端名額…';
+    const slot=await reserveCloudEventSlot(ev.id);
+    if(!slot.ok){
+      alert(`這個 Google 帳號已達 ${CLOUD_EVENT_LIMIT} 場雲端賽事上限，請先刪除一場舊賽事。`);
+      return;
+    }
+    reservedSlot=slot.slot;
+
+    if(createBtn)createBtn.textContent='寫入賽事…';
+    await cloudSet(`events/${ev.id}`,ev,3000);
+
     const code=String(Math.floor(100000+Math.random()*900000));
     const expiresAt=Date.now()+30000;
 
-    if(createBtn)createBtn.textContent='寫入賽事…';
-
-    // 第一步：先建立 event 本體。
-    // Rules 只依 Google owner + 已保留的 count 判斷，不依賴尚未建立的 admins/secrets。
-    await cloudSet(`events/${ev.id}`,ev,3000);
-
     if(createBtn)createBtn.textContent='建立管理權限…';
-
-    // 第二步：event 已存在後再建立這些相依節點。
     await cloudUpdate({
       [`secrets/${ev.id}`]:{adminCode:code,expiresAt},
-      [`admins/${ev.id}/${fbUser.uid}`]:code,
-      [`userEvents/${fbUser.uid}/${ev.id}`]:true
-    },8000);
-
-    slotReserved=false;
+      [`admins/${ev.id}/${fbUser.uid}`]:code
+    },6000);
 
     isAdmin=true;
+    isReferee=false;
+    cloudEventsCache[ev.id]=ev;
+    cloudEventIds=[ev.id,...cloudEventIds.filter(x=>x!==ev.id)];
+    cloudEventSlots[ev.id]=String(reservedSlot);
+
     localStorage.setItem(adminFlagKey(ev.id),'1');
     localStorage.setItem(adminCodeKey(ev.id),code);
-    localEventSave();
-    markEventSaved(ev.id);
-
-    currentAdminTab='bracket';
 
     listenCloudEvent(ev.id);
     history.replaceState(null,'',`${location.pathname}?event=${encodeURIComponent(ev.id)}`);
@@ -3194,42 +3196,31 @@ async function createTournament(){
     $('admin').classList.remove('hidden');
 
     renderAdmin();
-
-    // 只有「剛建立完成」時先帶主辦到裁判頁設定裁判資料。
     showTab('referee');
     forcePageTopStable();
 
   }catch(e){
     console.error('createTournament failed',e);
 
-    // 如果 event 本體已建立但後續管理節點失敗，清掉半成品。
     if(createdEventId){
-      try{ await rtdbRestDelete(`events/${createdEventId}`,8000); }catch(cleanErr){
+      try{await rtdbRestDelete(`events/${createdEventId}`,5000)}catch(cleanErr){
         console.warn('cleanup event failed',cleanErr);
       }
     }
-
-    if(slotReserved || createdEventId){
-      await releaseCloudEventSlot();
+    if(reservedSlot!==null){
+      await releaseCloudEventSlot(reservedSlot,createdEventId);
     }
 
     const code=e?.code?`\n錯誤代碼：${e.code}`:'';
     const msg=e?.message||String(e);
 
-    if(
-      String(msg).includes('PERMISSION_DENIED') ||
-      String(msg).includes('Permission denied') ||
-      String(msg).includes('401') ||
-      String(msg).includes('403')
-    ){
-      alert('建立雲端賽事失敗：Firebase Rules 仍是舊版。請把我這次提供的新 Rules 發布後再建立。');
-    }else if(String(msg).includes('逾時')){
-      alert('建立雲端賽事逾時。這次已停止等待，請再試一次；如果 SDK 卡住會自動改走 REST，不會再永久停在「寫入賽事…」。');
+    if(String(msg).includes('PERMISSION_DENIED')||String(msg).includes('Permission denied')||String(msg).includes('401')||String(msg).includes('403')){
+      alert('建立雲端賽事失敗：Firebase Rules 與 V2 網頁版本不一致，請發布這一版附帶的 V2 Rules。');
     }else{
       alert('建立雲端賽事失敗：'+msg+code);
     }
   }finally{
-    if(createBtn && document.body.contains(createBtn)){
+    if(createBtn&&document.body.contains(createBtn)){
       createBtn.disabled=false;
       createBtn.textContent=oldText;
     }
@@ -3267,19 +3258,19 @@ function score(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.rounds[ri].matches[mi];
-  if(!canEditMatchScore(m) || !canCompleteMatch(m))return;
+  if(!canEditMatchScore(m)||!canCompleteMatch(m))return;
 
-  const a=Number(m.sa ?? 0);
-  const b=Number(m.sb ?? 0);
+  const before=cloneJson(ev);
 
-  const oldWinner=m._previousWinner || m.winner || null;
+  const a=Number(m.sa??0);
+  const b=Number(m.sb??0);
+  const oldWinner=m._previousWinner||m.winner||null;
   const newWinner=a>b?m.a:m.b;
 
   m.sa=a;
   m.sb=b;
   m.winner=newWinner;
   delete m._previousWinner;
-
   m.refereeActive=false;
   m.referee='';
 
@@ -3290,8 +3281,7 @@ function score(ri,mi){
   renderAdmin();
   backToBracketFromMatch();
 
-  // 不再讓使用者等整份 event PUT 完才返回畫面。
-  queueWholeEventCloud(50);
+  if(!ev.testOnly)syncBracketDiff(before,ev);
 
   if(rebuilt){
     alert('比分已修改。因勝者改變，後續賽程已依新的勝者重新產生。');
@@ -3321,19 +3311,25 @@ async function resetScoreOnly(){
 
   if(!m)return alert('找不到這場比賽資料。');
 
-  // 如果這場原本已完成，保留舊勝者供之後重新記錄比分時判斷是否需要重建後續賽程。
-  if(m.winner && !m._previousWinner)m._previousWinner=m.winner;
+  if(m.winner&&!m._previousWinner)m._previousWinner=m.winner;
 
   m.winner=null;
   m.sa=0;
   m.sb=0;
 
-  // 比分重置只歸零，不釋放目前裁判、不關閉比賽。
-  const ok=await saveEventCloudNow();
-  if(!ok)return;
+  localEventSave();
+
+  if(!ev.testOnly){
+    try{
+      await rtdbRestPut(matchCloudPath(t.kind,t.ri,t.mi),cloneJson(m),3500);
+    }catch(e){
+      alert('比分重設沒有成功寫入 Firebase，將重新載入雲端資料。');
+      await backgroundRefreshCurrentEvent(ev.id);
+      return;
+    }
+  }
 
   closeResetChoice();
-
   if(t.kind==='rr')openRRMatch(t.mi);
   else openMatchEditor(t.ri,t.mi);
 }
@@ -3348,7 +3344,8 @@ async function clearMatchAll(){
 
   if(!m)return alert('找不到這場比賽資料。');
 
-  const hadWinner=!!(m._previousWinner || m.winner);
+  const before=cloneJson(ev);
+  const hadWinner=!!(m._previousWinner||m.winner);
 
   m.winner=null;
   m.sa=0;
@@ -3357,12 +3354,16 @@ async function clearMatchAll(){
   m.refereeActive=false;
   m.referee='';
 
-  if(t.kind!=='rr' && hadWinner){
+  if(t.kind!=='rr'&&hadWinner){
     clearDownstreamAfterMatchReset(t.ri);
   }
 
-  const ok=await saveEventCloudNow();
-  if(!ok)return;
+  localEventSave();
+
+  if(!ev.testOnly){
+    const ok=await syncBracketDiff(before,ev);
+    if(!ok)return;
+  }
 
   closeResetChoice();
   closeMatchEditor();
@@ -3433,17 +3434,16 @@ function rrScore(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.finalRR.matches[i];
+  if(!canEditMatchScore(m)||!canCompleteMatch(m))return;
 
-  if(!canEditMatchScore(m) || !canCompleteMatch(m))return;
-
-  const a=Number(m.sa ?? 0);
-  const b=Number(m.sb ?? 0);
+  const before=cloneJson(ev);
+  const a=Number(m.sa??0);
+  const b=Number(m.sb??0);
 
   m.sa=a;
   m.sb=b;
   m.winner=a>b?m.a:m.b;
   delete m._previousWinner;
-
   m.refereeActive=false;
   m.referee='';
 
@@ -3451,7 +3451,7 @@ function rrScore(i){
   renderAdmin();
   backToBracketFromMatch();
 
-  queueWholeEventCloud(50);
+  if(!ev.testOnly)syncBracketDiff(before,ev);
 }
 function stageLabel(ri,r){
   if(ev.mode==='free'&&ev.freeFinal==='rr3'){
@@ -3543,7 +3543,7 @@ async function claimRefereeSlot(index){
   for(const [k,claim] of Object.entries(ev.refereeClaims||{})){
     if(claim?.uid===uid && k!==refereeClaimKey(index)){
       try{
-        await rtdbRestDelete(`events/${ev.id}/refereeClaims/${k}`,5000);
+        await rtdbRestDelete(`refereeClaims/${ev.id}/${k}`,5000);
       }catch(e){
         console.warn('release previous referee claim failed',e);
       }
@@ -3554,7 +3554,7 @@ async function claimRefereeSlot(index){
   // 兩支手機同時選同一位時，只會有一支成功。
   const token=await getRestIdToken(false);
   const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
-  const path=`events/${encodeURIComponent(ev.id)}/refereeClaims/${encodeURIComponent(refereeClaimKey(index))}.json`;
+  const path=`refereeClaims/${encodeURIComponent(ev.id)}/${encodeURIComponent(refereeClaimKey(index))}.json`;
   const url=`${base}/${path}?auth=${encodeURIComponent(token)}`;
 
   const ctrl1=new AbortController();
@@ -3639,7 +3639,7 @@ async function releaseRefereeSlot(index){
   }
 
   try{
-    await rtdbRestDelete(`events/${ev.id}/refereeClaims/${refereeClaimKey(index)}`,5000);
+    await rtdbRestDelete(`refereeClaims/${ev.id}/${refereeClaimKey(index)}`,5000);
 
     if(ev.refereeClaims)delete ev.refereeClaims[refereeClaimKey(index)];
     if(getMyReferee()===name)localStorage.removeItem(refereeIdentityKey());
@@ -3820,11 +3820,10 @@ function backgroundSyncAlert(message){
   alert(message);
 }
 
-function queueSingleMatchCloud(kind,ri,mi,delay=120){
+function queueSingleMatchCloud(kind,ri,mi,delay=100){
   if(!ev)return;
 
   localEventSave();
-
   if(ev.testOnly)return;
 
   const m=kind==='rr'
@@ -3837,67 +3836,31 @@ function queueSingleMatchCloud(kind,ri,mi,delay=120){
   const path=matchCloudPath(kind,ri,mi);
   const snapshot=cloneJson(m);
 
-  if(matchSyncTimers.has(key)){
-    clearTimeout(matchSyncTimers.get(key));
-  }
+  if(matchSyncTimers.has(key))clearTimeout(matchSyncTimers.get(key));
 
   matchSyncTimers.set(key,setTimeout(async()=>{
     matchSyncTimers.delete(key);
-
     try{
-      // 高頻比分不再先等 Firebase SDK 3 秒。
-      // 直接走 REST，讓操作介面完全不等待網路。
-      await rtdbRestPut(path,snapshot,3500);
+      await rtdbRestPut(path,snapshot,3000);
       matchSyncRetry.delete(key);
     }catch(e){
       console.warn('background match sync failed',key,e);
-
       const retry=(matchSyncRetry.get(key)||0)+1;
       matchSyncRetry.set(key,retry);
 
       if(retry<=1){
-        setTimeout(()=>queueSingleMatchCloud(kind,ri,mi,0),500);
+        setTimeout(()=>queueSingleMatchCloud(kind,ri,mi,0),350);
       }else{
         matchSyncRetry.delete(key);
-        backgroundSyncAlert('比分已保存在這支手機，但雲端同步暫時失敗。請確認網路連線後再操作一次。');
+        backgroundSyncAlert('這次比分沒有成功寫入 Firebase，將重新讀取雲端資料避免衝突。');
+        backgroundRefreshCurrentEvent(ev.id);
       }
     }
   },delay));
 }
 
 function queueWholeEventCloud(delay=80){
-  if(!ev)return;
-
-  if(!ev.testOnly)ev.syncVersion=Date.now();
-
-  localEventSave();
-
-  if(ev.testOnly)return;
-
-  if(eventSyncTimer)clearTimeout(eventSyncTimer);
-
-  const eventId=ev.id;
-  const snapshot=cloneJson(ev);
-
-  eventSyncTimer=setTimeout(async()=>{
-    eventSyncTimer=null;
-
-    try{
-      // 結構更新也直接走 REST，不阻塞畫面。
-      await rtdbRestPut(`events/${eventId}`,snapshot,5000);
-    }catch(e){
-      console.warn('background event sync failed',e);
-
-      setTimeout(async()=>{
-        try{
-          await rtdbRestPut(`events/${eventId}`,snapshot,5000);
-        }catch(e2){
-          console.warn('background event sync retry failed',e2);
-          backgroundSyncAlert('賽程已保存在這支手機，但雲端同步暫時失敗。請確認網路後再試。');
-        }
-      },700);
-    }
-  },delay);
+  return;
 }
 
 async function saveSingleMatchCloud(kind,ri,mi){
@@ -3924,32 +3887,24 @@ async function saveSingleMatchCloud(kind,ri,mi){
 }
 
 async function saveEventCloudNow(){
-  // 只有低頻的「結構變更」才整份寫入。
-  // syncVersion 讓其他手機知道需要重新抓一次賽程結構。
-  if(ev && !ev.testOnly)ev.syncVersion=Date.now();
+  if(!ev)return false;
 
   localEventSave();
   renderAdmin();
 
-  if(ev?.testOnly)return true;
+  if(ev.testOnly)return true;
 
-  if(!cloudReady||!ev?.id){
-    alert('目前尚未連上雲端，無法同步。');
-    return false;
-  }
-
-  if(!fbAuth?.currentUser){
-    alert('目前是觀看模式，沒有雲端寫入權限。');
+  if(!hasOrganizerAccess()){
+    alert('這個操作需要主辦權限；裁判只能同步被授權的比賽資料。');
     return false;
   }
 
   try{
-    await cloudSet(`events/${ev.id}`,ev);
+    await cloudUpdate(cloudOrganizerUpdatesFromEvent(),5000);
     return true;
   }catch(e){
-    console.error('event cloud sync failed',e);
-    const role=isReferee&&!isAdmin?'裁判':'主辦';
-    alert(`${role}雲端同步失敗：${e?.message||e}`);
+    console.error('organizer event sync failed',e);
+    alert('主辦雲端同步失敗：'+(e?.message||e));
     return false;
   }
 }
@@ -4355,16 +4310,19 @@ function getRaffleState(){
   const roster=[...(ev?.roster||[])].filter(Boolean);
   let state=null;
 
-  try{
-    const raw=localStorage.getItem(raffleStorageKey());
-    if(raw)state=JSON.parse(raw);
-  }catch(e){}
+  if(ev?.testOnly){
+    try{
+      const raw=localStorage.getItem(raffleStorageKey());
+      if(raw)state=JSON.parse(raw);
+    }catch(e){}
+  }else{
+    state=ev?.raffleState?cloneJson(ev.raffleState):null;
+  }
 
-  if(!state || !Array.isArray(state.winners) || typeof state.checked!=='object' || !state.checked){
+  if(!state||!Array.isArray(state.winners)||typeof state.checked!=='object'||!state.checked){
     state=defaultRaffleState();
   }
 
-  // 名單變動時自動補上新參賽者，已不在名單的人移除。
   state.winners=state.winners.filter(name=>roster.includes(name));
 
   const nextChecked={};
@@ -4378,7 +4336,22 @@ function getRaffleState(){
 }
 
 function saveRaffleState(state){
-  try{localStorage.setItem(raffleStorageKey(),JSON.stringify(state))}catch(e){}
+  if(!ev)return;
+
+  if(ev.testOnly){
+    try{localStorage.setItem(raffleStorageKey(),JSON.stringify(state))}catch(e){}
+    return;
+  }
+
+  ev.raffleState=cloneJson(state);
+  cloudEventsCache[ev.id]=ev;
+
+  if(hasOrganizerAccess()){
+    rtdbRestPut(`events/${ev.id}/raffleState`,cloneJson(state),3500).catch(e=>{
+      console.warn('raffle cloud sync failed',e);
+      backgroundSyncAlert('抽獎狀態沒有成功同步到 Firebase，請檢查網路。');
+    });
+  }
 }
 
 function setRaffleChecked(name,checked){
@@ -5830,17 +5803,11 @@ $('deleteConfirmModal')?.addEventListener('click',e=>{
 
 function restoreCachedEventImmediately(id,tab){
   const cached=events()[id];
-  if(!cached)return false;
+  if(!cached?.testOnly)return false;
 
   ev=cached;
-
-  if(cached.testOnly){
-    isAdmin=true;
-    isReferee=false;
-  }else if(isGoogleUser() && cached.ownerUid===fbAuth?.currentUser?.uid){
-    isAdmin=true;
-    isReferee=false;
-  }
+  isAdmin=true;
+  isReferee=false;
 
   $('home').classList.add('hidden');
   $('create').classList.add('hidden');
@@ -5851,34 +5818,42 @@ function restoreCachedEventImmediately(id,tab){
 
   const allowed=['bracket','draw','roster','referee','organizer','share'];
   showTab(allowed.includes(currentAdminTab)?currentAdminTab:'bracket');
-
   return true;
 }
 
 async function backgroundRefreshCurrentEvent(id){
   try{
-    const data=await publicCloudGet(`events/${id}`,10000);
-    if(!data)return;
+    const data=await publicCloudGet(`events/${id}`,8000);
 
-    // 若使用者已切去別場，不覆蓋。
-    if(!ev || ev.id!==id)return;
+    if(!data){
+      if(ev?.id===id){
+        ev=null;
+        clearActiveView();
+        ['create','admin'].forEach(x=>$(x)?.classList.add('hidden'));
+        $('home')?.classList.remove('hidden');
+        history.replaceState(null,'',location.pathname);
+      }
+      delete cloudEventsCache[id];
+      cloudEventIds=cloudEventIds.filter(x=>x!==id);
+      renderSavedEvents();
+      return;
+    }
+
+    if(!ev||ev.id!==id)return;
 
     const keepTab=currentAdminTab||'bracket';
     ev=data;
-    localEventSave();
+    cloudEventsCache[id]=data;
 
     if(fbAuth?.currentUser){
-      try{await refreshAdminState(id)}catch(e){console.warn(e)}
-      try{await refreshRefereeState(id)}catch(e){console.warn(e)}
+      try{await refreshAdminState(id)}catch(e){}
+      try{await refreshRefereeState(id)}catch(e){}
     }
 
     renderAdmin();
     showTab(keepTab);
-
-    try{listenCloudEvent(id)}catch(e){console.warn('listenCloudEvent failed',e)}
   }catch(e){
-    // 暫時連線失敗時留在本機快取畫面，不再把使用者踢回首頁或彈干擾訊息。
-    console.warn('backgroundRefreshCurrentEvent transient failure',e);
+    console.warn('backgroundRefreshCurrentEvent failed',e);
   }
 }
 
@@ -5934,15 +5909,16 @@ async function refreshCloudListOnHome(){
 }
 
 async function bootstrapCloud(){
+  migrateLegacyTestEvents();
+
   draftMode=null;
   draftStorage=null;
   await initCloud();
 
-  // 先恢復 Firebase 登入狀態，但不要先做任何大量同步。
   if(fbAuth && !fbAuth.currentUser){
     await new Promise(resolve=>{
       let finished=false;
-      const timer=setTimeout(()=>{if(!finished){finished=true;resolve()}},1200);
+      const timer=setTimeout(()=>{if(!finished){finished=true;resolve()}},1000);
       const off=fbAuth.onAuthStateChanged(()=>{
         if(finished)return;
         finished=true;
@@ -5958,65 +5934,37 @@ async function bootstrapCloud(){
 
   const params=new URLSearchParams(location.search);
   const saved=readActiveView();
-
   const urlEvent=params.get('event');
-  const targetId=urlEvent || saved?.eventId || '';
-  const wantedTab=params.get('tab') || (saved?.eventId===targetId?saved?.tab:null) || 'bracket';
 
-  // 重新整理時「先顯示原本頁面」，完全不等待 Firebase。
-  if(targetId){
-    const restored=restoreCachedEventImmediately(targetId,wantedTab);
-
-    if(restored){
-      if(!ev.testOnly){
-        try{
-          const u=new URL(location.href);
-          u.searchParams.set('event',targetId);
-          u.searchParams.set('tab',wantedTab);
-          history.replaceState(null,'',u.pathname+u.search);
-        }catch(e){}
-
-        // 背景再更新最新雲端資料；失敗時保持目前畫面，不彈「無法連線」。
-        setTimeout(()=>backgroundRefreshCurrentEvent(targetId),0);
-      }
-      return;
-    }
-  }
-
-  // 沒有本機快取時才真的需要從雲端載入。
   if(urlEvent){
     const result=await loadCloudEvent(urlEvent);
 
     if(result==='missing'){
-      purgeLocalEvent(urlEvent);
       clearActiveView();
       history.replaceState(null,'',location.pathname);
-      renderSavedEvents();
-      alert('這個雲端賽事已被刪除或不存在，分享連結已失效。');
+      alert('這個雲端賽事已被刪除或不存在。');
+      goHome();
     }else if(result==='expired'){
       clearActiveView();
       history.replaceState(null,'',location.pathname);
-      alert('這場賽事的公開觀看已關閉或 2 小時有效時間已到期。');
+      alert('這場賽事的公開觀看已關閉或有效時間已到期。');
+      goHome();
     }else if(result==='error'){
-      // 只有完全沒有任何快取、首次開啟雲端連結失敗時才提示。
-      alert('目前暫時無法載入這場雲端賽事，請稍後再試。');
+      alert('目前無法連上 Firebase。V2 不會使用本機舊雲端資料代替，請檢查網路後重新整理。');
     }
     return;
   }
 
-  // 真正待在首頁時才同步自己的雲端賽事清單，避免每次重整賽事頁都額外打一堆請求。
+  if(saved?.testOnly && saved?.eventId){
+    const wanted=saved.tab||'bracket';
+    if(restoreCachedEventImmediately(saved.eventId,wanted))return;
+  }
+
   renderHomeSelections();
 
   if(isGoogleUser()){
-    Promise.resolve().then(async()=>{
-      try{
-        await syncMyCloudEvents();
-        renderSavedEvents();
-        listenMyCloudEventIndex();
-      }catch(e){
-        console.warn('home cloud list sync skipped',e);
-      }
-    });
+    await syncMyCloudEvents();
+    listenMyCloudEventIndex();
   }else{
     stopMyCloudEventIndexListener();
   }
