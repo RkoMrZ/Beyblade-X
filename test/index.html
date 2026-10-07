@@ -1670,6 +1670,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 .registrationLaunchTop{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .registrationLaunch h3{margin:0 0 5px}.registrationLaunch button{white-space:nowrap}
 .regGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.regList{display:grid;gap:9px;margin-top:12px}
+.requiredMark{color:#ff6b57;font-weight:900;margin-left:3px}.fieldHint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
 .regItem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
 .regItemName{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.regMeta{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
 .regActions{display:flex;gap:7px;flex-wrap:wrap}.regActions button{padding:8px 10px;font-size:13px}.regStatRow{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
@@ -1778,13 +1779,21 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
  </div>
  <div class="card">
   <div class="regGrid">
-   <div><label>活動 / 賽事名稱</label><input id="regFormTitle" placeholder="例如：Beyblade X 秋季盃"></div>
-   <div><label>舉辦地址</label><input id="regFormAddress" maxlength="160" placeholder="例如：新北市淡水區○○路 123 號"></div>
-   <div><label>正選人數上限</label><input id="regFormMax" type="number" min="2" max="256" value="24"></div>
-   <div><label>備選人數上限</label><input id="regFormWaitlistMax" type="number" min="0" max="256" value="8"></div>
+   <div><label>活動 / 賽事名稱<span class="requiredMark">*</span></label><input id="regFormTitle" required maxlength="80" placeholder="例如：Beyblade X 秋季盃"></div>
+   <div><label>舉辦日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date"></div>
+   <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160" placeholder="例如：淡水戰鬥陀螺館／新北市淡水區○○路 123 號"></div>
+   <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
+   <div><label>備選人數上限（選填）</label><input id="regFormWaitlistMax" type="number" min="0" max="256" placeholder="例如：8；不需要備選可留空"></div>
+   <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local"></div>
   </div>
-  <label>報名截止時間（可留空）</label><input id="regFormDeadline" type="datetime-local">
-  <label>報名說明（可留空）</label><textarea id="regFormDesc" rows="3" placeholder="例如：請填寫比賽現場使用名稱；正選額滿後自動進入備選。"></textarea>
+  <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="8" maxlength="1000" placeholder="例如：
+🏆 大會獎項
+📅 比賽日期、報到時間、開賽時間
+📍 比賽地點
+💰 報名費用
+⚠️ 注意事項
+
+可直接貼上平常在 LINE 群組使用的宣傳內容。"></textarea>
   <div class="toolbar" style="margin-top:12px">
    <button type="button" class="secondary" onclick="openRegistrationHub()">取消</button>
    <button type="button" onclick="createRegistrationForm()">建立報名表</button>
@@ -1795,7 +1804,8 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 <section id="registrationPublic" class="hidden">
  <div class="card regPublicHero"><div class="muted">Beyblade X 線上報名</div><h2 id="regPublicTitle">報名表</h2><div id="regPublicStatus" class="muted"></div></div>
  <div class="card regPublicForm">
-  <div id="regPublicDesc" class="notice hidden" style="margin-bottom:12px"></div>
+  <div id="regPublicDesc" class="notice hidden" style="margin-bottom:12px;white-space:pre-wrap"></div>
+  <div id="regPublicDate" class="regLinkBox hidden" style="margin-bottom:8px"></div>
   <div id="regPublicAddress" class="regLinkBox hidden" style="margin-bottom:12px"></div>
   <label>選手名稱 *</label><input id="regPlayerName" maxlength="40" placeholder="比賽現場使用的名稱">
   <label>手機後三碼 *</label><input id="regPhoneLast3" type="tel" inputmode="numeric" maxlength="3" pattern="[0-9]{3}" placeholder="例如：168">
@@ -3114,25 +3124,34 @@ async function createRegistrationForm(){
   if(!(await initCloud())||!isGoogleUser())return alert('請先登入 Google。');
   const title=$('regFormTitle').value.trim();
   if(!title)return alert('請輸入活動 / 賽事名稱。');
+  const eventDate=$('regFormEventDate').value;
+  if(!eventDate)return alert('請選擇舉辦日期。');
   const address=$('regFormAddress').value.trim();
-  if(!address)return alert('請輸入舉辦地址。');
-  const maxPlayers=Math.max(2,Math.min(256,Number($('regFormMax').value)||24));
-  const waitlistMax=Math.max(0,Math.min(256,Number($('regFormWaitlistMax').value)||0));
+  if(!address)return alert('請輸入舉辦地址 or 店面名稱。');
+  const maxRaw=$('regFormMax').value.trim();
+  if(!maxRaw)return alert('請輸入正選人數上限。');
+  const maxPlayers=Number(maxRaw);
+  if(!Number.isInteger(maxPlayers)||maxPlayers<2||maxPlayers>256)return alert('正選人數上限請輸入 2～256 的整數。');
+  const waitRaw=$('regFormWaitlistMax').value.trim();
+  const waitlistMax=waitRaw===''?0:Number(waitRaw);
+  if(!Number.isInteger(waitlistMax)||waitlistMax<0||waitlistMax>256)return alert('備選人數上限請輸入 0～256 的整數，或直接留空。');
   const d=$('regFormDeadline').value;
-  const deadline=d?new Date(d).getTime():0;
-  if(deadline && deadline<=Date.now())return alert('截止時間必須在未來。');
+  if(!d)return alert('請設定報名截止時間。');
+  const deadline=new Date(d).getTime();
+  if(!Number.isFinite(deadline)||deadline<=Date.now())return alert('報名截止時間必須在未來。');
   const id='REG-'+uid()+uid().slice(0,3);
   const now=Date.now();
-  const form={id,title,address,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
+  const form={id,title,eventDate,address,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
   try{
     await cloudUpdate({[`registrationForms/${id}`]:form,[`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`]:true},7000);
     registrationFormCache[id]=form;
     $('regFormTitle').value='';
+    $('regFormEventDate').value='';
     $('regFormAddress').value='';
     $('regFormDesc').value='';
     $('regFormDeadline').value='';
     $('regFormMax').value='24';
-    $('regFormWaitlistMax').value='8';
+    $('regFormWaitlistMax').value='';
     await openRegistrationAdmin(id);
   }catch(e){alert('建立報名表失敗：'+(e?.message||e)+'\n\n請確認已套用這版附帶的 Firebase Rules。')}
 }
@@ -3149,7 +3168,7 @@ async function loadMyRegistrationForms(){
     }
     rows.sort((a,b)=>(b.created||0)-(a.created||0));
     badge.textContent=rows.length+' 份';
-    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">正選 ${Number(f.maxPlayers)||0} 人｜備選 ${Number(f.waitlistMax)||0} 人｜${f.open!==false?'🟢 報名中':'⚪ 已關閉'}${f.deadline?`｜截止 ${esc(formatRegDate(f.deadline))}`:''}</div></div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有報名表。</div>';
+    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">${f.eventDate?`📅 ${esc(f.eventDate)}｜`:''}正選 ${Number(f.maxPlayers)||0} 人${Number(f.waitlistMax)>0?`｜備選 ${Number(f.waitlistMax)} 人`:''}｜${f.open!==false?'🟢 報名中':'⚪ 已關閉'}${f.deadline?`｜截止 ${esc(formatRegDate(f.deadline))}`:''}</div></div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有報名表。</div>';
   }catch(e){box.innerHTML=`<div class="notice">讀取失敗：${esc(e?.message||e)}</div>`}
 }
 async function deleteRegistrationForm(id){
@@ -3203,7 +3222,7 @@ async function loadRegistrationAdmin(id){
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份報名表的建立者。');
     activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
     $('regAdminTitle').textContent=form.title;
-    $('regAdminMeta').textContent=`正選 ${Number(form.maxPlayers)||0} 人｜備選 ${Number(form.waitlistMax)||0} 人${form.address?`｜${form.address}`:''}${form.deadline?`｜截止 ${formatRegDate(form.deadline)}`:'｜未設定截止時間'}`;
+    $('regAdminMeta').textContent=`${form.eventDate?`日期 ${form.eventDate}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${form.deadline?`｜截止 ${formatRegDate(form.deadline)}`:''}`;
     $('regShareUrl').textContent=regPublicUrl(id);
     $('regToggleOpenBtn').textContent=form.open!==false?'關閉報名':'重新開放';
     renderRegistrationList();
@@ -3258,9 +3277,11 @@ async function openPublicRegistration(formId){
     const maxPlayers=Number(f.maxPlayers)||0, waitlistMax=Number(f.waitlistMax)||0;
     const timeClosed=Number(f.deadline||0)>0 && Number(f.deadline)<Date.now();
     const closed=f.open===false || timeClosed;
-    $('regPublicStatus').textContent=closed?'報名已截止':`${f.deadline?`截止：${formatRegDate(f.deadline)}｜`:''}正選上限 ${maxPlayers} 人｜備選上限 ${waitlistMax} 人`;
+    $('regPublicStatus').textContent=closed?'報名已截止':`截止：${formatRegDate(f.deadline)}｜正選上限 ${maxPlayers} 人${waitlistMax>0?`｜備選上限 ${waitlistMax} 人`:''}`;
+    const dateBox=$('regPublicDate');
+    dateBox.classList.toggle('hidden',!f.eventDate);dateBox.textContent=f.eventDate?`📅 舉辦日期：${f.eventDate}`:'';
     const addr=$('regPublicAddress');
-    addr.classList.toggle('hidden',!f.address);addr.textContent=f.address?`📍 舉辦地址：${f.address}`:'';
+    addr.classList.toggle('hidden',!f.address);addr.textContent=f.address?`📍 舉辦地址 / 店面名稱：${f.address}`:'';
     $('regPublicDesc').classList.toggle('hidden',!f.description);$('regPublicDesc').textContent=f.description||'';
     $('regSubmitBtn').disabled=closed;$('regSubmitBtn').textContent=closed?'報名已截止':'送出報名';
     $('regSubmitResult').textContent='';
