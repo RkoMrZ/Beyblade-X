@@ -1823,10 +1823,10 @@ html,body{max-width:100%;overflow-x:hidden}
  <div class="card">
   <div class="regGrid">
    <div><label>活動 / 賽事名稱<span class="requiredMark">*</span></label><input id="regFormTitle" required maxlength="80" placeholder="例如：Beyblade X 秋季盃"></div>
-   <div><label>比賽日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date" onchange="handleRegistrationTimeChange('date')"><div class="fieldHint">不得早於今天</div></div>
-   <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time" onchange="handleRegistrationTimeChange('checkin')"><div class="fieldHint">必須早於比賽時間</div></div>
-   <div><label>比賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time" onchange="handleRegistrationTimeChange('start')"></div>
-   <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local" onchange="handleRegistrationTimeChange('deadline')"><div class="fieldHint">必須在未來，且不得晚於報到時間</div></div>
+   <div><label>比賽日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date" onblur="handleRegistrationTimeChange('date')"><div class="fieldHint">不得早於今天</div></div>
+   <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time" onblur="handleRegistrationTimeChange('checkin')"><div class="fieldHint">必須早於比賽時間</div></div>
+   <div><label>比賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time" onblur="handleRegistrationTimeChange('start')"></div>
+   <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local" onblur="handleRegistrationTimeChange('deadline')"><div class="fieldHint">必須在未來，且不得晚於報到時間</div></div>
    <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160"></div>
    <div><label>報名費/人<span class="requiredMark">*</span></label><input id="regFormFee" required type="number" min="0" max="999999" step="1" inputmode="numeric"><div class="fieldHint">0 = 免費</div></div>
    <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
