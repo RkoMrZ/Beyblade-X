@@ -1800,14 +1800,14 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
  <div class="card">
   <div class="regGrid">
    <div><label>活動 / 賽事名稱<span class="requiredMark">*</span></label><input id="regFormTitle" required maxlength="80" placeholder="例如：Beyblade X 秋季盃"></div>
-   <div><label>比賽日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date"></div>
+   <div><label>比賽日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date" onchange="syncRegistrationDeadlineLimit()"></div>
    <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time"></div>
-   <div><label>開賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time"></div>
+   <div><label>開賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time" onchange="syncRegistrationDeadlineLimit()"></div>
+   <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local"><div class="fieldHint">必須早於比賽開賽時間</div></div>
    <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160" placeholder="例如：漁藏／新北市淡水區中山北路 255 號"></div>
    <div><label>報名費/人<span class="requiredMark">*</span></label><input id="regFormFee" required type="number" min="0" max="999999" step="1" inputmode="numeric" placeholder="例如：300"><div class="fieldHint">0 = 免費</div></div>
    <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
    <div><label>備選人數上限（選填）</label><input id="regFormWaitlistMax" type="number" min="0" max="256" placeholder="例如：8；不需要備選可留空"></div>
-   <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local"></div>
   </div>
   <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="8" maxlength="3000" placeholder="例如：
 🏆 大會獎項
@@ -1817,7 +1817,7 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 可直接貼上平常在 LINE 群組使用的宣傳內容。"></textarea>
   <div class="toolbar" style="margin-top:12px">
    <button type="button" class="secondary" onclick="openRegistrationHub()">取消</button>
-   <button type="button" onclick="createRegistrationForm()">建立報名表</button>
+   <button id="regCreateBtn" type="button" onclick="createRegistrationForm()">建立報名表</button>
   </div>
  </div>
 </section>
@@ -3150,38 +3150,60 @@ async function openRegistrationCreate(){
   history.replaceState(null,'',`${location.pathname}?reg=create`);
   window.scrollTo({top:0,behavior:'instant'});
 }
+function syncRegistrationDeadlineLimit(){
+  const date=$('regFormEventDate')?.value||'';
+  const time=$('regFormStartTime')?.value||'';
+  const deadlineEl=$('regFormDeadline');
+  if(!deadlineEl)return;
+  if(date&&time){
+    const maxValue=`${date}T${time}`;
+    deadlineEl.max=maxValue;
+    if(deadlineEl.value && deadlineEl.value>=maxValue)deadlineEl.value='';
+  }else{
+    deadlineEl.removeAttribute('max');
+  }
+}
+let registrationCreateBusy=false;
 async function createRegistrationForm(){
-  if(!(await initCloud())||!isGoogleUser())return alert('請先登入 Google。');
+  if(registrationCreateBusy)return;
+  registrationCreateBusy=true;
+  const createBtn=$('regCreateBtn');
+  const oldCreateText=createBtn?.textContent||'建立報名表';
+  if(createBtn){createBtn.disabled=true;createBtn.textContent='建立報名表…';}
+  try{
+    if(!(await initCloud())||!isGoogleUser())throw new Error('請先登入 Google。');
   const title=$('regFormTitle').value.trim();
-  if(!title)return alert('請輸入活動 / 賽事名稱。');
+  if(!title)throw new Error('請輸入活動 / 賽事名稱。');
   const eventDate=$('regFormEventDate').value;
-  if(!eventDate)return alert('請選擇比賽日期。');
+  if(!eventDate)throw new Error('請選擇比賽日期。');
   const checkInTime=$('regFormCheckInTime').value;
-  if(!checkInTime)return alert('請設定報到時間。');
+  if(!checkInTime)throw new Error('請設定報到時間。');
   const startTime=$('regFormStartTime').value;
-  if(!startTime)return alert('請設定開賽時間。');
+  if(!startTime)throw new Error('請設定開賽時間。');
   const address=$('regFormAddress').value.trim();
-  if(!address)return alert('請輸入舉辦地址 or 店面名稱。');
+  if(!address)throw new Error('請輸入舉辦地址 or 店面名稱。');
   const feeRaw=$('regFormFee').value.trim();
-  if(feeRaw==='')return alert('請輸入報名費/人；免費請輸入 0。');
+  if(feeRaw==='')throw new Error('請輸入報名費/人；免費請輸入 0。');
   const fee=Number(feeRaw);
-  if(!Number.isInteger(fee)||fee<0||fee>999999)return alert('報名費/人請輸入 0～999999 的整數。');
+  if(!Number.isInteger(fee)||fee<0||fee>999999)throw new Error('報名費/人請輸入 0～999999 的整數。');
   const maxRaw=$('regFormMax').value.trim();
-  if(!maxRaw)return alert('請輸入正選人數上限。');
+  if(!maxRaw)throw new Error('請輸入正選人數上限。');
   const maxPlayers=Number(maxRaw);
-  if(!Number.isInteger(maxPlayers)||maxPlayers<2||maxPlayers>256)return alert('正選人數上限請輸入 2～256 的整數。');
+  if(!Number.isInteger(maxPlayers)||maxPlayers<2||maxPlayers>256)throw new Error('正選人數上限請輸入 2～256 的整數。');
   const waitRaw=$('regFormWaitlistMax').value.trim();
   const waitlistMax=waitRaw===''?0:Number(waitRaw);
-  if(!Number.isInteger(waitlistMax)||waitlistMax<0||waitlistMax>256)return alert('備選人數上限請輸入 0～256 的整數，或直接留空。');
+  if(!Number.isInteger(waitlistMax)||waitlistMax<0||waitlistMax>256)throw new Error('備選人數上限請輸入 0～256 的整數，或直接留空。');
   const d=$('regFormDeadline').value;
-  if(!d)return alert('請設定報名截止時間。');
+  if(!d)throw new Error('請設定報名截止時間。');
   const deadline=new Date(d).getTime();
-  if(!Number.isFinite(deadline)||deadline<=Date.now())return alert('報名截止時間必須在未來。');
+  if(!Number.isFinite(deadline)||deadline<=Date.now())throw new Error('報名截止時間必須在未來。');
+  const eventStart=new Date(`${eventDate}T${startTime}`).getTime();
+  if(!Number.isFinite(eventStart))throw new Error('比賽日期或開賽時間格式不正確。');
+  if(deadline>=eventStart)throw new Error('報名截止時間必須早於比賽開賽時間。');
   const id='REG-'+uid()+uid().slice(0,3);
   const now=Date.now();
-  const form={id,title,eventDate,checkInTime,startTime,address,fee,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
-  try{
-    await cloudUpdate({[`registrationForms/${id}`]:form,[`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`]:true},7000);
+  const form={id,title,eventDate,checkInTime,startTime,eventStart,address,fee,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
+    await cloudUpdate({[`registrationForms/${id}`]:form,[`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`]:true},3500);
     registrationFormCache[id]=form;
     $('regFormTitle').value='';
     $('regFormEventDate').value='';
@@ -3194,7 +3216,13 @@ async function createRegistrationForm(){
     $('regFormMax').value='24';
     $('regFormWaitlistMax').value='';
     await openRegistrationAdmin(id);
-  }catch(e){alert('建立報名表失敗：'+(e?.message||e)+'\n\n請確認已套用這版附帶的 Firebase Rules。')}
+  }catch(e){
+    const msg=e?.message||String(e);
+    alert(msg.startsWith('請')||msg.startsWith('報名')||msg.startsWith('比賽')||msg.startsWith('正選')||msg.startsWith('備選')||msg.startsWith('活動')||msg.startsWith('舉辦') ? msg : '建立報名表失敗：'+msg+'\n\n請確認已套用這版附帶的 Firebase Rules。');
+  }finally{
+    registrationCreateBusy=false;
+    if(createBtn){createBtn.disabled=false;createBtn.textContent=oldCreateText;}
+  }
 }
 async function loadMyRegistrationForms(){
   const box=$('myRegForms'), badge=$('myRegFormCount');
