@@ -1804,10 +1804,10 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
    <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time"></div>
    <div><label>開賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time" onchange="syncRegistrationDeadlineLimit()"></div>
    <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local"><div class="fieldHint">必須早於比賽開賽時間</div></div>
-   <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160" placeholder="例如：漁藏／新北市淡水區中山北路 255 號"></div>
-   <div><label>報名費/人<span class="requiredMark">*</span></label><input id="regFormFee" required type="number" min="0" max="999999" step="1" inputmode="numeric" placeholder="例如：300"><div class="fieldHint">0 = 免費</div></div>
+   <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160"></div>
+   <div><label>報名費/人<span class="requiredMark">*</span></label><input id="regFormFee" required type="number" min="0" max="999999" step="1" inputmode="numeric"><div class="fieldHint">0 = 免費</div></div>
    <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
-   <div><label>備選人數上限（選填）</label><input id="regFormWaitlistMax" type="number" min="0" max="256" placeholder="例如：8；不需要備選可留空"></div>
+   <div><label>備選人數上限（選填）</label><input id="regFormWaitlistMax" type="number" min="0" max="256" placeholder="不需要備選可以留空"></div>
   </div>
   <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="8" maxlength="3000" placeholder="例如：
 🏆 大會獎項
