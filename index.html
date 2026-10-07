@@ -1361,6 +1361,18 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 }
 </style>
 
+
+<style>
+.refereeNameEdit{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.refereeNameEdit .refClaimState{white-space:nowrap;font-size:12px;color:var(--muted)}
+.refereeNameEdit .danger.mini{padding:8px 10px;white-space:nowrap}
+@media(max-width:520px){
+  .refereeNameEdit{grid-template-columns:32px minmax(0,1fr) auto}
+  .refereeNameEdit .refClaimState{grid-column:2/3}
+  .refereeNameEdit .danger.mini{grid-column:3/4;grid-row:1/2}
+}
+</style>
+
 </head>
 <body>
 <header><div class="wrap brand">
@@ -4260,16 +4272,28 @@ function drawBracketLinks(){
 }
 function normalizeEvent(){
   if(!Number.isInteger(ev.refereeCount)||ev.refereeCount<1){
-    ev.refereeCount=Array.isArray(ev.referees)&&ev.referees.length?ev.referees.length:2;
+    ev.refereeCount=Array.isArray(ev.refereeNames)&&ev.refereeNames.length
+      ? ev.refereeNames.length
+      : (Array.isArray(ev.referees)&&ev.referees.length?ev.referees.length:1);
   }
+
   if(!Array.isArray(ev.refereeNames))ev.refereeNames=[];
   if(!ev.refereeClaims || typeof ev.refereeClaims!=='object' || Array.isArray(ev.refereeClaims))ev.refereeClaims={};
+
   ev.refereeNames=Array.from({length:ev.refereeCount},(_,i)=>{
     const v=String(ev.refereeNames[i]??ev.referees?.[i]??`裁判 ${i+1}`).trim();
     return v||`裁判 ${i+1}`;
   });
-  ev.rounds.forEach(r=>r.matches.forEach(m=>{if(typeof m.referee!=='string')m.referee='';if(typeof m.refereeActive!=='boolean')m.refereeActive=false}));
-  if(ev.finalRR)ev.finalRR.matches.forEach(m=>{if(typeof m.referee!=='string')m.referee='';if(typeof m.refereeActive!=='boolean')m.refereeActive=false});
+
+  ev.rounds.forEach(r=>r.matches.forEach(m=>{
+    if(typeof m.referee!=='string')m.referee='';
+    if(typeof m.refereeActive!=='boolean')m.refereeActive=false;
+  }));
+
+  if(ev.finalRR)ev.finalRR.matches.forEach(m=>{
+    if(typeof m.referee!=='string')m.referee='';
+    if(typeof m.refereeActive!=='boolean')m.refereeActive=false;
+  });
 }
 
 function freeFlowLabel(n){
@@ -4678,14 +4702,90 @@ async function addReferee(){
   showTab('referee');
 }
 
+async function removeReferee(index){
+  if(!isAdmin&&!ev?.testOnly)return;
+
+  normalizeEvent();
+  normalizeRefereeClaims();
+
+  if(ev.refereeCount<=1){
+    return alert('至少要保留 1 位裁判。');
+  }
+
+  if(index<0 || index>=ev.refereeCount)return;
+
+  const claim=getRefereeClaim(index);
+  if(claim){
+    return alert('這位裁判目前已被領取，請先按「釋放」後再刪除。');
+  }
+
+  const removedName=ev.refereeNames[index]||`裁判 ${index+1}`;
+  const nextNames=ev.refereeNames.filter((_,i)=>i!==index);
+
+  // 刪除中間某位時，claim 的 index 也要跟著往前移，避免身份對錯人。
+  const oldClaims={...(ev.refereeClaims||{})};
+  const nextClaims={};
+
+  for(const [k,v] of Object.entries(oldClaims)){
+    const oldIndex=Number(k);
+    if(!Number.isInteger(oldIndex))continue;
+    if(oldIndex===index)continue;
+    const newIndex=oldIndex>index?oldIndex-1:oldIndex;
+    nextClaims[String(newIndex)]=v;
+  }
+
+  ev.refereeCount-=1;
+  ev.refereeNames=nextNames;
+  ev.refereeClaims=nextClaims;
+
+  if(getMyReferee()===removedName){
+    localStorage.removeItem(refereeIdentityKey());
+  }
+
+  localEventSave();
+
+  if(!ev.testOnly){
+    try{
+      const updates={
+        [`events/${ev.id}/refereeNames`]:ev.refereeNames,
+        [`events/${ev.id}/refereeCount`]:ev.refereeCount
+      };
+
+      // claims 已搬到獨立節點，因此需要同步整個 claims 物件。
+      updates[`refereeClaims/${ev.id}`]=Object.keys(nextClaims).length?nextClaims:null;
+
+      await cloudUpdate(updates,5000);
+    }catch(e){
+      return alert('刪除裁判失敗：'+(e?.message||e));
+    }
+  }
+
+  renderAdmin();
+  showTab('referee');
+}
+
+
 function setRefereeCount(){
   if(!isAdmin&&!ev?.testOnly)return;
-  let n=Math.round(Number($('refereeCountInput')?.value||2));
+
+  let n=Math.round(Number($('refereeCountInput')?.value||1));
   n=Math.max(1,Math.min(12,n));
+
   normalizeEvent();
+
+  // 舊版相容用；新版畫面不再靠直接輸入人數，改用增加/刪除按鈕。
+  if(n<ev.refereeCount){
+    for(let i=n;i<ev.refereeCount;i++){
+      if(getRefereeClaim(i)){
+        return alert('目前有使用中的裁判，請先釋放後再減少裁判人數。');
+      }
+    }
+  }
+
   ev.refereeCount=n;
   ev.refereeNames=Array.from({length:n},(_,i)=>ev.refereeNames[i]||`裁判 ${i+1}`);
-  put();showTab('referee');
+  put();
+  showTab('referee');
 }
 
 function releaseMyOtherMatches(who){
@@ -5531,7 +5631,7 @@ function renderReferee(){
   };
 
   if(hasOrganizerAccess()){
-    const n=ev.refereeCount||2,me=getMyReferee();
+    const n=ev.refereeCount||1,me=getMyReferee();
     const names=ev.refereeNames.map((name,i)=>{
       const claim=getRefereeClaim(i);
       const claimed=!!claim;
@@ -5539,6 +5639,10 @@ function renderReferee(){
         <span class=num>${i+1}</span>
         <input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}" ${claimed?'disabled':''}>
         ${claimed?`<span class=refClaimState>${isMyRefereeClaim(i)?'你已領取':'使用中'}</span>`:''}
+        ${!claimed && n>1
+          ? `<button type=button class="danger mini" onclick="removeReferee(${i})">刪除</button>`
+          : ''
+        }
       </div>`;
     }).join('');
 
@@ -5563,8 +5667,9 @@ function renderReferee(){
 
     $('refereeTab').innerHTML=`<div class="refCard refSimple"><h3 style="margin-top:0">⚖ 裁判設定</h3>
       <div class=muted>
-        裁判名稱一旦被某支手機領取，其他裁判與主辦手機都不能再選同一個名稱。
-        使用中的裁判會變灰；只有該裁判本人或主辦可以按「釋放」恢復未使用狀態。
+        預設 1 位裁判，需要時可按「增加裁判」逐位新增。
+        未被領取的裁判可以刪除；已被領取的裁判要先按「釋放」才能刪除。
+        裁判名稱一旦被某支手機領取，其他手機不能再選同一個名稱。
       </div>
 
       <div class=refereeListHead style="margin-top:14px">
