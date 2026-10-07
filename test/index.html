@@ -1669,7 +1669,19 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 .registrationLaunch{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:16px;background:var(--panel)}
 .registrationLaunchTop{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .registrationLaunch h3{margin:0 0 5px}.registrationLaunch button{white-space:nowrap}
-.regGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.regList{display:grid;gap:9px;margin-top:12px}
+.regGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.regList{display:grid;gap:9px;margin-top:12px}
+.regGrid>*{min-width:0;max-width:100%}
+.regGrid input,.regGrid select,.regGrid textarea{display:block;width:100%;max-width:100%;min-width:0}
+.regGrid input[type="date"],.regGrid input[type="time"],.regGrid input[type="datetime-local"]{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  -webkit-appearance:none;
+  appearance:none;
+}
+#registrationCreate,#registrationCreate .card{min-width:0;max-width:100%;overflow:hidden}
+html,body{max-width:100%;overflow-x:hidden}
+
 .requiredMark{color:#ff6b57;font-weight:900;margin-left:3px}.fieldHint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
 .regItem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
 .regItemName{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.regMeta{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
@@ -1703,7 +1715,18 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 .importSourceBox{margin-top:10px;padding:11px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
 .importModal{position:fixed;inset:0;z-index:110;background:#0009;display:flex;align-items:flex-end;justify-content:center;padding:12px}.importCard{width:min(620px,100%);max-height:82dvh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:20px 20px 14px 14px;padding:14px;box-shadow:0 20px 60px #0008}
 :root[data-theme="light"] .registrationLaunch,:root[data-theme="light"] .regItem,:root[data-theme="light"] .regPerson,:root[data-theme="light"] .importSourceBox,:root[data-theme="light"] .regLinkBox{background:#fff}
-@media(max-width:640px){.regGrid{grid-template-columns:1fr}.registrationLaunchTop{align-items:flex-start}.regItem{grid-template-columns:1fr}.regActions{width:100%}.regActions button{flex:1}.regPerson{grid-template-columns:30px minmax(0,1fr)}.regPerson>button{grid-column:2}.registrationLaunch{padding:14px}}
+@media(max-width:640px){
+  .regGrid{grid-template-columns:minmax(0,1fr)}
+  #registrationCreate .card{padding-left:14px;padding-right:14px}
+  #registrationCreate input,#registrationCreate select,#registrationCreate textarea{width:100%;max-width:100%;min-width:0}
+  .registrationLaunchTop{align-items:flex-start}
+  .regItem{grid-template-columns:1fr}
+  .regActions{width:100%}
+  .regActions button{flex:1}
+  .regPerson{grid-template-columns:30px minmax(0,1fr)}
+  .regPerson>button{grid-column:2}
+  .registrationLaunch{padding:14px}
+}
 </style>
 
 
@@ -1800,10 +1823,10 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
  <div class="card">
   <div class="regGrid">
    <div><label>活動 / 賽事名稱<span class="requiredMark">*</span></label><input id="regFormTitle" required maxlength="80" placeholder="例如：Beyblade X 秋季盃"></div>
-   <div><label>比賽日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date" onchange="syncRegistrationDeadlineLimit()"></div>
-   <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time"></div>
-   <div><label>開賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time" onchange="syncRegistrationDeadlineLimit()"></div>
-   <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local"><div class="fieldHint">必須早於比賽開賽時間</div></div>
+   <div><label>比賽日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date" onchange="handleRegistrationTimeChange('date')"><div class="fieldHint">不得早於今天</div></div>
+   <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time" onchange="handleRegistrationTimeChange('checkin')"><div class="fieldHint">必須早於比賽時間</div></div>
+   <div><label>比賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time" onchange="handleRegistrationTimeChange('start')"></div>
+   <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local" onchange="handleRegistrationTimeChange('deadline')"><div class="fieldHint">必須在未來，且不得晚於報到時間</div></div>
    <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160"></div>
    <div><label>報名費/人<span class="requiredMark">*</span></label><input id="regFormFee" required type="number" min="0" max="999999" step="1" inputmode="numeric"><div class="fieldHint">0 = 免費</div></div>
    <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
@@ -3147,20 +3170,128 @@ async function openRegistrationCreate(){
   }
   hideMainSections();
   $('registrationCreate').classList.remove('hidden');
+  syncRegistrationTimeRules();
   history.replaceState(null,'',`${location.pathname}?reg=create`);
   window.scrollTo({top:0,behavior:'instant'});
 }
-function syncRegistrationDeadlineLimit(){
-  const date=$('regFormEventDate')?.value||'';
-  const time=$('regFormStartTime')?.value||'';
+function registrationLocalDateString(d=new Date()){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function syncRegistrationTimeRules(){
+  const dateEl=$('regFormEventDate');
+  const checkEl=$('regFormCheckInTime');
+  const startEl=$('regFormStartTime');
   const deadlineEl=$('regFormDeadline');
-  if(!deadlineEl)return;
-  if(date&&time){
-    const maxValue=`${date}T${time}`;
-    deadlineEl.max=maxValue;
-    if(deadlineEl.value && deadlineEl.value>=maxValue)deadlineEl.value='';
+  if(!dateEl||!checkEl||!startEl||!deadlineEl)return;
+
+  const today=registrationLocalDateString();
+  dateEl.min=today;
+
+  const date=dateEl.value||'';
+  const check=checkEl.value||'';
+
+  if(date && check){
+    deadlineEl.max=`${date}T${check}`;
   }else{
     deadlineEl.removeAttribute('max');
+  }
+
+  const now=new Date();
+  now.setSeconds(0,0);
+  const localNow=`${registrationLocalDateString(now)}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  deadlineEl.min=localNow;
+}
+
+function handleRegistrationTimeChange(source){
+  const dateEl=$('regFormEventDate');
+  const checkEl=$('regFormCheckInTime');
+  const startEl=$('regFormStartTime');
+  const deadlineEl=$('regFormDeadline');
+  if(!dateEl||!checkEl||!startEl||!deadlineEl)return;
+
+  const now=Date.now();
+  const today=registrationLocalDateString();
+
+  const clearWithAlert=(el,msg)=>{
+    alert(msg);
+    el.value='';
+    syncRegistrationTimeRules();
+    el.focus();
+    return false;
+  };
+
+  // 先檢查剛剛被使用者改動的欄位；不合法就直接清空該欄位。
+  if(source==='date' && dateEl.value && dateEl.value<today){
+    return clearWithAlert(dateEl,'比賽日期不能早於今天。\n\n此欄位已恢復為未設定。');
+  }
+
+  const date=dateEl.value||'';
+  const check=checkEl.value||'';
+  const start=startEl.value||'';
+  const deadlineValue=deadlineEl.value||'';
+
+  const checkTs=(date&&check)?new Date(`${date}T${check}`).getTime():NaN;
+  const startTs=(date&&start)?new Date(`${date}T${start}`).getTime():NaN;
+  const deadlineTs=deadlineValue?new Date(deadlineValue).getTime():NaN;
+
+  if(source==='checkin' && date && check && Number.isFinite(checkTs) && checkTs<=now){
+    return clearWithAlert(checkEl,'報到時間必須晚於現在。\n\n此欄位已恢復為未設定。');
+  }
+
+  if(source==='start' && date && start && Number.isFinite(startTs) && startTs<=now){
+    return clearWithAlert(startEl,'比賽時間必須晚於現在。\n\n此欄位已恢復為未設定。');
+  }
+
+  if(source==='checkin' && check && start && check>=start){
+    return clearWithAlert(checkEl,'報到時間必須早於比賽時間。\n\n此欄位已恢復為未設定。');
+  }
+
+  if(source==='start' && check && start && start<=check){
+    return clearWithAlert(startEl,'比賽時間必須晚於報到時間。\n\n此欄位已恢復為未設定。');
+  }
+
+  if(source==='deadline' && deadlineValue && (!Number.isFinite(deadlineTs) || deadlineTs<=now)){
+    return clearWithAlert(deadlineEl,'報名截止時間必須晚於現在。\n\n此欄位已恢復為未設定。');
+  }
+
+  if(source==='deadline' && deadlineValue && Number.isFinite(checkTs) && deadlineTs>checkTs){
+    return clearWithAlert(deadlineEl,'報名截止時間不能晚於報到時間。\n\n可以等於報到時間。\n\n此欄位已恢復為未設定。');
+  }
+
+  // 改動日期或其他時間後，也重新檢查已經填好的相關欄位。
+  const cleared=[];
+  if(date && check && Number.isFinite(checkTs) && checkTs<=now){
+    checkEl.value='';
+    cleared.push('報到時間');
+  }
+  if(date && start && Number.isFinite(startTs) && startTs<=now){
+    startEl.value='';
+    cleared.push('比賽時間');
+  }
+
+  const checkNow=checkEl.value||'';
+  const startNow=startEl.value||'';
+  if(checkNow && startNow && checkNow>=startNow){
+    // 如果不是剛改報到或比賽時間，優先清掉比賽時間，保留較前面的報到時間。
+    startEl.value='';
+    cleared.push('比賽時間');
+  }
+
+  const effectiveCheckTs=(dateEl.value&&checkEl.value)?new Date(`${dateEl.value}T${checkEl.value}`).getTime():NaN;
+  if(deadlineEl.value){
+    const dTs=new Date(deadlineEl.value).getTime();
+    if(!Number.isFinite(dTs) || dTs<=now || (Number.isFinite(effectiveCheckTs)&&dTs>effectiveCheckTs)){
+      deadlineEl.value='';
+      cleared.push('報名截止時間');
+    }
+  }
+
+  syncRegistrationTimeRules();
+
+  if(cleared.length){
+    const uniq=[...new Set(cleared)];
+    alert(`因為新的時間設定不符合規則，以下欄位已恢復為未設定：\n\n${uniq.join('、')}\n\n規則：報名截止 ≤ 報到時間 < 比賽時間。`);
   }
 }
 let registrationCreateBusy=false;
@@ -3176,10 +3307,13 @@ async function createRegistrationForm(){
   if(!title)throw new Error('請輸入活動 / 賽事名稱。');
   const eventDate=$('regFormEventDate').value;
   if(!eventDate)throw new Error('請選擇比賽日期。');
+  const today=registrationLocalDateString();
+  if(eventDate<today)throw new Error('比賽日期不能早於今天。');
   const checkInTime=$('regFormCheckInTime').value;
   if(!checkInTime)throw new Error('請設定報到時間。');
   const startTime=$('regFormStartTime').value;
-  if(!startTime)throw new Error('請設定開賽時間。');
+  if(!startTime)throw new Error('請設定比賽時間。');
+  if(checkInTime>=startTime)throw new Error('報到時間必須早於比賽時間。');
   const address=$('regFormAddress').value.trim();
   if(!address)throw new Error('請輸入舉辦地址 or 店面名稱。');
   const feeRaw=$('regFormFee').value.trim();
@@ -3196,13 +3330,16 @@ async function createRegistrationForm(){
   const d=$('regFormDeadline').value;
   if(!d)throw new Error('請設定報名截止時間。');
   const deadline=new Date(d).getTime();
-  if(!Number.isFinite(deadline)||deadline<=Date.now())throw new Error('報名截止時間必須在未來。');
-  const eventStart=new Date(`${eventDate}T${startTime}`).getTime();
-  if(!Number.isFinite(eventStart))throw new Error('比賽日期或開賽時間格式不正確。');
-  if(deadline>=eventStart)throw new Error('報名截止時間必須早於比賽開賽時間。');
-  const id='REG-'+uid()+uid().slice(0,3);
   const now=Date.now();
-  const form={id,title,eventDate,checkInTime,startTime,eventStart,address,fee,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
+  if(!Number.isFinite(deadline)||deadline<=now)throw new Error('報名截止時間必須在未來。');
+  const eventCheckIn=new Date(`${eventDate}T${checkInTime}`).getTime();
+  const eventStart=new Date(`${eventDate}T${startTime}`).getTime();
+  if(!Number.isFinite(eventCheckIn)||!Number.isFinite(eventStart))throw new Error('比賽日期、報到時間或比賽時間格式不正確。');
+  if(eventCheckIn<=now)throw new Error('報到時間必須晚於現在。');
+  if(eventStart<=eventCheckIn)throw new Error('比賽時間必須晚於報到時間。');
+  if(deadline>eventCheckIn)throw new Error('報名截止時間不能晚於報到時間，可以等於報到時間。');
+  const id='REG-'+uid()+uid().slice(0,3);
+  const form={id,title,eventDate,checkInTime,startTime,eventCheckIn,eventStart,address,fee,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
     await cloudUpdate({[`registrationForms/${id}`]:form,[`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`]:true},3500);
     registrationFormCache[id]=form;
     $('regFormTitle').value='';
@@ -3291,7 +3428,7 @@ async function loadRegistrationAdmin(id){
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份報名表的建立者。');
     activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
     $('regAdminTitle').textContent=form.title;
-    $('regAdminMeta').textContent=`${form.eventDate?`比賽日期 ${form.eventDate}｜`:''}${form.checkInTime?`報到 ${form.checkInTime}｜`:''}${form.startTime?`開賽 ${form.startTime}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${Number.isFinite(Number(form.fee))?`｜報名費 ${Number(form.fee)===0?'免費':`NT$ ${Number(form.fee)} / 人`}`:''}${form.deadline?`｜報名截止 ${formatRegDate(form.deadline)}`:''}`;
+    $('regAdminMeta').textContent=`${form.eventDate?`比賽日期 ${form.eventDate}｜`:''}${form.checkInTime?`報到 ${form.checkInTime}｜`:''}${form.startTime?`比賽 ${form.startTime}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${Number.isFinite(Number(form.fee))?`｜報名費 ${Number(form.fee)===0?'免費':`NT$ ${Number(form.fee)} / 人`}`:''}${form.deadline?`｜報名截止 ${formatRegDate(form.deadline)}`:''}`;
     $('regShareUrl').textContent=regPublicUrl(id);
     $('regToggleOpenBtn').textContent=form.open!==false?'關閉報名':'重新開放';
     renderRegistrationList();
@@ -3352,7 +3489,7 @@ async function openPublicRegistration(formId){
     const checkInBox=$('regPublicCheckIn');
     checkInBox.classList.toggle('hidden',!f.checkInTime);checkInBox.textContent=f.checkInTime?`🕘 報到時間：${f.checkInTime}`:'';
     const startBox=$('regPublicStart');
-    startBox.classList.toggle('hidden',!f.startTime);startBox.textContent=f.startTime?`🕤 開賽時間：${f.startTime}`:'';
+    startBox.classList.toggle('hidden',!f.startTime);startBox.textContent=f.startTime?`🕤 比賽時間：${f.startTime}`:'';
     const addr=$('regPublicAddress');
     addr.classList.toggle('hidden',!f.address);addr.textContent=f.address?`📍 舉辦地點 / 店面名稱：${f.address}`:'';
     const feeBox=$('regPublicFee');
