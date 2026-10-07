@@ -1675,7 +1675,27 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 .regItemName{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.regMeta{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
 .regActions{display:flex;gap:7px;flex-wrap:wrap}.regActions button{padding:8px 10px;font-size:13px}.regStatRow{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
 .regStat{padding:6px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:12px;color:var(--muted)}
-.regPublicHero{text-align:center;padding:24px 16px}.regPublicHero h2{margin:0 0 8px}.regPublicForm{max-width:620px;margin:0 auto}.regPublicForm textarea{min-height:90px}
+.regPublicHero{text-align:center;padding:26px 16px;background:linear-gradient(180deg,var(--panel),var(--panel2));border-color:color-mix(in srgb,var(--accent) 24%,var(--line))}
+.regPublicHero .muted:first-child{letter-spacing:.08em;text-transform:none;font-weight:750}
+.regPublicHero h2{margin:5px 0 10px;font-size:30px;line-height:1.15}
+.regPublicHero #regPublicStatus{display:inline-flex;justify-content:center;align-items:center;padding:7px 11px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:12px;line-height:1.4}
+.regPublicForm{max-width:620px;margin:0 auto}.regPublicForm textarea{min-height:90px}
+.regPublicInfo{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}
+.regPublicInfo .regLinkBox{margin:0!important;padding:13px 14px;border-style:solid;border-radius:14px;background:linear-gradient(180deg,color-mix(in srgb,var(--panel2) 88%,transparent),var(--panel2));font-size:14px;font-weight:750;line-height:1.45;word-break:break-word;box-shadow:0 1px 0 rgba(255,255,255,.02) inset}
+.regPublicInfo #regPublicAddress{grid-column:1/-1}
+.regPublicInfo #regPublicFee{grid-column:1/-1}
+.regPublicDescWrap{margin:2px 0 16px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--panel2)}
+.regPublicDescTitle{font-size:13px;font-weight:900;margin-bottom:9px;color:var(--text)}
+.regPublicDescWrap #regPublicDesc{margin:0!important;border:0;background:transparent;padding:0;color:var(--text);font-size:13px;line-height:1.7}
+.regPublicEntryTitle{display:flex;align-items:center;gap:8px;margin:18px 0 2px;font-size:16px;font-weight:900}
+.regPublicEntryTitle:before{content:"✍️";font-size:18px}
+:root[data-theme="light"] .regPublicInfo .regLinkBox,:root[data-theme="light"] .regPublicDescWrap{background:#fff}
+@media(max-width:520px){
+  .regPublicInfo{grid-template-columns:1fr 1fr;gap:8px}
+  .regPublicInfo .regLinkBox{padding:12px 11px;font-size:13px}
+  .regPublicInfo #regPublicAddress,.regPublicInfo #regPublicFee{grid-column:1/-1}
+  .regPublicHero h2{font-size:28px}
+}
 .regPerson{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
 .regPerson input[type=checkbox]{width:22px;height:22px}.regPerson .name{font-weight:850}.regPerson .detail{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}.regNo{font-size:12px;color:var(--muted);text-align:center}
 .regStickyTools{position:sticky;bottom:10px;z-index:5;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(10px)}
@@ -1780,20 +1800,30 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
  <div class="card">
   <div class="regGrid">
    <div><label>活動 / 賽事名稱<span class="requiredMark">*</span></label><input id="regFormTitle" required maxlength="80" placeholder="例如：Beyblade X 秋季盃"></div>
-   <div><label>舉辦日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date"></div>
-   <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160" placeholder="例如：淡水戰鬥陀螺館／新北市淡水區○○路 123 號"></div>
+   <div><label>比賽日期<span class="requiredMark">*</span></label><input id="regFormEventDate" required type="date"></div>
+   <div><label>報到時間<span class="requiredMark">*</span></label><input id="regFormCheckInTime" required type="time"></div>
+   <div><label>開賽時間<span class="requiredMark">*</span></label><input id="regFormStartTime" required type="time"></div>
+   <div><label>舉辦地址 or 店面名稱<span class="requiredMark">*</span></label><input id="regFormAddress" required maxlength="160" placeholder="例如：漁藏／新北市淡水區中山北路 255 號"></div>
+   <div><label>報名費（選填）</label><input id="regFormFee" maxlength="60" placeholder="例如：NT$ 300／人 或 免費"></div>
    <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
    <div><label>備選人數上限（選填）</label><input id="regFormWaitlistMax" type="number" min="0" max="256" placeholder="例如：8；不需要備選可留空"></div>
    <div><label>報名截止時間<span class="requiredMark">*</span></label><input id="regFormDeadline" required type="datetime-local"></div>
   </div>
-  <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="8" maxlength="1000" placeholder="例如：
-🏆 大會獎項
-📅 比賽日期、報到時間、開賽時間
-📍 比賽地點
-💰 報名費用
-⚠️ 注意事項
+  <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="10" maxlength="3000" placeholder="例如：
+🏆【大會獎項】
+第一名：...
+第二名：...
 
-可直接貼上平常在 LINE 群組使用的宣傳內容。"></textarea>
+📅 比賽日期：2026/10/08
+🕘 報到時間：21:00 - 21:30
+🕤 開賽時間：21:30
+📍 比賽地點：新北市淡水區...
+💰 報名費用：NT$ 300／人
+⚠️ 注意事項：
+1. ...
+2. ...
+
+可直接貼上平常在 LINE 群組使用的完整宣傳內容。"></textarea>
   <div class="toolbar" style="margin-top:12px">
    <button type="button" class="secondary" onclick="openRegistrationHub()">取消</button>
    <button type="button" onclick="createRegistrationForm()">建立報名表</button>
@@ -1804,9 +1834,18 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 <section id="registrationPublic" class="hidden">
  <div class="card regPublicHero"><div class="muted">Beyblade X 線上報名</div><h2 id="regPublicTitle">報名表</h2><div id="regPublicStatus" class="muted"></div></div>
  <div class="card regPublicForm">
-  <div id="regPublicDesc" class="notice hidden" style="margin-bottom:12px;white-space:pre-wrap"></div>
-  <div id="regPublicDate" class="regLinkBox hidden" style="margin-bottom:8px"></div>
-  <div id="regPublicAddress" class="regLinkBox hidden" style="margin-bottom:12px"></div>
+  <div class="regPublicInfo">
+   <div id="regPublicDate" class="regLinkBox hidden"></div>
+   <div id="regPublicCheckIn" class="regLinkBox hidden"></div>
+   <div id="regPublicStart" class="regLinkBox hidden"></div>
+   <div id="regPublicAddress" class="regLinkBox hidden"></div>
+   <div id="regPublicFee" class="regLinkBox hidden"></div>
+  </div>
+  <div id="regPublicDescWrap" class="regPublicDescWrap hidden">
+   <div class="regPublicDescTitle">📣 賽事公告 / 宣傳內容</div>
+   <div id="regPublicDesc" style="white-space:pre-wrap"></div>
+  </div>
+  <div class="regPublicEntryTitle">填寫報名資料</div>
   <label>選手名稱 *</label><input id="regPlayerName" maxlength="40" placeholder="比賽現場使用的名稱">
   <label>手機後三碼 *</label><input id="regPhoneLast3" type="tel" inputmode="numeric" maxlength="3" pattern="[0-9]{3}" placeholder="例如：168">
   <button id="regSubmitBtn" type="button" style="width:100%;margin-top:14px;padding:14px" onclick="submitRegistration()">送出報名</button>
@@ -3125,9 +3164,14 @@ async function createRegistrationForm(){
   const title=$('regFormTitle').value.trim();
   if(!title)return alert('請輸入活動 / 賽事名稱。');
   const eventDate=$('regFormEventDate').value;
-  if(!eventDate)return alert('請選擇舉辦日期。');
+  if(!eventDate)return alert('請選擇比賽日期。');
+  const checkInTime=$('regFormCheckInTime').value;
+  if(!checkInTime)return alert('請設定報到時間。');
+  const startTime=$('regFormStartTime').value;
+  if(!startTime)return alert('請設定開賽時間。');
   const address=$('regFormAddress').value.trim();
   if(!address)return alert('請輸入舉辦地址 or 店面名稱。');
+  const fee=$('regFormFee').value.trim();
   const maxRaw=$('regFormMax').value.trim();
   if(!maxRaw)return alert('請輸入正選人數上限。');
   const maxPlayers=Number(maxRaw);
@@ -3141,13 +3185,16 @@ async function createRegistrationForm(){
   if(!Number.isFinite(deadline)||deadline<=Date.now())return alert('報名截止時間必須在未來。');
   const id='REG-'+uid()+uid().slice(0,3);
   const now=Date.now();
-  const form={id,title,eventDate,address,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
+  const form={id,title,eventDate,checkInTime,startTime,address,fee,description:$('regFormDesc').value.trim(),maxPlayers,waitlistMax,deadline,open:true,ownerUid:fbAuth.currentUser.uid,created:now};
   try{
     await cloudUpdate({[`registrationForms/${id}`]:form,[`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`]:true},7000);
     registrationFormCache[id]=form;
     $('regFormTitle').value='';
     $('regFormEventDate').value='';
     $('regFormAddress').value='';
+    $('regFormCheckInTime').value='';
+    $('regFormStartTime').value='';
+    $('regFormFee').value='';
     $('regFormDesc').value='';
     $('regFormDeadline').value='';
     $('regFormMax').value='24';
@@ -3168,7 +3215,7 @@ async function loadMyRegistrationForms(){
     }
     rows.sort((a,b)=>(b.created||0)-(a.created||0));
     badge.textContent=rows.length+' 份';
-    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">${f.eventDate?`📅 ${esc(f.eventDate)}｜`:''}正選 ${Number(f.maxPlayers)||0} 人${Number(f.waitlistMax)>0?`｜備選 ${Number(f.waitlistMax)} 人`:''}｜${f.open!==false?'🟢 報名中':'⚪ 已關閉'}${f.deadline?`｜截止 ${esc(formatRegDate(f.deadline))}`:''}</div></div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有報名表。</div>';
+    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">${f.eventDate?`📅 比賽日期 ${esc(f.eventDate)}｜`:''}正選 ${Number(f.maxPlayers)||0} 人${Number(f.waitlistMax)>0?`｜備選 ${Number(f.waitlistMax)} 人`:''}｜${f.open!==false?'🟢 報名中':'⚪ 已關閉'}${f.deadline?`｜報名截止 ${esc(formatRegDate(f.deadline))}`:''}</div></div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有報名表。</div>';
   }catch(e){box.innerHTML=`<div class="notice">讀取失敗：${esc(e?.message||e)}</div>`}
 }
 async function deleteRegistrationForm(id){
@@ -3222,7 +3269,7 @@ async function loadRegistrationAdmin(id){
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份報名表的建立者。');
     activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
     $('regAdminTitle').textContent=form.title;
-    $('regAdminMeta').textContent=`${form.eventDate?`日期 ${form.eventDate}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${form.deadline?`｜截止 ${formatRegDate(form.deadline)}`:''}`;
+    $('regAdminMeta').textContent=`${form.eventDate?`比賽日期 ${form.eventDate}｜`:''}${form.checkInTime?`報到 ${form.checkInTime}｜`:''}${form.startTime?`開賽 ${form.startTime}｜`:''}正選 ${Number(form.maxPlayers)||0} 人${Number(form.waitlistMax)>0?`｜備選 ${Number(form.waitlistMax)} 人`:''}${form.address?`｜${form.address}`:''}${form.fee?`｜報名費 ${form.fee}`:''}${form.deadline?`｜報名截止 ${formatRegDate(form.deadline)}`:''}`;
     $('regShareUrl').textContent=regPublicUrl(id);
     $('regToggleOpenBtn').textContent=form.open!==false?'關閉報名':'重新開放';
     renderRegistrationList();
@@ -3277,12 +3324,20 @@ async function openPublicRegistration(formId){
     const maxPlayers=Number(f.maxPlayers)||0, waitlistMax=Number(f.waitlistMax)||0;
     const timeClosed=Number(f.deadline||0)>0 && Number(f.deadline)<Date.now();
     const closed=f.open===false || timeClosed;
-    $('regPublicStatus').textContent=closed?'報名已截止':`截止：${formatRegDate(f.deadline)}｜正選上限 ${maxPlayers} 人${waitlistMax>0?`｜備選上限 ${waitlistMax} 人`:''}`;
+    $('regPublicStatus').textContent=closed?'報名已截止':`報名截止：${formatRegDate(f.deadline)}｜正選上限 ${maxPlayers} 人${waitlistMax>0?`｜備選上限 ${waitlistMax} 人`:''}`;
     const dateBox=$('regPublicDate');
-    dateBox.classList.toggle('hidden',!f.eventDate);dateBox.textContent=f.eventDate?`📅 舉辦日期：${f.eventDate}`:'';
+    dateBox.classList.toggle('hidden',!f.eventDate);dateBox.textContent=f.eventDate?`📅 比賽日期：${f.eventDate}`:'';
+    const checkInBox=$('regPublicCheckIn');
+    checkInBox.classList.toggle('hidden',!f.checkInTime);checkInBox.textContent=f.checkInTime?`🕘 報到時間：${f.checkInTime}`:'';
+    const startBox=$('regPublicStart');
+    startBox.classList.toggle('hidden',!f.startTime);startBox.textContent=f.startTime?`🕤 開賽時間：${f.startTime}`:'';
     const addr=$('regPublicAddress');
-    addr.classList.toggle('hidden',!f.address);addr.textContent=f.address?`📍 舉辦地址 / 店面名稱：${f.address}`:'';
-    $('regPublicDesc').classList.toggle('hidden',!f.description);$('regPublicDesc').textContent=f.description||'';
+    addr.classList.toggle('hidden',!f.address);addr.textContent=f.address?`📍 舉辦地點 / 店面名稱：${f.address}`:'';
+    const feeBox=$('regPublicFee');
+    feeBox.classList.toggle('hidden',!f.fee);feeBox.textContent=f.fee?`💰 報名費：${f.fee}`:'';
+    const descWrap=$('regPublicDescWrap');
+    descWrap.classList.toggle('hidden',!f.description);
+    $('regPublicDesc').textContent=f.description||'';
     $('regSubmitBtn').disabled=closed;$('regSubmitBtn').textContent=closed?'報名已截止':'送出報名';
     $('regSubmitResult').textContent='';
   }catch(e){$('regPublicStatus').textContent='無法讀取報名表';$('regSubmitBtn').disabled=true;$('regSubmitResult').textContent=e?.message||e}
