@@ -43,7 +43,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .bracketScroll{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 14px 26px;min-height:420px}.bracketStage{position:relative;min-width:1px;min-height:1px}.bracketCanvas{position:relative;display:flex;align-items:flex-start;gap:48px;width:max-content;transform-origin:top left;padding:8px 20px 28px 6px}.bracketLinks{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:0}.bracketLinks path{fill:none;stroke:#53627c;stroke-width:2;vector-effect:non-scaling-stroke}.bracketLinks path.live{stroke:#b7842d}
 .roundCol{position:relative;width:204px;flex:0 0 204px;z-index:1}.roundHead{min-height:54px;padding:4px 4px 10px;background:linear-gradient(180deg,#0b0d12 68%,transparent);position:relative;top:auto;z-index:2;margin-bottom:8px;pointer-events:none}.roundHead h3{margin:0;font-size:17px;line-height:1.1}.roundHead .roundSub{color:var(--muted);font-size:11px;margin-top:5px}.roundCol:first-of-type .roundHead h3{color:#ff8b74}.roundCol:nth-of-type(2) .roundHead h3,.roundCol:nth-of-type(3) .roundHead h3{color:#7cb8ff}
 .roundMatches{display:flex;flex-direction:column;gap:var(--gap,16px);padding-top:var(--top,0px)}
-.bracketMatch{position:relative;width:100%;height:112px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:13px;padding:8px 9px;text-align:left;color:var(--text);box-shadow:0 8px 22px #0004;cursor:pointer}.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 8px 22px #0004}.bracketMatch:hover{border-color:#62718b}.bracketMatch.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite;box-shadow:0 0 0 1px #ffd45a55 inset,0 0 22px #ffd45a55,0 8px 22px #0005}@keyframes judgePulse{0%,100%{box-shadow:0 0 0 1px #ffd45a44 inset,0 0 8px #ffd45a22,0 8px 22px #0005}50%{box-shadow:0 0 0 2px #ffd45aaa inset,0 0 26px #ffd45a99,0 8px 22px #0005}}.bracketMatch .matchNo{height:18px;line-height:18px;margin:0 62px 4px 0}.bSide{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;align-items:center;height:34px;padding:4px 6px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:13px;line-height:1.15}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bScore{display:flex;align-items:center;justify-content:center;width:36px;height:24px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px;line-height:1}.bSide.winner .bScore{border-color:#a8672e;color:#ffb371}.winnerDot{flex:0 0 auto;font-size:10px;color:#ff9b54}.tapEdit{position:absolute;right:8px;top:7px;color:#7c879a;font-size:10px}.refTag{position:absolute;left:9px;right:9px;bottom:4px;display:block;max-width:calc(100% - 18px);padding:2px 6px;border:1px solid #334158;border-radius:999px;background:#0d131c;color:#9fb0c8;font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.refTag.on{border-color:#6c5630;color:#f0c27a;background:#211a11}.refTag.live{border-color:#ffd45a;color:#ffe9a6;background:#342b12;font-weight:800}.bracketMatch.judging .bSide:last-of-type{margin-bottom:17px}
+.bracketMatch{position:relative;width:100%;height:112px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:13px;padding:8px 9px;text-align:left;color:var(--text);box-shadow:0 8px 22px #0004;cursor:pointer}.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 8px 22px #0004}.bracketMatch:hover{border-color:#62718b}.bracketMatch.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite;box-shadow:0 0 0 1px #ffd45a55 inset,0 0 22px #ffd45a55,0 8px 22px #0005}@keyframes judgePulse{0%,100%{box-shadow:0 0 0 1px #ffd45a44 inset,0 0 8px #ffd45a22,0 8px 22px #0005}50%{box-shadow:0 0 0 2px #ffd45aaa inset,0 0 26px #ffd45a99,0 8px 22px #0005}}.bracketMatch .matchNo{height:18px;line-height:18px;margin:0 62px 4px 0}.bSide{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;align-items:center;height:34px;padding:4px 6px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bSide.pending{opacity:.48}.bSide.pending .playerLabel{font-style:italic}.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:13px;line-height:1.15}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bScore{display:flex;align-items:center;justify-content:center;width:36px;height:24px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px;line-height:1}.bSide.winner .bScore{border-color:#a8672e;color:#ffb371}.winnerDot{flex:0 0 auto;font-size:10px;color:#ff9b54}.tapEdit{position:absolute;right:8px;top:7px;color:#7c879a;font-size:10px}.refTag{position:absolute;left:9px;right:9px;bottom:4px;display:block;max-width:calc(100% - 18px);padding:2px 6px;border:1px solid #334158;border-radius:999px;background:#0d131c;color:#9fb0c8;font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.refTag.on{border-color:#6c5630;color:#f0c27a;background:#211a11}.refTag.live{border-color:#ffd45a;color:#ffe9a6;background:#342b12;font-weight:800}.bracketMatch.judging .bSide:last-of-type{margin-bottom:17px}
 .rrCol{position:relative;width:236px;flex:0 0 236px;z-index:1}.rrPanel{background:linear-gradient(180deg,#281e14,#141820);border:1px solid #855521;border-radius:15px;padding:12px;box-shadow:0 0 25px #ff8a2a18}.rrPlayers{margin:0}.rrRow{display:grid;grid-template-columns:24px 1fr auto;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #4a3827;font-size:12px}.rrRank{font-weight:900;color:#ffb45f}.rrGames{display:grid;gap:8px;margin-top:10px}.rrMini{background:#141a24;border:1px solid #3c465a;border-radius:10px;padding:8px;font-size:11px;display:flex;justify-content:space-between;gap:8px}.rrMini b{font-weight:700}.rrMini span{color:var(--muted)}.rrMini.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite}
 .matchModal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#0009;padding:16px}.matchSheet{width:min(520px,100%);background:#151a24;border:1px solid #3a465b;border-radius:20px 20px 16px 16px;padding:16px;box-shadow:0 20px 60px #000a}.sheetHandle{width:46px;height:5px;border-radius:999px;background:#3d4657;margin:0 auto 12px}.sheetTitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.sheetTitle h3{margin:0}.sheetClose{background:#222a38;border:1px solid #3b4658;padding:8px 10px}.sheetPlayer{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;padding:10px 0}.sheetPlayer+.sheetPlayer{border-top:1px solid #2b3444}.sheetPlayer input{text-align:center}.sheetRef{display:grid;grid-template-columns:92px 1fr;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #2b3444}.sheetRef select{min-width:0}.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sheetActions button{min-width:0}.sheetFooter{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.scorePickBtn{width:72px;height:52px;border:1px solid #3b4658;background:#0f141d;color:#f7f8fa;border-radius:14px;font-size:15px;line-height:1;white-space:nowrap;font-weight:800;display:flex;align-items:center;justify-content:center}.scorePickBtn.hasValue{border-color:#ff7d45;background:#2b1c15;color:#ffb17e}.scorePickerPop{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:#0007;padding:16px}.scorePickerCard{width:min(420px,100%);background:#171d28;border:1px solid #3a465b;border-radius:18px;padding:14px;box-shadow:0 20px 60px #000b}.scorePickerTitle{font-size:13px;color:#aeb7c6;margin-bottom:10px;text-align:center}.scoreGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.scoreGrid button{min-height:54px;font-size:22px;border-radius:14px}.scoreClear{width:100%;margin-top:10px;background:#202838;border:1px solid #3a465b;color:#d5dbe5}
 .resetChoiceModal{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:#0009;padding:20px}
@@ -4884,22 +4884,137 @@ function buildFirst(){
  } else {
    for(let i=0;i<r.length;i+=2)slots.push(match(r[i],r[i+1]||'BYE'));
  }
- autoByes(slots); ev.rounds=[{name:'第 1 輪',matches:slots}]
+ autoByes(slots);
+ ev.rounds=[{name:'第 1 輪',matches:slots}];
+
+ // 建立賽事時就先把後續淘汰樹架好，尚未出線的位置顯示「待定」。
+ // 每一場一確定勝者，就會立即填入下一輪對應位置。
+ ensureNext();
 }
 function match(a,b){return {a:a||'BYE',b:b||'BYE',sa:'',sb:'',winner:null,referee:'',refereeActive:false}}
-function autoByes(ms){ms.forEach(m=>{if(m.a==='BYE'&&m.b!=='BYE')m.winner=m.b;if(m.b==='BYE'&&m.a!=='BYE')m.winner=m.a})}
+function pendingMatch(){return match('待定','待定')}
+function autoByes(ms){ms.forEach(m=>{if(m.a==='BYE'&&m.b!=='BYE'&&m.b!=='待定')m.winner=m.b;if(m.b==='BYE'&&m.a!=='BYE'&&m.a!=='待定')m.winner=m.a})}
 function winners(r){return r.matches.map(m=>m.winner).filter(Boolean)}
 function complete(r){return r.matches.every(m=>m.winner)}
+
+function resetMatchForParticipants(m,a,b){
+  const nextA=a||'待定';
+  const nextB=b||'待定';
+  const changed=m.a!==nextA || m.b!==nextB;
+
+  if(changed){
+    m.a=nextA;
+    m.b=nextB;
+    m.sa='';
+    m.sb='';
+    m.winner=null;
+    m.referee='';
+    m.refereeActive=false;
+    delete m._previousWinner;
+  }
+
+  if(m.a==='BYE'&&m.b!=='BYE'&&m.b!=='待定'){
+    m.winner=m.b;
+  }else if(m.b==='BYE'&&m.a!=='BYE'&&m.a!=='待定'){
+    m.winner=m.a;
+  }
+
+  return changed;
+}
+
 function ensureNext(){
- let last=ev.rounds.at(-1); if(!complete(last)||ev.finalRR)return;
- let w=winners(last);
- if(ev.mode==='free'&&ev.freeFinal==='rr3'&&w.length===3){ev.finalRR={players:w,matches:[match(w[0],w[1]),match(w[1],w[2]),match(w[0],w[2])]};return}
- if(w.length===1)return;
- let ms=[];for(let i=0;i<w.length;i+=2)ms.push(match(w[i],w[i+1]||'BYE'));autoByes(ms);ev.rounds.push({name:`第 ${ev.rounds.length+1} 輪`,matches:ms});
- if(complete(ev.rounds.at(-1)))ensureNext()
+  if(!ev?.rounds?.length)return false;
+
+  let changed=false;
+  let ri=0;
+
+  while(ri<ev.rounds.length){
+    const current=ev.rounds[ri];
+    const currentCount=current?.matches?.length||0;
+    if(!currentCount)break;
+
+    const rr3Stop=ev.mode==='free' && ev.freeFinal==='rr3' && currentCount<=3;
+    const championStop=currentCount<=1;
+
+    if(rr3Stop){
+      const w=winners(current);
+      if(complete(current) && w.length===3){
+        const samePlayers=ev.finalRR &&
+          Array.isArray(ev.finalRR.players) &&
+          ev.finalRR.players.length===3 &&
+          ev.finalRR.players.every((p,i)=>p===w[i]);
+
+        if(!samePlayers){
+          ev.finalRR={
+            players:[...w],
+            matches:[
+              match(w[0],w[1]),
+              match(w[1],w[2]),
+              match(w[0],w[2])
+            ]
+          };
+          changed=true;
+        }
+      }else if(ev.finalRR){
+        // 上游結果被修改後，三人尚未全部確定時先撤掉舊循環賽。
+        ev.finalRR=null;
+        changed=true;
+      }
+      break;
+    }
+
+    if(championStop)break;
+
+    const nextCount=Math.ceil(currentCount/2);
+    let next=ev.rounds[ri+1];
+
+    if(!next){
+      next={
+        name:`第 ${ri+2} 輪`,
+        matches:Array.from({length:nextCount},()=>pendingMatch())
+      };
+      ev.rounds.push(next);
+      changed=true;
+    }else{
+      if(!Array.isArray(next.matches))next.matches=[];
+      while(next.matches.length<nextCount){
+        next.matches.push(pendingMatch());
+        changed=true;
+      }
+      if(next.matches.length>nextCount){
+        next.matches=next.matches.slice(0,nextCount);
+        changed=true;
+      }
+      next.name=`第 ${ri+2} 輪`;
+    }
+
+    for(let mi=0;mi<nextCount;mi++){
+      const sourceA=current.matches[mi*2];
+      const sourceB=current.matches[mi*2+1];
+
+      const a=sourceA
+        ? (sourceA.winner || '待定')
+        : 'BYE';
+      const b=sourceB
+        ? (sourceB.winner || '待定')
+        : 'BYE';
+
+      if(resetMatchForParticipants(next.matches[mi],a,b))changed=true;
+    }
+
+    ri++;
+  }
+
+  return changed;
 }
 function pick(ri,mi,side){
- let m=ev.rounds[ri].matches[mi],v=side==='a'?m.a:m.b;if(v==='BYE')return;m.winner=v;m.refereeActive=false;m.referee='';put();ensureNext();put()
+ let m=ev.rounds[ri].matches[mi],v=side==='a'?m.a:m.b;
+ if(v==='BYE'||v==='待定')return;
+ m.winner=v;
+ m.refereeActive=false;
+ m.referee='';
+ ensureNext();
+ put();
 }
 function score(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
@@ -5112,11 +5227,13 @@ function roundLayout(ri){
   return {top:Math.round((pitch/2)*(mult-1)),gap:Math.max(16,Math.round(pitch*mult-cardH))};
 }
 function renderBracketMatch(m,ri,mi){
-  const scoreA=m.sa===''?'–':m.sa, scoreB=m.sb===''?'–':m.sb;
-  const canEdit=isAdmin||isReferee||!!ev?.testOnly;
-  return `<button type="button" class="bracketMatch ${m.winner?'done':''} ${m.refereeActive?'judging':''}" data-ri="${ri}" data-mi="${mi}" ${canEdit?`onclick="openMatchEditor(${ri},${mi})"`:'aria-disabled="true"'}><span class=tapEdit>${canEdit?'點擊編輯':'觀看'}</span><div class=matchNo>第 ${mi+1} 場</div>
-    <div class="bSide ${m.winner===m.a?'winner':''}"><span class=bName>${m.winner===m.a?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.a)}</span></span><span class=bScore>${esc(scoreA)}</span></div>
-    <div class="bSide ${m.winner===m.b?'winner':''}"><span class=bName>${m.winner===m.b?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.b)}</span></span><span class=bScore>${esc(scoreB)}</span></div>${m.refereeActive?`<span class="refTag live">⚖ 執裁中：${esc(m.referee)}</span>`:''}</button>`;
+  const pendingA=m.a==='待定', pendingB=m.b==='待定';
+  const scoreA=pendingA?'':(m.sa===''?'–':m.sa);
+  const scoreB=pendingB?'':(m.sb===''?'–':m.sb);
+  const canEdit=(isAdmin||isReferee||!!ev?.testOnly) && !pendingA && !pendingB;
+  return `<button type="button" class="bracketMatch ${m.winner?'done':''} ${m.refereeActive?'judging':''}" data-ri="${ri}" data-mi="${mi}" ${canEdit?`onclick="openMatchEditor(${ri},${mi})"`:'aria-disabled="true"'}><span class=tapEdit>${canEdit?'點擊編輯':(pendingA||pendingB?'等待出線':'觀看')}</span><div class=matchNo>第 ${mi+1} 場</div>
+    <div class="bSide ${pendingA?'pending':''} ${m.winner===m.a?'winner':''}"><span class=bName>${m.winner===m.a?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.a)}</span></span><span class=bScore>${esc(scoreA)}</span></div>
+    <div class="bSide ${pendingB?'pending':''} ${m.winner===m.b?'winner':''}"><span class=bName>${m.winner===m.b?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.b)}</span></span><span class=bScore>${esc(scoreB)}</span></div>${m.refereeActive?`<span class="refTag live">⚖ 執裁中：${esc(m.referee)}</span>`:''}</button>`;
 }
 function refereeIdentityKey(){return `bx_ref_identity_${ev?.id||'default'}`}
 function getMyReferee(){return localStorage.getItem(refereeIdentityKey())||''}
@@ -6174,6 +6291,7 @@ function syncTabButtons(t=currentAdminTab){
 function renderAdmin(){
   if(!ev){$('admin').classList.add('hidden');$('home').classList.remove('hidden');return;}
   normalizeEvent();
+  ensureNext();
   let flow=ev.mode==='free'&&ev.freeFinal==='rr3'?freeFlowLabel(ev.roster.length):'標準單淘汰';
   let top=`<div class=adminHero><div class=adminHeroTop><div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2>${isReferee&&!isAdmin?`<div class="cloudBadge on" style="margin-top:8px">⚖ 裁判模式：${esc(getMyReferee()||'尚未選擇')}</div>`:''}</div></div><div class=adminActions><button id=organizerHeroBtn class=secondary data-tab-btn="organizer" onclick="showTab('organizer')">🛡 主辦</button><button class=secondary data-tab-btn="referee" onclick="showTab('referee')">⚖ 裁判</button></div><div class=metaChips><span class=metaChip>👤 ${ev.roster.length} 人</span><span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class=metaChip>⌘ ${flow}</span></div></div>`;
   let cols=ev.rounds.map((r,ri)=>{let l=roundLayout(ri);return `<section class=roundCol data-round="${ri}"><div class=roundHead><h3>${stageLabel(ri,r)}</h3><div class=roundSub>${r.matches.length} 場對戰</div></div><div class=roundMatches style="--top:${l.top}px;--gap:${l.gap}px">${r.matches.map((m,mi)=>renderBracketMatch(m,ri,mi)).join('')}</div></section>`}).join('');
