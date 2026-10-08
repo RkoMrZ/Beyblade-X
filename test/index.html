@@ -1708,9 +1708,11 @@ html,body{max-width:100%;overflow-x:hidden}
   .regPublicInfo #regPublicAddress,.regPublicInfo #regPublicFee{grid-column:1/-1}
   .regPublicHero h2{font-size:28px}
 }
-.regPerson{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2);transition:.18s ease}
+.regPerson{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2);transition:.18s ease;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+.regPerson:active{transform:scale(.995)}
 .regPerson.checkedIn{border-color:#2e9b63;background:rgba(46,155,99,.10);box-shadow:0 0 0 1px rgba(46,155,99,.16) inset}
-.regPerson input[type=checkbox]{width:22px;height:22px;accent-color:#2e9b63}
+.regPerson input[type=checkbox]{width:22px;height:22px;accent-color:#2e9b63;cursor:pointer}
+.regDeleteBtn{width:auto!important;min-width:70px!important;padding:7px 12px!important;font-size:12px!important;line-height:1.15!important;justify-self:end!important;align-self:center!important;border-radius:10px!important}
 .regPerson .name{font-weight:850}.regPerson .detail{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}.regNo{font-size:12px;color:var(--muted);text-align:center}
 .regCheckStatus{display:inline-flex;align-items:center;margin-left:7px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:11px;font-weight:850;vertical-align:middle}
 .regCheckStatus.on{border-color:#2e9b63;background:rgba(46,155,99,.14);color:#45b97d}
@@ -1771,6 +1773,7 @@ html,body{max-width:100%;overflow-x:hidden}
   .regActions button{flex:1}
   .regPerson{grid-template-columns:30px minmax(0,1fr)}
   .regPerson>button{grid-column:2}
+  .regPerson .regDeleteBtn{width:auto!important;min-width:68px!important;justify-self:end!important;padding:7px 11px!important;font-size:12px!important}
   .registrationLaunch{padding:14px}
 }
 </style>
@@ -3655,7 +3658,30 @@ async function loadRegistrationAdmin(id){
   }catch(e){alert('讀取報名資料失敗：'+(e?.message||e))}
 }
 function orderedRegistrationEntries(){
-  return Object.entries(activeRegistrations||{}).filter(([,r])=>r&&r.playerName).sort((a,b)=>(a[1].created||0)-(b[1].created||0));
+  const rows=Object.entries(activeRegistrations||{}).filter(([,r])=>r&&r.playerName);
+
+  const positionOf=([id,r])=>{
+    // 新版報名資料優先依實際名額排序：正選 1,2,3... → 備選 1,2,3...
+    const type=r?.entryType==='waitlist'?'waitlist':'main';
+    const no=Number(r?.entryNo);
+
+    if(Number.isFinite(no) && no>=1){
+      return type==='main' ? no : 10000+no;
+    }
+
+    // 舊資料如果沒有 entryNo，嘗試由 S0001 / S0002... 推回位置。
+    const m=String(id||'').match(/^S(\d+)$/i);
+    if(m)return Number(m[1]);
+
+    // 最舊資料最後才依建立時間排列。
+    return 20000+(Number(r?.created)||0)/1e13;
+  };
+
+  return rows.sort((a,b)=>{
+    const pa=positionOf(a), pb=positionOf(b);
+    if(pa!==pb)return pa-pb;
+    return (Number(a[1]?.created)||0)-(Number(b[1]?.created)||0);
+  });
 }
 function normalizedPhoneSearch(value){
   return String(value||'').replace(/\D/g,'').slice(0,3);
@@ -3705,17 +3731,33 @@ function renderRegistrationList(){
     const state=r.entryLabel || (originalIndex<max?`正選 ${originalIndex+1}`:`備選 ${originalIndex-max+1}`);
     const checked=r.checkedIn===true || registrationSelected.has(id);
     if(checked)registrationSelected.add(id); else registrationSelected.delete(id);
-    return `<div class="regPerson${checked?' checkedIn':''}" data-reg-card="${esc(id)}">
-      <input type="checkbox" data-reg-check="${esc(id)}" ${checked?'checked':''} onchange="toggleRegistrationSelected('${esc(id)}',this.checked)">
+    return `<div class="regPerson${checked?' checkedIn':''}" data-reg-card="${esc(id)}" onclick="toggleRegistrationCard('${esc(id)}',event)" role="button" tabindex="0" onkeydown="handleRegistrationCardKey('${esc(id)}',event)">
+      <input type="checkbox" data-reg-check="${esc(id)}" ${checked?'checked':''} onclick="event.stopPropagation()" onchange="toggleRegistrationSelected('${esc(id)}',this.checked)">
       <div>
         <div class="name">${esc(r.playerName)} <span class="badge">${esc(state)}</span><span class="regCheckStatus${checked?' on':''}" data-reg-status="${esc(id)}">${checked?'✓ 已報到':'尚未報到'}</span></div>
         <div class="detail">${r.phoneLast3?`手機後三碼：${esc(r.phoneLast3)}<br>`:''}${esc(formatRegDate(r.created))}</div>
       </div>
-      <button class="danger" type="button" onclick="deleteRegistration('${esc(id)}')">刪除</button>
+      <button class="danger regDeleteBtn" type="button" onclick="event.stopPropagation();deleteRegistration('${esc(id)}')">刪除</button>
     </div>`;
   }).join('');
   updateRegistrationSelectedUI();
 }
+function toggleRegistrationCard(id,event){
+  if(event?.target?.closest?.('button,input,a,select,textarea'))return;
+  const row=activeRegistrations[id];
+  if(!row)return;
+  const next=!(row.checkedIn===true || registrationSelected.has(id));
+  const cb=document.querySelector(`[data-reg-check="${CSS.escape(id)}"]`);
+  if(cb)cb.checked=next;
+  toggleRegistrationSelected(id,next);
+}
+function handleRegistrationCardKey(id,event){
+  if(event.key!=='Enter' && event.key!==' ')return;
+  if(event.target?.closest?.('button,input,a,select,textarea'))return;
+  event.preventDefault();
+  toggleRegistrationCard(id,event);
+}
+
 async function toggleRegistrationSelected(id,on){
   const row=activeRegistrations[id];
   if(!row)return;
