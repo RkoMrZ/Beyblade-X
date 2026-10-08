@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：淺色模式改為 iOS 中性灰白風格，深色模式維持原設計 -->
-<title>[TEST] Beyblade X Tournament + Registration</title>
-<!-- BUILD: 2026-10-09 FINAL-BEST cloud-only + 200-device optimized + champion/bronze placement -->
+<title>Beyblade X Tournament</title>
+<!-- BUILD: 2026-10-09 PRODUCTION cloud-only + 200-device optimized + champion/bronze placement -->
 
 <script>
 (function(){
@@ -1781,7 +1781,6 @@ html,body{max-width:100%;overflow-x:hidden}
 
 
 <style>
-.testEnvBadge{position:fixed;right:10px;bottom:10px;z-index:9999;padding:7px 10px;border-radius:999px;background:#7a3cff;color:#fff;font-size:11px;font-weight:900;box-shadow:0 4px 16px #0005;pointer-events:none}
 </style>
 
 <style id="pwaVisualViewportFix">
@@ -1871,9 +1870,8 @@ html,body{max-width:100%;overflow-x:hidden}
 
 </head>
 <body>
-<div class="testEnvBadge">🧪 TEST + 報名系統</div>
 <header><div class="wrap brand">
-  <div><h1>🧪 Beyblade X Tournament</h1><small id="headSub">測試環境・含線上報名系統</small></div>
+  <div><h1>⚔️ Beyblade X Tournament</h1><small id="headSub">戰鬥陀螺賽程表</small></div>
   <div class="headActions">
     <button class="themeBtn secondary" id="themeToggleBtn" type="button" onclick="toggleTheme()" aria-label="切換深淺模式">🌙</button>
     <button class="loginBtn" id="googleLoginBtn" type="button" onclick="handleHeaderLogin()">Google 登入</button>
@@ -1891,7 +1889,7 @@ html,body{max-width:100%;overflow-x:hidden}
 
  <div class="card hero">
   <h2>建立新賽事</h2>
-  <div class="muted">先選擇賽制，再選擇這場要使用雲端同步或只在本機測試。</div>
+  <div class="muted">先選擇賽制，再選擇這場要使用雲端同步或只保留在本機。</div>
 
   <div class="homeSection">
    <div class="homeSectionTitle">① 選擇賽制</div>
@@ -1905,7 +1903,7 @@ html,body{max-width:100%;overflow-x:hidden}
    <div class="homeSectionTitle">② 選擇建立方式</div>
    <div class="homeChoices">
     <div id="choiceCloud" class="choiceCard" onclick="selectStorageMode('cloud')"><div class="choiceIcon">☁️</div><h3>雲端賽事</h3><div class="muted">可 QR 分享、主辦管理、跨手機同步比分與裁判狀態。</div></div>
-    <div id="choiceTest" class="choiceCard" onclick="selectStorageMode('test')"><div class="choiceIcon">🧪</div><h3>測試賽事</h3><div class="muted">只存在這支手機，適合測試版面與比賽流程。</div></div>
+    <div id="choiceTest" class="choiceCard" onclick="selectStorageMode('test')"><div class="choiceIcon">📱</div><h3>本機賽事</h3><div class="muted">只存在這支裝置，不上傳雲端，也不提供跨手機同步。</div></div>
    </div>
   </div>
 
@@ -1928,7 +1926,7 @@ html,body{max-width:100%;overflow-x:hidden}
    <div class="row"><div><b>名單來源</b><div id="importSourceInfo" class="muted" style="margin-top:4px">目前：手動輸入</div></div><button type="button" class="secondary" onclick="openImportRegistration()">📥 從報名表匯入</button></div>
   </div>
   <label>參賽名單（每行一位）</label><textarea id="bulkNames" rows="10" placeholder="王小明&#10;陳小華&#10;選手 C"></textarea>
-  <div class="row"><button class="secondary" onclick="makeDemo()">產生測試名單</button><input id="demoCount" type="number" min="2" value="24" style="max-width:95px"></div>
+  <div class="row"><button class="secondary" onclick="makeDemo()">自動產生名單</button><input id="demoCount" type="number" min="2" value="24" style="max-width:95px"></div>
  </div>
  <div class="card"><div class="row"><h3 style="margin:0">選手名單</h3><span id="countBadge" class="badge">0 人</span></div><div id="rosterPreview" class="muted">輸入名單後會顯示在這裡。</div>
   <div class="toolbar" style="margin-top:12px"><button data-create-tournament="1" onclick="createTournament()">建立對戰表</button></div>
@@ -2104,7 +2102,7 @@ const FIREBASE_CONFIG = {
 };
 const STORE='bx_testenv_events_v3', CURRENT='bx_testenv_current_v3', SAVED='bx_testenv_saved_events_v3', KEEP='bx_testenv_event_v1';
 const LEGACY_STORE='bx_testenv_legacy_disabled';
-const CLOUD_LOCAL_POLICY_VERSION=1; // 雲端賽事：Firebase only；本機只保留測試賽事與純 UI / 身分資訊。
+const CLOUD_LOCAL_POLICY_VERSION=1; // 雲端賽事：Firebase only；本機只保留本機賽事與純 UI / 身分資訊。
 let draftMode=null, draftStorage=null, ev=null;
 let cloudEventsCache={}, cloudEventIds=[], cloudEventSlots={}; // 僅 RAM，重新載入即清空。
 let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
@@ -2140,7 +2138,7 @@ function keepLocalEnabled(){return localStorage.getItem(KEEP)==='1'}
 
 function cleanupLegacyCloudLocalData(){
   try{
-    // STORE 永遠只允許 testOnly=true 的測試賽事。
+    // STORE 永遠只允許 testOnly=true 的本機賽事。
     const raw=JSON.parse(localStorage.getItem(STORE)||'{}');
     const tests={};
     for(const [id,e] of Object.entries(raw||{})){
@@ -2148,14 +2146,14 @@ function cleanupLegacyCloudLocalData(){
     }
     localStorage.setItem(STORE,JSON.stringify(tests));
 
-    // SAVED 也只留下測試賽事 ID。
+    // SAVED 也只留下本機賽事 ID。
     let savedIds=[];
     try{savedIds=JSON.parse(localStorage.getItem(SAVED)||'[]')}catch(e){}
     if(!Array.isArray(savedIds))savedIds=[];
     savedIds=savedIds.filter(id=>tests[id]?.testOnly===true);
     localStorage.setItem(SAVED,JSON.stringify([...new Set(savedIds)]));
 
-    // CURRENT 只服務測試賽事。
+    // CURRENT 只服務本機賽事。
     const current=localStorage.getItem(CURRENT);
     if(current && !tests[current])localStorage.removeItem(CURRENT);
 
@@ -2182,7 +2180,7 @@ function cleanupLegacyCloudLocalData(){
       }
     }
 
-    // 抽籤 localStorage 只允許測試賽事保留。
+    // 抽籤 localStorage 只允許本機賽事保留。
     for(let i=localStorage.length-1;i>=0;i--){
       const k=localStorage.key(i)||'';
       const prefix='bx_testenv_raffle_round_';
@@ -2294,7 +2292,7 @@ function renderHomeSelections(){
   const ready=hasMode&&hasStorage&&!cloudFull;
 
   const modeText=draftMode==='free'?'自由編排':draftMode==='single'?'單淘汰賽':'尚未選擇賽制';
-  const storageText=draftStorage==='cloud'?'雲端賽事':draftStorage==='test'?'測試賽事':'尚未選擇建立方式';
+  const storageText=draftStorage==='cloud'?'雲端賽事':draftStorage==='test'?'本機賽事':'尚未選擇建立方式';
 
   if(s){
     if(cloudFull){
@@ -2455,7 +2453,7 @@ async function proceedCreate(){
     $('home').classList.add('hidden');
     $('create').classList.remove('hidden');
 
-    $('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;
+    $('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'本機賽事'}`;
     $('freeOpts').classList.toggle('hidden',draftMode!=='free');
 
     updatePreview();
@@ -2716,11 +2714,11 @@ function renderSavedEvents(){
   const testCount=ids.filter(id=>all[id]?.testOnly).length;
 
   count.textContent=isGoogleUser()
-    ? `${cloudCount}/${CLOUD_EVENT_LIMIT} 場雲端・${testCount} 場測試`
-    : `${testCount} 場測試`;
+    ? `${cloudCount}/${CLOUD_EVENT_LIMIT} 場雲端・${testCount} 場本機`
+    : `${testCount} 場本機`;
 
   if(!ids.length){
-    box.innerHTML='<div class=savedEmpty>目前沒有賽事。☁️ 雲端賽事只存在 Firebase；🧪 測試賽事只存在這支手機。</div>';
+    box.innerHTML='<div class=savedEmpty>目前沒有賽事。☁️ 雲端賽事使用跨裝置同步；📱 本機賽事只存在這支裝置。</div>';
     return;
   }
 
@@ -2732,7 +2730,7 @@ function renderSavedEvents(){
     const when=formatSavedTime(e.created);
     const isTest=!!e.testOnly;
     const typeHtml=isTest
-      ? '<span class="savedType test">🧪 測試賽事</span>'
+      ? '<span class="savedType test">📱 本機賽事</span>'
       : '<span class="savedType cloud">☁️ 雲端賽事</span>';
     const ownerControls=!isTest && isGoogleUser() && e.ownerUid===fbAuth.currentUser.uid;
     const status=!isTest
@@ -2837,7 +2835,7 @@ function requestDeleteSavedEvent(id){
   pendingDeleteId=id;
   const modal=$('deleteConfirmModal'),text=$('deleteConfirmText'),ok=$('deleteOkBtn');
   if(cached.testOnly){
-    text.innerHTML='這會刪除這支手機上的<strong>測試賽事</strong>。<br>這場沒有雲端資料。';
+    text.innerHTML='這會刪除這支裝置上的<strong>本機賽事</strong>。<br>這場沒有雲端資料。';
     ok.textContent='刪除本機';
   }else{
     text.innerHTML='這會<strong>永久刪除雲端賽事</strong>，包含 Firebase 上的賽程、管理員與驗證碼資料。<br><br>此動作無法復原。';
@@ -2988,7 +2986,7 @@ function localEventSave(){
   if(!ev)return;
 
   if(ev.testOnly){
-    // 測試賽事：完整資料只存在這支裝置。
+    // 本機賽事：完整資料只存在這支裝置。
     let tests={};
     try{tests=JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){}
     tests[ev.id]=ev;
@@ -4258,7 +4256,7 @@ function copySelectedRegistrationNames(){const n=selectedRegistrationNames();if(
 function importSelectedToTournament(){
   const n=selectedRegistrationNames();if(!n.length)return alert('請先勾選選手。');
   draftMode=draftMode||'free';draftStorage=draftStorage||'cloud';
-  hideMainSections();$('create').classList.remove('hidden');$('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'測試賽事'}`;$('freeOpts').classList.toggle('hidden',draftMode!=='free');
+  hideMainSections();$('create').classList.remove('hidden');$('createTitle').textContent=`建立${draftMode==='free'?'自由編排':'單淘汰賽'}・${draftStorage==='cloud'?'雲端賽事':'本機賽事'}`;$('freeOpts').classList.toggle('hidden',draftMode!=='free');
   $('eventName').value=$('eventName').value||activeRegistrationForm?.title||'';$('bulkNames').value=n.join('\n');$('importSourceInfo').textContent=`來源：${activeRegistrationForm?.title||'報名表'}｜${n.length} 人`;updatePreview();history.replaceState(null,'',location.pathname);window.scrollTo({top:0,behavior:'instant'});
 }
 async function openPublicRegistration(formId){
@@ -4470,7 +4468,7 @@ function goHome(){
 function startCreate(m){selectHomeMode(m);proceedCreate()}
 $('bulkNames').addEventListener('input',updatePreview);
 
-// 使用者手動修改名單後，就不再把「產生測試名單」數字當成預期人數。
+// 使用者手動修改名單後，就不再把「產生模擬名單」數字當成預期人數。
 document.addEventListener('input',e=>{
   if(e.target?.id==='bulkNames')demoExpectedCount=null;
 });
@@ -4938,7 +4936,7 @@ async function createTournament(){
     }
 
     if(demoExpectedCount!==null && r.length!==demoExpectedCount){
-      alert(`目前選手名單是 ${r.length} 人，但你最後一次產生測試名單設定為 ${demoExpectedCount} 人。\n\n請先重新產生名單或確認名單人數後再建立賽事。`);
+      alert(`目前選手名單是 ${r.length} 人，但你最後一次自動產生名單設定為 ${demoExpectedCount} 人。\n\n請先重新產生名單或確認名單人數後再建立賽事。`);
       return;
     }
 
@@ -5598,7 +5596,7 @@ async function claimRefereeSlot(index){
   const uid=currentRefereeUid();
   if(!uid)return false;
 
-  // 本機測試賽事：直接本機鎖定。
+  // 本機賽事：直接本機鎖定。
   if(ev.testOnly){
     const existing=getRefereeClaim(index);
     if(existing && existing.uid!==uid)return false;
@@ -6085,16 +6083,36 @@ function refereeStatusHtml(m,kind,ri,mi){
 let activeScoreTarget=null;
 function openScorePicker(inputId,buttonId){
   let m=null;
+  let side=null;
 
-  let mm=inputId.match(/^s(\d+)-(\d+)[ab]$/);
-  if(mm)m=ev?.rounds?.[+mm[1]]?.matches?.[+mm[2]];
+  let mm=inputId.match(/^s(\d+)-(\d+)([ab])$/);
+  if(mm){
+    m=ev?.rounds?.[+mm[1]]?.matches?.[+mm[2]];
+    side=mm[3];
+  }
 
-  mm=inputId.match(/^rr(\d+)[ab]$/);
-  if(mm)m=ev?.finalRR?.matches?.[+mm[1]];
+  mm=inputId.match(/^rr(\d+)([ab])$/);
+  if(mm){
+    m=ev?.finalRR?.matches?.[+mm[1]];
+    side=mm[2];
+  }
 
-  if(m && matchReachedFinishThreshold(m))return;
+  // 比分規則：同一時間最多只能有一方 >= 4 分。
+  // 如果對手已經 >= 4，這一方只能選 0～3。
+  const opponentScore=m
+    ? +(side==='a' ? (m.sb||0) : (m.sa||0))
+    : 0;
+  const maxAllowed=opponentScore>=4?3:6;
 
-  activeScoreTarget={inputId,buttonId};
+  activeScoreTarget={inputId,buttonId,maxAllowed};
+
+  // 直接把不合法的 4～6 隱藏，裁判不會誤按。
+  document.querySelectorAll('#scorePicker .scoreGrid button').forEach(btn=>{
+    const n=+btn.textContent.trim();
+    btn.style.display=n<=maxAllowed?'':'none';
+    btn.disabled=n>maxAllowed;
+  });
+
   $('scorePicker').classList.remove('hidden');
 }
 function closeScorePicker(){
@@ -6105,6 +6123,8 @@ function chooseScore(v){
   if(!activeScoreTarget)return;
 
   const scoreValue=(v===''?0:+v);
+  if(scoreValue>(activeScoreTarget.maxAllowed??6))return;
+
   const id=activeScoreTarget.inputId;
   let matchInfo=null;
 
@@ -6144,7 +6164,7 @@ function scoreEventButtons(handler){
     <button type=button onclick="${handler}(3,'極限')">極限</button>`;
 }
 
-function quickScoreHtml(m,kind,ri,mi,enabled){
+function quickScoreHtml(m,kind,ri,mi,quickEnabled,scoreEditEnabled=quickEnabled){
   const aScore=m.sa===''?0:+m.sa;
   const bScore=m.sb===''?0:+m.sb;
 
@@ -6152,35 +6172,36 @@ function quickScoreHtml(m,kind,ri,mi,enabled){
   const bInputId=kind==='rr'?`rr${mi}b`:`s${ri}-${mi}b`;
   const aScoreId=kind==='rr'?`qrr-0-${mi}-a`:`qm-${ri}-${mi}-a`;
   const bScoreId=kind==='rr'?`qrr-0-${mi}-b`:`qm-${ri}-${mi}-b`;
-  const disabled=enabled?'':'disabled';
+  const quickDisabled=quickEnabled?'':'disabled';
+  const scoreDisabled=scoreEditEnabled?'':'disabled';
 
   const aButtons=kind==='rr'
     ? `
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',1,'對方違規')">對方違規</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',1,'轉停')">轉停</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',2,'爆裂')">爆裂</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',2,'擊飛')">擊飛</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'a',3,'極限')">極限</button>`
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'a',1,'對方違規')">對方違規</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'a',1,'轉停')">轉停</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'a',2,'爆裂')">爆裂</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'a',2,'擊飛')">擊飛</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'a',3,'極限')">極限</button>`
     : `
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',1,'對方違規')">對方違規</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',1,'轉停')">轉停</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',2,'爆裂')">爆裂</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',2,'擊飛')">擊飛</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'a',3,'極限')">極限</button>`;
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'a',1,'對方違規')">對方違規</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'a',1,'轉停')">轉停</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'a',2,'爆裂')">爆裂</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'a',2,'擊飛')">擊飛</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'a',3,'極限')">極限</button>`;
 
   const bButtons=kind==='rr'
     ? `
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',1,'對方違規')">對方違規</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',1,'轉停')">轉停</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',2,'爆裂')">爆裂</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',2,'擊飛')">擊飛</button>
-      <button type=button ${disabled} onclick="quickAddRRScore(${mi},'b',3,'極限')">極限</button>`
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'b',1,'對方違規')">對方違規</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'b',1,'轉停')">轉停</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'b',2,'爆裂')">爆裂</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'b',2,'擊飛')">擊飛</button>
+      <button type=button ${quickDisabled} onclick="quickAddRRScore(${mi},'b',3,'極限')">極限</button>`
     : `
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',1,'對方違規')">對方違規</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',1,'轉停')">轉停</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',2,'爆裂')">爆裂</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',2,'擊飛')">擊飛</button>
-      <button type=button ${disabled} onclick="quickAddMatchScore(${ri},${mi},'b',3,'極限')">極限</button>`;
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'b',1,'對方違規')">對方違規</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'b',1,'轉停')">轉停</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'b',2,'爆裂')">爆裂</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'b',2,'擊飛')">擊飛</button>
+      <button type=button ${quickDisabled} onclick="quickAddMatchScore(${ri},${mi},'b',3,'極限')">極限</button>`;
 
   return `<div class=quickScoreBox>
     <div class=quickScoreTitle>⚡ 快速加分</div>
@@ -6193,11 +6214,11 @@ function quickScoreHtml(m,kind,ri,mi,enabled){
           <button type=button
             class=quickScoreTotal
             id="${aScoreId}"
-            ${disabled}
+            ${scoreDisabled}
             onclick="openScorePicker('${aInputId}','${aScoreId}')"
           >${aScore}</button>
         </div>
-        ${enabled?`<div class=quickScoreBtns>${aButtons}</div>`:''}
+        ${quickEnabled?`<div class=quickScoreBtns>${aButtons}</div>`:''}
       </div>
 
       <div class=quickScoreSide>
@@ -6207,16 +6228,16 @@ function quickScoreHtml(m,kind,ri,mi,enabled){
           <button type=button
             class=quickScoreTotal
             id="${bScoreId}"
-            ${disabled}
+            ${scoreDisabled}
             onclick="openScorePicker('${bInputId}','${bScoreId}')"
           >${bScore}</button>
         </div>
-        ${enabled?`<div class=quickScoreBtns>${bButtons}</div>`:''}
+        ${quickEnabled?`<div class=quickScoreBtns>${bButtons}</div>`:''}
       </div>
     </div>
 
     <div class=quickScoreHint>
-      點右側數字可直接修改比分。至少一方達到 4 分且比分不同時，「此場完成」才會開放。
+      點右側數字可隨時修改比分。若一方已達 4 分以上，另一方只能選 0～3 分；確認無誤後再按「此場完成」。
     </div>
   </div>`;
 }
@@ -6255,7 +6276,7 @@ function quickAddMatchScore(ri,mi,side,points,reason){
   // UI 立即更新；雲端在背景合併同步。
   queueSingleMatchCloud('round',ri,mi,120);
 
-  // 立刻重畫編輯器，讓「達 4 分鎖定 / 此場完成」狀態馬上生效。
+  // 立刻重畫編輯器；達 4 分後停止快速加分，但數字比分仍可直接修正。
   openMatchEditor(ri,mi);
 }
 
@@ -6345,9 +6366,9 @@ function openMatchEditor(ri,mi){
 
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
     <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
-    ${quickScoreHtml(m,'round',ri,mi,quickEnabled)}
+    ${quickScoreHtml(m,'round',ri,mi,quickEnabled,scoreEnabled)}
     ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分。</div>`:''}
-    ${finishLocked?`<div class=refHint style="margin:7px 0">已有人達到 4 分以上。請選擇「此場完成」或「重設比分」。</div>`:''}
+    ${finishLocked?`<div class=refHint style="margin:7px 0">已有人達到 4 分以上。另一方仍可修正比分，但只能選 0～3；若要改判另一方獲勝，請先把目前 4 分以上的一方調回 0～3。</div>`:''}
 
     <div class=sheetFooter style="grid-template-columns:1fr 1fr 1fr">
       <button class=secondary ${backDisabled} onclick="backToBracketFromMatch()">回到對戰表</button>
@@ -6813,7 +6834,7 @@ function openRRMatch(i){
       ${refereeStatusHtml(m,'rr',0,i)}
     </div>
 
-    ${quickScoreHtml(m,'rr',0,i,quickEnabled)}
+    ${quickScoreHtml(m,'rr',0,i,quickEnabled,scoreEnabled)}
 
     ${!scoreEnabled?`
       <div class=refHint style="margin:10px 0">
@@ -6823,7 +6844,7 @@ function openRRMatch(i){
 
     ${finishLocked?`
       <div class=refHint style="margin:7px 0">
-        已有人達到 4 分以上。請選擇「此場完成」或「重設比分」。
+        已有人達到 4 分以上。另一方仍可修正比分，但只能選 0～3；若要改判另一方獲勝，請先把目前 4 分以上的一方調回 0～3。
       </div>
     `:''}
 
@@ -7493,7 +7514,7 @@ async function renderOrganizer(){
 
   if(ev?.testOnly){
     stopAdminCodeRotation();
-    tab.innerHTML=`<div class=card><h3>🧪 測試賽事</h3><div class=notice>這場賽事是「本機測試模式」，不會上傳 Firebase，也無法讓第二支手機共同管理。</div><div class=cloudNote style="margin-top:12px">如果要正式多人同步，請回首頁建立一場雲端賽事。</div></div>`;
+    tab.innerHTML=`<div class=card><h3>📱 本機賽事</h3><div class=notice>這場賽事使用本機模式，不會上傳 Firebase，也無法讓第二支手機共同管理。</div><div class=cloudNote style="margin-top:12px">如果需要多人同步，請回首頁建立一場雲端賽事。</div></div>`;
     return;
   }
 
@@ -7723,7 +7744,7 @@ function persistActiveView(tab){
   try{sessionStorage.setItem(ACTIVE_VIEW_KEY,JSON.stringify(payload))}catch(e){}
 
   if(ev.testOnly){
-    // 只有測試賽事允許跨關窗持久保存 active view。
+    // 只有本機賽事允許跨關窗持久保存 active view。
     try{localStorage.setItem(ACTIVE_VIEW_KEY,JSON.stringify(payload))}catch(e){}
   }else{
     // 雲端賽事不在 localStorage 留 eventId / tab。
@@ -7962,7 +7983,7 @@ async function renderReferee(){
 }
 function renderShare(){
   if(ev?.testOnly){
-    $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這場是本機測試賽事，沒有雲端網址，因此不提供 QR 分享或跨手機同步。</div></div>`;
+    $('shareTab').innerHTML=`<div class=card><h3>QR／分享</h3><div class=notice>這場是本機賽事，沒有雲端網址，因此不提供 QR 分享或跨手機同步。</div></div>`;
     return;
   }
 
