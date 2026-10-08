@@ -5540,7 +5540,23 @@ async function releaseRefereeSlot(index){
     }
   }
 
-  if(!claim)return alert('目前找不到這個裁判的領取資料，請按重新整理後再試一次。');
+  if(!claim){
+    const localName=getMyReferee();
+    const targetName=ev.refereeNames?.[index]||'';
+
+    // 某些舊版本可能只留下本機裁判身分、雲端 claim 已不存在。
+    // 這時「釋放」仍應該能清掉本機身分，不要讓使用者卡死。
+    if(localName && localName===targetName){
+      localStorage.removeItem(refereeIdentityKey());
+      if(ev.refereeClaims)delete ev.refereeClaims[refereeClaimKey(index)];
+      localEventSave();
+      renderAdmin();
+      showTab('referee');
+      return;
+    }
+
+    return alert('目前找不到這個裁判的領取資料，請按重新整理後再試一次。');
+  }
 
   // 只有該裁判本人或主辦可以釋放。
   if(!organizer && (!uid || claim.uid!==uid)){
@@ -6979,38 +6995,63 @@ async function releaseMatchAny(ri,mi){
 
   await cancelQueuedMatchCloud('round',ri,mi);
 
-  let m=ev.rounds[ri].matches[mi];
+  const m=ev.rounds?.[ri]?.matches?.[mi];
+  if(!m)return alert('找不到這場比賽資料。');
+
   const me=currentRefereeName();
 
   if(!isAdmin&&!ev?.testOnly&&m.referee!==me){
-    return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
+    return alert(`這場目前由 ${m.referee||'其他裁判'} 執裁中，你不能釋放別人的場次。`);
   }
 
   m.referee='';
   m.refereeActive=false;
 
+  // 先立即更新本機畫面，讓對戰表的「執裁中」標籤當場消失。
   localEventSave();
-  queueSingleMatchCloud('round',ri,mi,0);
+  renderAdmin();
   openMatchEditor(ri,mi);
+
+  // 雲端直接等待寫入完成，不再丟到背景 queue，
+  // 避免畫面已釋放但 Firebase 還保留 refereeActive=true。
+  if(!ev.testOnly){
+    try{
+      await rtdbRestPut(matchCloudPath('round',ri,mi),cloneJson(m),5000);
+    }catch(e){
+      console.error('release match cloud sync failed',e);
+      alert('釋放場次已更新在本機，但雲端同步失敗，請再按一次釋放或重新整理。');
+    }
+  }
 }
 async function releaseRRMatchAny(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   await cancelQueuedMatchCloud('rr',0,i);
 
-  let m=ev.finalRR.matches[i];
+  const m=ev.finalRR?.matches?.[i];
+  if(!m)return alert('找不到這場循環賽資料。');
+
   const me=currentRefereeName();
 
   if(!isAdmin&&!ev?.testOnly&&m.referee!==me){
-    return alert(`這場目前由 ${m.referee} 執裁中，你不能釋放別人的場次。`);
+    return alert(`這場目前由 ${m.referee||'其他裁判'} 執裁中，你不能釋放別人的場次。`);
   }
 
   m.referee='';
   m.refereeActive=false;
 
   localEventSave();
-  queueSingleMatchCloud('rr',0,i,0);
+  renderAdmin();
   openRRMatch(i);
+
+  if(!ev.testOnly){
+    try{
+      await rtdbRestPut(matchCloudPath('rr',0,i),cloneJson(m),5000);
+    }catch(e){
+      console.error('release RR match cloud sync failed',e);
+      alert('釋放場次已更新在本機，但雲端同步失敗，請再按一次釋放或重新整理。');
+    }
+  }
 }
 
 
@@ -7582,7 +7623,7 @@ async function renderReferee(){
         ${selected?'✓ ':''}⚖ ${esc(name)}
         ${taken?'・已被領取':mine?'・你已領取':localSelected?'・本機已選':''}
       </button>
-      ${((mine||localSelected)&&isReferee || organizer&&claim)
+      ${(organizer || mine || localSelected)
         ? `<button type=button class="danger refReleaseBtn" onclick="releaseRefereeSlot(${index})">釋放</button>`
         : ''
       }
@@ -7598,7 +7639,7 @@ async function renderReferee(){
         <span class=num>${i+1}</span>
         <input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}" ${claimed?'disabled':''}>
         ${claimed?`<span class=refClaimState>${isMyRefereeClaim(i)?'你已領取':'使用中'}</span>`:''}
-        ${claimed
+        ${(claimed || getMyReferee()===name)
           ? `<button type=button class="danger mini" onclick="releaseRefereeSlot(${i})">釋放</button>`
           : (n>1?`<button type=button class="danger mini" onclick="removeReferee(${i})">刪除</button>`:'')
         }
