@@ -1708,8 +1708,20 @@ html,body{max-width:100%;overflow-x:hidden}
   .regPublicInfo #regPublicAddress,.regPublicInfo #regPublicFee{grid-column:1/-1}
   .regPublicHero h2{font-size:28px}
 }
-.regPerson{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
-.regPerson input[type=checkbox]{width:22px;height:22px}.regPerson .name{font-weight:850}.regPerson .detail{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}.regNo{font-size:12px;color:var(--muted);text-align:center}
+.regPerson{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel2);transition:.18s ease}
+.regPerson.checkedIn{border-color:#2e9b63;background:rgba(46,155,99,.10);box-shadow:0 0 0 1px rgba(46,155,99,.16) inset}
+.regPerson input[type=checkbox]{width:22px;height:22px;accent-color:#2e9b63}
+.regPerson .name{font-weight:850}.regPerson .detail{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}.regNo{font-size:12px;color:var(--muted);text-align:center}
+.regCheckStatus{display:inline-flex;align-items:center;margin-left:7px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:11px;font-weight:850;vertical-align:middle}
+.regCheckStatus.on{border-color:#2e9b63;background:rgba(46,155,99,.14);color:#45b97d}
+.regSearchBox{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+.regSearchHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.regSearchInputWrap{position:relative}
+.regSearchInputWrap input{padding-right:82px}
+.regSearchClear{position:absolute;right:6px;top:50%;transform:translateY(-50%);padding:7px 10px;font-size:12px}
+.regSearchResult{margin-top:7px;font-size:12px;color:var(--muted)}
+:root[data-theme="light"] .regPerson.checkedIn{border-color:#72c798;background:#effaf4}
+:root[data-theme="light"] .regCheckStatus.on{background:#e7f7ee;color:#187347;border-color:#91d2ad}
 .regDeadlineLine{margin-top:7px;font-size:12px;font-weight:800;color:#d96b32;line-height:1.45}
 .regAdminInfoGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
 .regAdminInfoItem{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);min-width:0}
@@ -1908,10 +1920,18 @@ html,body{max-width:100%;overflow-x:hidden}
     <button id="regManualAddBtn" class="secondary" type="button" onclick="manualAddRegistration()">新增選手</button>
    </div>
   </div>
+  <div class="regSearchBox">
+   <div class="regSearchHead"><b>🔎 搜尋報名者</b><span class="muted">依手機後三碼搜尋</span></div>
+   <div class="regSearchInputWrap">
+    <input id="regSearchPhone" type="tel" inputmode="numeric" maxlength="3" placeholder="輸入手機後三碼，例如：168" oninput="handleRegistrationSearch(this.value)">
+    <button id="regSearchClearBtn" class="secondary regSearchClear hidden" type="button" onclick="clearRegistrationSearch()">清除</button>
+   </div>
+   <div id="regSearchResult" class="regSearchResult">顯示全部報名者</div>
+  </div>
   <div id="registrationList" class="regList"></div>
   <div class="regStickyTools">
-   <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">報名 0</span><span id="regSelectedStat" class="regStat">已勾選 0</span></div>
-   <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已勾選名單</button><button type="button" onclick="importSelectedToTournament()">📥 匯入建立賽事</button></div>
+   <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">報名 0</span><span id="regSelectedStat" class="regStat">已報到 0</span></div>
+   <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已報到名單</button><button type="button" onclick="importSelectedToTournament()">📥 匯入已報到建立賽事</button></div>
   </div>
  </div>
 </section>
@@ -1997,7 +2017,7 @@ const LEGACY_STORE='bx_testenv_legacy_disabled';
 let draftMode=null, draftStorage=null, ev=null;
 let cloudEventsCache={}, cloudEventIds=[], cloudEventSlots={};
 let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
-let activeRegistrationFormId='',activeRegistrationForm=null,activeRegistrations={},registrationSelected=new Set(),importRegistrationRows={},importRegistrationSelected=new Set(),registrationFormCache={};
+let activeRegistrationFormId='',activeRegistrationForm=null,activeRegistrations={},registrationSelected=new Set(),registrationSearchPhone='',importRegistrationRows={},importRegistrationSelected=new Set(),registrationFormCache={};
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function events(){
   let localTests={};
@@ -3611,12 +3631,14 @@ async function openRegistrationAdmin(id){
   window.scrollTo({top:0,behavior:'instant'});
 }
 async function loadRegistrationAdmin(id){
-  if(!id)return;activeRegistrationFormId=id;registrationSelected=new Set();
+  if(!id)return;activeRegistrationFormId=id;registrationSelected=new Set();registrationSearchPhone='';
   try{
     const [form,regs]=await Promise.all([rtdbRestGet(`registrationForms/${id}`,6000),rtdbRestGet(`registrations/${id}`,6000).catch(()=>null)]);
     if(!form)return alert('找不到這份報名表。');
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份報名表的建立者。');
     activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
+    registrationSelected=new Set(Object.entries(activeRegistrations).filter(([,r])=>r?.checkedIn===true).map(([regId])=>regId));
+    if($('regSearchPhone'))$('regSearchPhone').value='';
     await backfillRegistrationNameLocks(id,form,activeRegistrations);
     $('regAdminTitle').textContent=form.title;
     $('regAdminMeta').innerHTML=[
@@ -3635,20 +3657,104 @@ async function loadRegistrationAdmin(id){
 function orderedRegistrationEntries(){
   return Object.entries(activeRegistrations||{}).filter(([,r])=>r&&r.playerName).sort((a,b)=>(a[1].created||0)-(b[1].created||0));
 }
+function normalizedPhoneSearch(value){
+  return String(value||'').replace(/\D/g,'').slice(0,3);
+}
+function handleRegistrationSearch(value){
+  registrationSearchPhone=normalizedPhoneSearch(value);
+  const el=$('regSearchPhone');
+  if(el && el.value!==registrationSearchPhone)el.value=registrationSearchPhone;
+  $('regSearchClearBtn')?.classList.toggle('hidden',!registrationSearchPhone);
+  renderRegistrationList();
+}
+function clearRegistrationSearch(){
+  registrationSearchPhone='';
+  if($('regSearchPhone'))$('regSearchPhone').value='';
+  $('regSearchClearBtn')?.classList.add('hidden');
+  renderRegistrationList();
+}
 function renderRegistrationList(){
-  const rows=orderedRegistrationEntries(), box=$('registrationList');
-  $('regTotalStat').textContent=`報名 ${rows.length}`;
-  if(!rows.length){box.innerHTML='<div class="savedEmpty">目前還沒有人報名。</div>';updateRegistrationSelectedUI();return}
+  const allRows=orderedRegistrationEntries(), box=$('registrationList');
+  $('regTotalStat').textContent=`報名 ${allRows.length}`;
+
+  const query=registrationSearchPhone;
+  const rows=query
+    ? allRows.filter(([,r])=>String(r.phoneLast3||'').includes(query))
+    : allRows;
+
+  if($('regSearchResult')){
+    $('regSearchResult').textContent=query
+      ? `搜尋「${query}」：找到 ${rows.length} 人`
+      : `顯示全部 ${allRows.length} 位報名者`;
+  }
+
+  if(!allRows.length){
+    box.innerHTML='<div class="savedEmpty">目前還沒有人報名。</div>';
+    updateRegistrationSelectedUI();
+    return;
+  }
+  if(query && !rows.length){
+    box.innerHTML='<div class="savedEmpty">找不到符合這組手機後三碼的報名者。</div>';
+    updateRegistrationSelectedUI();
+    return;
+  }
+
   const max=Number(activeRegistrationForm?.maxPlayers)||0;
-  box.innerHTML=rows.map(([id,r],i)=>{const state=r.entryLabel || (i<max?`正選 ${i+1}`:`備選 ${i-max+1}`);return `<div class="regPerson"><input type="checkbox" data-reg-check="${esc(id)}" onchange="toggleRegistrationSelected('${esc(id)}',this.checked)"><div><div class="name">${esc(r.playerName)} <span class="badge">${esc(state)}</span></div><div class="detail">${r.phoneLast3?`手機後三碼：${esc(r.phoneLast3)}<br>`:''}${esc(formatRegDate(r.created))}</div></div><button class="danger" type="button" onclick="deleteRegistration('${esc(id)}')">刪除</button></div>`}).join('');
+  box.innerHTML=rows.map(([id,r])=>{
+    const originalIndex=allRows.findIndex(([rid])=>rid===id);
+    const state=r.entryLabel || (originalIndex<max?`正選 ${originalIndex+1}`:`備選 ${originalIndex-max+1}`);
+    const checked=r.checkedIn===true || registrationSelected.has(id);
+    if(checked)registrationSelected.add(id); else registrationSelected.delete(id);
+    return `<div class="regPerson${checked?' checkedIn':''}" data-reg-card="${esc(id)}">
+      <input type="checkbox" data-reg-check="${esc(id)}" ${checked?'checked':''} onchange="toggleRegistrationSelected('${esc(id)}',this.checked)">
+      <div>
+        <div class="name">${esc(r.playerName)} <span class="badge">${esc(state)}</span><span class="regCheckStatus${checked?' on':''}" data-reg-status="${esc(id)}">${checked?'✓ 已報到':'尚未報到'}</span></div>
+        <div class="detail">${r.phoneLast3?`手機後三碼：${esc(r.phoneLast3)}<br>`:''}${esc(formatRegDate(r.created))}</div>
+      </div>
+      <button class="danger" type="button" onclick="deleteRegistration('${esc(id)}')">刪除</button>
+    </div>`;
+  }).join('');
   updateRegistrationSelectedUI();
 }
-function toggleRegistrationSelected(id,on){if(on)registrationSelected.add(id);else registrationSelected.delete(id);updateRegistrationSelectedUI()}
+async function toggleRegistrationSelected(id,on){
+  const row=activeRegistrations[id];
+  if(!row)return;
+
+  const cb=document.querySelector(`[data-reg-check="${CSS.escape(id)}"]`);
+  const card=document.querySelector(`[data-reg-card="${CSS.escape(id)}"]`);
+  const status=document.querySelector(`[data-reg-status="${CSS.escape(id)}"]`);
+
+  if(cb)cb.disabled=true;
+
+  // 先即時更新畫面，若 Firebase 失敗再還原。
+  if(on)registrationSelected.add(id); else registrationSelected.delete(id);
+  row.checkedIn=!!on;
+  card?.classList.toggle('checkedIn',!!on);
+  status?.classList.toggle('on',!!on);
+  if(status)status.textContent=on?'✓ 已報到':'尚未報到';
+  updateRegistrationSelectedUI();
+
+  try{
+    await rtdbRestPut(`registrations/${activeRegistrationFormId}/${id}/checkedIn`,!!on,5000);
+  }catch(e){
+    // 回復原狀
+    row.checkedIn=!on;
+    if(on)registrationSelected.delete(id); else registrationSelected.add(id);
+    if(cb)cb.checked=!on;
+    card?.classList.toggle('checkedIn',!on);
+    status?.classList.toggle('on',!on);
+    if(status)status.textContent=!on?'✓ 已報到':'尚未報到';
+    updateRegistrationSelectedUI();
+    alert('更新報到狀態失敗：'+(e?.message||e));
+  }finally{
+    if(cb)cb.disabled=false;
+  }
+}
 function updateRegistrationSelectedUI(){
   const names=[...registrationSelected].map(id=>activeRegistrations[id]?.playerName).filter(Boolean);
-  $('regSelectedStat').textContent=`已勾選 ${names.length}`;
-  
+  $('regSelectedStat').textContent=`已報到 ${names.length}`;
 }
+
 function normalizeRegistrationName(name){
   return String(name||'')
     .normalize('NFKC')
