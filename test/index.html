@@ -1977,9 +1977,9 @@ html,body{max-width:100%;overflow-x:hidden}
 </div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-database-compat.js"></script>
 <script>
 const THEME_KEY='bx_testenv_theme';
 const FIREBASE_CONFIG = {
@@ -2092,7 +2092,9 @@ function renderHeaderAuth(){
   }
 }
 async function handleHeaderLogin(){
-  if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
+  if(!cloudReady){
+    if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
+  }
   if(isGoogleUser()){
     if(!confirm('要登出目前的 Google 帳號嗎？'))return;
     try{
@@ -2165,27 +2167,86 @@ function selectStorageMode(mode){
   localStorage.setItem(KEEP,mode==='test'?'1':'0');
   renderHomeSelections();
 }
+let googleLoginBusy=false;
+
+function isInAppBrowser(){
+  const ua=navigator.userAgent||'';
+  return /Line\/|FBAN|FBAV|Instagram|MicroMessenger|Twitter/i.test(ua);
+}
+
+function setGoogleLoginBusy(busy){
+  googleLoginBusy=!!busy;
+  const b=$('googleLoginBtn');
+  if(!b)return;
+  b.disabled=!!busy;
+  if(busy){
+    b.classList.remove('logged');
+    b.textContent='Google 登入中…';
+  }else{
+    renderHeaderAuth();
+  }
+}
+
 async function requireGoogleLogin(){
-  if(!(await initCloud()))return false;
   if(isGoogleUser())return true;
+  if(googleLoginBusy)return false;
+
+  // LINE / FB / IG 內建瀏覽器對 Google popup 特別容易卡住或無法返回。
+  if(isInAppBrowser()){
+    alert('目前使用的是 App 內建瀏覽器，Google 登入可能會卡住。\n\n請用右上角 / 分享選單，改用 Safari 或 Chrome 開啟此網頁後再登入。');
+    return false;
+  }
+
+  if(!cloudReady){
+    const ok=await initCloud();
+    if(!ok)return false;
+  }
+
+  setGoogleLoginBusy(true);
+
   try{
     const provider=new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({prompt:'select_account'});
-    const result=await fbAuth.signInWithPopup(provider);
-    fbUser=result.user||fbAuth.currentUser;
+
+    // 加入逾時保護，避免某些手機瀏覽器 popup promise 永遠不回來。
+    const loginPromise=fbAuth.signInWithPopup(provider);
+    const timeoutPromise=new Promise((_,reject)=>{
+      setTimeout(()=>{
+        const err=new Error('Google 登入逾時');
+        err.code='auth/login-timeout';
+        reject(err);
+      },20000);
+    });
+
+    const result=await Promise.race([loginPromise,timeoutPromise]);
+
+    fbUser=result?.user||fbAuth.currentUser;
     renderHeaderAuth();
     renderHomeSelections();
     return isGoogleUser();
+
   }catch(e){
     console.error('Google popup login failed',e);
+
     if(e?.code==='auth/popup-blocked'){
-      alert('Google 登入視窗被瀏覽器阻擋，請允許彈出式視窗後再試一次。');
+      alert('Google 登入視窗被瀏覽器阻擋。\n\n請允許彈出式視窗，或改用 Safari / Chrome 開啟後再試一次。');
     }else if(e?.code==='auth/popup-closed-by-user'){
       // 使用者自行關閉，不顯示錯誤。
+    }else if(e?.code==='auth/cancelled-popup-request'){
+      // 重複點擊造成舊 popup 被取消，不另外提示。
+    }else if(e?.code==='auth/login-timeout'){
+      alert('Google 登入等待過久，已自動取消等待。\n\n如果你是從 LINE、Facebook 或 Instagram 內開啟，請改用 Safari / Chrome 開啟這個網頁再登入。');
+    }else if(e?.code==='auth/network-request-failed'){
+      alert('Google 登入失敗：網路連線不穩定，請確認網路後再試一次。');
+    }else if(e?.code==='auth/unauthorized-domain'){
+      alert('Google 登入失敗：目前網址尚未加入 Firebase Authorized domains。');
     }else{
       alert('Google 登入失敗：'+(e?.message||e));
     }
+
     return false;
+  }finally{
+    setGoogleLoginBusy(false);
   }
 }
 async function proceedCreate(){
@@ -2296,12 +2357,10 @@ async function getCloudEventCountFromServer(timeoutMs=2500){
   const fallback=cloudEventCountForCurrentGoogle();
 
   try{
-    const snap=await Promise.race([
-      fbDb.ref(`userEventCounts/${uid}`).once('value'),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('讀取雲端賽事數量逾時')),timeoutMs))
-    ]);
-
-    const n=Number(snap.exists()?snap.val():0);
+    // Rules 已經允許 owner 讀自己的 userEvents；直接以 0/1/2 三個 slot 計算，
+    // 不再讀不存在的 userEventCounts 節點。
+    const slots=(await rtdbRestGet(`userEvents/${uid}`,timeoutMs))||{};
+    const n=Object.values(slots).filter(v=>typeof v==='string'&&v).length;
     return Number.isFinite(n)&&n>=0?n:fallback;
   }catch(e){
     console.warn('getCloudEventCountFromServer fallback',e);
@@ -3245,6 +3304,39 @@ async function rtdbRestPutIfEmpty(path,value,timeoutMs=6000){
     return {ok:true,value:body?JSON.parse(body):value};
   }finally{clearTimeout(putTimer)}
 }
+async function rtdbRestMultiUpdate(updates,timeoutMs=6000){
+  const base=String(FIREBASE_CONFIG.databaseURL||'').replace(/\/+$/,'');
+  if(!base)throw new Error('Firebase databaseURL 未設定');
+  const token=await getRestIdToken(false);
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const res=await fetch(`${base}/.json?auth=${encodeURIComponent(token)}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(updates),
+      signal:ctrl.signal,
+      cache:'no-store'
+    });
+    const body=await res.text();
+    if(!res.ok){
+      const err=new Error(`Firebase REST ${res.status}: ${body}`);
+      err.code=`HTTP_${res.status}`;
+      throw err;
+    }
+    return body?JSON.parse(body):updates;
+  }catch(e){
+    if(e?.name==='AbortError'){
+      const err=new Error('Firebase REST 寫入逾時');
+      err.code='TIMEOUT';
+      throw err;
+    }
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 async function openRegistrationHub(){
   if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
   if(!isGoogleUser()){
@@ -3587,11 +3679,21 @@ function registrationLockExpiry(form){
   const deadline=Number(form?.deadline)||0;
   return Math.max(eventStart,deadline,Date.now()+24*60*60*1000)+24*60*60*1000;
 }
+function registrationPendingExpiry(){
+  return Date.now()+2*60*1000;
+}
 async function claimPublicRegistrationName(formId,playerName){
   const user=await ensureRegistrationAuth();
   const nameKey=await registrationNameKey(playerName);
-  const lock={uid:user.uid,created:Date.now(),expiresAt:Date.now()+2*60*1000,status:'pending'};
+  const lock={
+    uid:user.uid,
+    created:Date.now(),
+    expiresAt:registrationPendingExpiry(),
+    status:'pending'
+  };
   try{
+    // Rules 只允許「不存在 / 已過期」的名字建立 pending 鎖；
+    // 即使是同一支手機、同一個匿名 UID，也不能覆蓋尚未到期的鎖。
     await rtdbRestPut(`registrationNames/${formId}/${nameKey}`,lock,5000);
   }catch(e){
     const msg=String(e?.message||e);
@@ -3604,66 +3706,88 @@ async function claimPublicRegistrationName(formId,playerName){
   }
   return {nameKey,user,lock};
 }
-async function finalizeRegistrationNameLock(formId,nameKey,form){
-  const user=fbAuth.currentUser;
-  if(!user)return;
-  await rtdbRestPut(`registrationNames/${formId}/${nameKey}`,{
-    uid:user.uid,
-    created:Date.now(),
+function finalRegistrationNameLock(claimed,form,slotId){
+  return {
+    uid:claimed.user.uid,
+    created:claimed.lock.created,
     expiresAt:registrationLockExpiry(form),
-    status:'final'
-  },5000);
+    status:'final',
+    slotId
+  };
 }
 async function releaseRegistrationNameLock(formId,nameKey){
   if(!formId||!nameKey)return;
-  try{await rtdbRestDelete(`registrationNames/${formId}/${nameKey}`,5000)}catch(e){console.warn('releaseRegistrationNameLock failed',e)}
+  try{
+    // 一般報名者只能刪掉自己的 pending 鎖；final 鎖 Rules 會拒絕刪除。
+    await rtdbRestDelete(`registrationNames/${formId}/${nameKey}`,5000);
+  }catch(e){
+    console.warn('releaseRegistrationNameLock failed',e);
+  }
 }
 async function backfillRegistrationNameLocks(formId,form,regs){
   if(!fbAuth?.currentUser || form?.ownerUid!==fbAuth.currentUser.uid)return;
   const expiry=registrationLockExpiry(form);
-  for(const r of Object.values(regs||{})){
-    if(!r?.playerName)continue;
+  const entries=Object.entries(regs||{})
+    .filter(([,r])=>r?.playerName)
+    .sort((a,b)=>(Number(a[1]?.created)||0)-(Number(b[1]?.created)||0));
+  const seen=new Set();
+
+  for(const [slotId,r] of entries){
     try{
       const key=r.nameKey||await registrationNameKey(r.playerName);
+      if(seen.has(key))continue;
+      seen.add(key);
       await rtdbRestPut(`registrationNames/${formId}/${key}`,{
         uid:r.submitterUid||fbAuth.currentUser.uid,
         created:Number(r.created)||Date.now(),
         expiresAt:expiry,
-        status:'final'
+        status:'final',
+        slotId
       },4000);
     }catch(e){
       console.warn('backfill registration name lock failed',e);
     }
   }
 }
+async function repairRegistrationNameLockAfterDelete(formId,row){
+  if(!row?.playerName)return;
+  const key=row.nameKey||await registrationNameKey(row.playerName);
+  const latest=(await rtdbRestGet(`registrations/${formId}`,5000).catch(()=>null))||{};
+  const same=Object.entries(latest)
+    .filter(([,r])=>r?.playerName && (r.nameKey===key || normalizeRegistrationName(r.playerName)===normalizeRegistrationName(row.playerName)))
+    .sort((a,b)=>(Number(a[1]?.created)||0)-(Number(b[1]?.created)||0));
+
+  if(!same.length){
+    await rtdbRestDelete(`registrationNames/${formId}/${key}`,5000).catch(e=>console.warn('刪除名稱鎖失敗',e));
+    return;
+  }
+
+  const [slotId,keep]=same[0];
+  await rtdbRestPut(`registrationNames/${formId}/${key}`,{
+    uid:keep.submitterUid||fbAuth.currentUser.uid,
+    created:Number(keep.created)||Date.now(),
+    expiresAt:registrationLockExpiry(activeRegistrationForm),
+    status:'final',
+    slotId
+  },5000).catch(e=>console.warn('修復名稱鎖失敗',e));
+}
 
 async function deleteRegistration(id){
   if(!confirm('確定刪除這筆報名嗎？'))return;
   const row=activeRegistrations[id]||null;
   try{
-    const normalized=row?.playerName?normalizeRegistrationName(row.playerName):'';
-    const sameNameRemains=normalized && Object.entries(activeRegistrations||{}).some(([otherId,r])=>otherId!==id && r?.playerName && normalizeRegistrationName(r.playerName)===normalized);
-
     await rtdbRestDelete(`registrations/${activeRegistrationFormId}/${id}`,5000);
-
-    if(row?.playerName){
-      const nameKey=row.nameKey||await registrationNameKey(row.playerName);
-      if(sameNameRemains){
-        await rtdbRestPut(`registrationNames/${activeRegistrationFormId}/${nameKey}`,{
-          uid:fbAuth.currentUser.uid,
-          created:Date.now(),
-          expiresAt:registrationLockExpiry(activeRegistrationForm),
-          status:'final'
-        },5000).catch(e=>console.warn('重建名稱鎖失敗',e));
-      }else{
-        await rtdbRestDelete(`registrationNames/${activeRegistrationFormId}/${nameKey}`,5000).catch(e=>console.warn('刪除名稱鎖失敗',e));
-      }
-    }
-
     delete activeRegistrations[id];
     registrationSelected.delete(id);
+
+    // 只有真的沒有其他同名報名者時才移除名稱鎖；
+    // 若是舊資料曾有重複同名，會把鎖重新指向剩下最早的一筆。
+    await repairRegistrationNameLockAfterDelete(activeRegistrationFormId,row);
+
     renderRegistrationList();
-  }catch(e){alert('刪除失敗：'+(e?.message||e))}
+  }catch(e){
+    alert('刪除失敗：'+(e?.message||e));
+  }
 }
 
 let manualRegistrationBusy=false;
@@ -3688,29 +3812,37 @@ async function manualAddRegistration(){
   const oldText=btn?.textContent||'新增選手';
   if(btn){btn.disabled=true;btn.textContent='新增中…';}
 
+  let nameKey='';
+  let lockClaimed=false;
+
   try{
-    // 先讀最新雲端名單，避免用到舊畫面資料。
     const latest=(await rtdbRestGet(`registrations/${activeRegistrationFormId}`,6000))||{};
     activeRegistrations=latest;
 
     const normalized=normalizeRegistrationName(playerName);
     const sameName=Object.values(latest).some(r=>r?.playerName && normalizeRegistrationName(r.playerName)===normalized);
-    if(sameName){
-      throw new Error('名稱重複，請更改選手名稱。');
-    }
+    if(sameName)throw new Error('名稱重複，請更改選手名稱。');
 
-    const nameKey=await registrationNameKey(playerName);
+    nameKey=await registrationNameKey(playerName);
     const ownerUid=fbAuth.currentUser.uid;
-    const lockResult=await rtdbRestPutIfEmpty(`registrationNames/${activeRegistrationFormId}/${nameKey}`,{
+    const pendingLock={
       uid:ownerUid,
       created:Date.now(),
-      expiresAt:registrationLockExpiry(activeRegistrationForm),
-      status:'final'
-    },6000);
+      expiresAt:registrationPendingExpiry(),
+      status:'pending'
+    };
+
+    const lockResult=await rtdbRestPutIfEmpty(
+      `registrationNames/${activeRegistrationFormId}/${nameKey}`,
+      pendingLock,
+      6000
+    );
     if(!lockResult.ok)throw new Error('名稱重複，請更改選手名稱。');
+    lockClaimed=true;
 
     let assigned=null;
     let assignedId='';
+
     for(let position=1;position<=totalCapacity;position++){
       const slotId=`S${String(position).padStart(4,'0')}`;
       if(latest[slotId])continue;
@@ -3727,21 +3859,36 @@ async function manualAddRegistration(){
         entryType:isMain?'main':'waitlist',
         created:Date.now()
       };
+      const finalLock={
+        uid:ownerUid,
+        created:pendingLock.created,
+        expiresAt:registrationLockExpiry(activeRegistrationForm),
+        status:'final',
+        slotId
+      };
 
-      const result=await rtdbRestPutIfEmpty(`registrations/${activeRegistrationFormId}/${slotId}`,row,6000);
-      if(result.ok){
+      try{
+        // 名額 + 名稱 final 鎖一次原子寫入，避免只成功其中一半。
+        await rtdbRestMultiUpdate({
+          [`registrations/${activeRegistrationFormId}/${slotId}`]:row,
+          [`registrationNames/${activeRegistrationFormId}/${nameKey}`]:finalLock
+        },6000);
         assigned=row;
         assignedId=slotId;
+        lockClaimed=false;
         break;
-      }
-      if(result.reason==='occupied'||result.reason==='race'){
-        // 有人剛好搶先取得這個名額，繼續找下一格。
-        continue;
+      }catch(e){
+        const msg=String(e?.message||e);
+        if(msg.includes('401')||msg.includes('403')||msg.includes('Permission denied')||msg.includes('PERMISSION_DENIED')){
+          continue;
+        }
+        throw e;
       }
     }
 
     if(!assigned){
-      await releaseRegistrationNameLock(activeRegistrationFormId,nameKey);
+      if(lockClaimed)await releaseRegistrationNameLock(activeRegistrationFormId,nameKey);
+      lockClaimed=false;
       await loadRegistrationAdmin(activeRegistrationFormId);
       throw new Error('正選與備選名額都已滿。若要再新增，請先刪除一筆或調整報名表名額。');
     }
@@ -3752,12 +3899,16 @@ async function manualAddRegistration(){
     renderRegistrationList();
     alert(`已新增「${playerName}」｜${assigned.entryLabel}`);
   }catch(e){
+    if(lockClaimed&&nameKey){
+      await releaseRegistrationNameLock(activeRegistrationFormId,nameKey);
+    }
     alert('新增選手失敗：'+(e?.message||e));
   }finally{
     manualRegistrationBusy=false;
     if(btn){btn.disabled=false;btn.textContent=oldText;}
   }
 }
+
 async function toggleRegistrationOpen(){
   if(!activeRegistrationForm)return;
   const next=activeRegistrationForm.open===false;
@@ -3820,11 +3971,15 @@ function closeRegistrationSuccess(){
 }
 
 async function submitRegistration(){
-  const f=activeRegistrationForm;if(!f)return;
-  if(f.open===false || (Number(f.deadline||0)>0&&Number(f.deadline)<Date.now()))return alert('這份報名表已截止。');
+  const f=activeRegistrationForm;
+  if(!f)return;
+  if(f.open===false || (Number(f.deadline||0)>0&&Number(f.deadline)<Date.now())){
+    return alert('這份報名表已截止。');
+  }
 
   const playerName=$('regPlayerName').value.trim();
   if(!playerName)return alert('請輸入選手名稱。');
+
   const phoneLast3=$('regPhoneLast3').value.trim();
   if(!/^\d{3}$/.test(phoneLast3))return alert('請輸入手機後三碼（3 位數字）。');
 
@@ -3832,21 +3987,26 @@ async function submitRegistration(){
   btn.disabled=true;
   btn.textContent='送出中…';
 
-  const maxPlayers=Number(f.maxPlayers)||0, waitlistMax=Number(f.waitlistMax)||0;
+  const maxPlayers=Number(f.maxPlayers)||0;
+  const waitlistMax=Number(f.waitlistMax)||0;
   const totalCapacity=maxPlayers+waitlistMax;
+
   if(totalCapacity<=0){
-    btn.disabled=false;btn.textContent=old;
+    btn.disabled=false;
+    btn.textContent=old;
     return alert('這份報名表尚未設定可用名額。');
   }
 
   let claimed=null;
-  let success=false;
+  let completed=false;
 
   try{
-    // 第一層：Firebase 名稱鎖。即使兩支手機同時按送出，同名也只能一支成功。
+    // 先搶兩分鐘 pending 名稱鎖。
+    // 同名不論是不是同一支手機 / 同一個匿名 UID，都不能再次取得鎖。
     claimed=await claimPublicRegistrationName(activeRegistrationFormId,playerName);
 
     let assigned=null;
+
     for(let position=1;position<=totalCapacity;position++){
       const entryLabel=position<=maxPlayers?`正選 ${position}`:`備選 ${position-maxPlayers}`;
       const slotId=`S${String(position).padStart(4,'0')}`;
@@ -3860,43 +4020,53 @@ async function submitRegistration(){
         entryType:position<=maxPlayers?'main':'waitlist',
         created:Date.now()
       };
+      const finalLock=finalRegistrationNameLock(claimed,f,slotId);
 
       try{
-        await rtdbRestPut(`registrations/${activeRegistrationFormId}/${slotId}`,row,5000);
+        // 這是一次 Firebase 原子多路徑更新：
+        // 「名額」與「名稱 final 鎖」要嘛一起成功，要嘛一起失敗。
+        await rtdbRestMultiUpdate({
+          [`registrations/${activeRegistrationFormId}/${slotId}`]:row,
+          [`registrationNames/${activeRegistrationFormId}/${claimed.nameKey}`]:finalLock
+        },6000);
+
         assigned=entryLabel;
+        completed=true;
         break;
       }catch(e){
         const msg=String(e?.message||e);
-        if(msg.includes('401')||msg.includes('403')||msg.includes('Permission denied')||msg.includes('PERMISSION_DENIED'))continue;
+        if(msg.includes('401')||msg.includes('403')||msg.includes('Permission denied')||msg.includes('PERMISSION_DENIED')){
+          // 最常見原因是此 slot 已被其他人搶先取得；換下一格。
+          continue;
+        }
         throw e;
       }
     }
 
     if(!assigned){
-      await releaseRegistrationNameLock(activeRegistrationFormId,claimed.nameKey);
+      // 沒取得任何名額，pending 鎖可以安全釋放。
+      if(claimed)await releaseRegistrationNameLock(activeRegistrationFormId,claimed.nameKey);
       claimed=null;
       $('regSubmitResult').textContent='目前正選與備選名額都已額滿。';
       btn.textContent='報名已額滿';
       return;
     }
 
-    // 報名成立後把名稱鎖延長到賽事結束後，後續同名一律禁止。
-    await finalizeRegistrationNameLock(activeRegistrationFormId,claimed.nameKey,f);
-
-    success=true;
     $('regSubmitResult').textContent='';
     $('regPlayerName').value='';
     $('regPhoneLast3').value='';
     showRegistrationSuccess(assigned,f);
 
   }catch(e){
-    if(claimed && !success){
+    // 只有在「名額 + final 鎖」尚未原子寫入成功時才釋放 pending 鎖。
+    if(claimed && !completed){
       await releaseRegistrationNameLock(activeRegistrationFormId,claimed.nameKey);
     }
+
     if(e?.code==='DUPLICATE_NAME' || String(e?.message||e).includes('名稱重複')){
       alert('名稱重複，請更改選手名稱。');
     }else{
-      $('regSubmitResult').textContent='送出失敗：'+(e?.message||e)+'；請通知主辦確認 Firebase Rules。';
+      $('regSubmitResult').textContent='送出失敗：'+(e?.message||e)+'；請稍後再試，或通知主辦。';
     }
   }finally{
     if(btn.textContent!=='報名已額滿'){
