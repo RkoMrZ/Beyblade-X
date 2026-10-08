@@ -1782,6 +1782,92 @@ html,body{max-width:100%;overflow-x:hidden}
 <style>
 .testEnvBadge{position:fixed;right:10px;bottom:10px;z-index:9999;padding:7px 10px;border-radius:999px;background:#7a3cff;color:#fff;font-size:11px;font-weight:900;box-shadow:0 4px 16px #0005;pointer-events:none}
 </style>
+
+<style id="pwaVisualViewportFix">
+/*
+  iOS Safari / 加到主畫面的 Web App(PWA) 對 position:fixed 的可視 viewport
+  可能與 layout viewport 不一致。所有重要彈窗固定使用 visualViewport
+  提供的實際 top / height，避免「看得到的位置」和「可點擊位置」錯位。
+*/
+:root{
+  --app-vv-top:0px;
+  --app-vv-height:100dvh;
+}
+
+.matchModal,
+.scorePickerPop,
+.resetChoiceModal,
+.importModal,
+.regSuccessModal{
+  inset:auto 0 auto 0 !important;
+  top:var(--app-vv-top) !important;
+  height:var(--app-vv-height) !important;
+  min-height:0 !important;
+  max-height:none !important;
+}
+
+/* 比賽編輯器：不要再靠固定 70/78px 底部補償，PWA 會因此整塊錯位 */
+.matchModal{
+  display:flex !important;
+  align-items:flex-end !important;
+  justify-content:center !important;
+  padding:6px !important;
+  padding-bottom:calc(6px + env(safe-area-inset-bottom)) !important;
+  overflow:hidden !important;
+}
+
+.matchModal.hidden{
+  display:none !important;
+}
+
+.matchSheet{
+  width:min(520px,100%) !important;
+  min-height:0 !important;
+  max-height:calc(var(--app-vv-height) - 12px - env(safe-area-inset-bottom)) !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain !important;
+  -webkit-overflow-scrolling:touch;
+  transform:none !important;
+}
+
+/* 分數選擇器也套同一個可視 viewport，避免 PWA 點擊位置偏移 */
+.scorePickerPop{
+  align-items:flex-end !important;
+  justify-content:center !important;
+  padding:6px !important;
+  padding-bottom:calc(6px + env(safe-area-inset-bottom)) !important;
+}
+.scorePickerPop.hidden{
+  display:none !important;
+}
+.scorePickerCard{
+  max-height:calc(var(--app-vv-height) - 12px - env(safe-area-inset-bottom)) !important;
+  overflow-y:auto !important;
+}
+
+/* 其他全螢幕彈窗同樣不要超出實際可視區 */
+.resetChoiceModal,
+.importModal,
+.regSuccessModal{
+  overflow:auto !important;
+}
+
+@media(max-width:520px){
+  .matchSheet{
+    padding:9px !important;
+    border-radius:16px 16px 12px 12px !important;
+  }
+  .sheetClose{
+    min-width:46px !important;
+    min-height:44px !important;
+  }
+  .sheetRef{
+    grid-template-columns:82px minmax(0,1fr) !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="testEnvBadge">🧪 TEST + 報名系統</div>
@@ -5294,6 +5380,19 @@ function getRefereeClaim(index){
   return claims[refereeClaimKey(index)]||null;
 }
 
+async function refreshRefereeClaimsNow(){
+  if(!ev || ev.testOnly || (!isAdmin&&!isReferee))return normalizeRefereeClaims();
+
+  try{
+    const latest=(await rtdbRestGet(`refereeClaims/${ev.id}`,5000))||{};
+    ev.refereeClaims=latest;
+    return latest;
+  }catch(e){
+    console.warn('refreshRefereeClaimsNow failed',e);
+    return normalizeRefereeClaims();
+  }
+}
+
 function findRefereeIndexByName(name){
   return Array.isArray(ev?.refereeNames)?ev.refereeNames.indexOf(name):-1;
 }
@@ -5415,11 +5514,33 @@ async function releaseRefereeSlot(index){
 
   normalizeRefereeClaims();
 
-  const claim=getRefereeClaim(index);
-  if(!claim)return;
-
+  let claim=getRefereeClaim(index);
   const uid=currentRefereeUid();
   const organizer=hasOrganizerAccess();
+
+  // 雲端賽事有時 event 本體刷新會暫時不帶 refereeClaims；
+  // 釋放前直接向專用節點讀一次，避免「已領取」框與釋放按鈕消失。
+  if(!claim && !ev.testOnly && (organizer||isReferee)){
+    await refreshRefereeClaimsNow();
+    claim=getRefereeClaim(index);
+  }
+
+  // 主辦即使畫面暫時沒有 claim，也可以直接清掉指定裁判槽。
+  if(!claim && organizer && !ev.testOnly){
+    try{
+      await rtdbRestDelete(`refereeClaims/${ev.id}/${refereeClaimKey(index)}`,5000);
+      const name=ev.refereeNames?.[index]||'';
+      if(getMyReferee()===name)localStorage.removeItem(refereeIdentityKey());
+      if(ev.refereeClaims)delete ev.refereeClaims[refereeClaimKey(index)];
+      renderAdmin();
+      showTab('referee');
+      return;
+    }catch(e){
+      return alert('釋放裁判身分失敗：'+(e?.message||e));
+    }
+  }
+
+  if(!claim)return alert('目前找不到這個裁判的領取資料，請按重新整理後再試一次。');
 
   // 只有該裁判本人或主辦可以釋放。
   if(!organizer && (!uid || claim.uid!==uid)){
@@ -6014,6 +6135,7 @@ function backToBracketFromMatch(){
 }
 
 function openMatchEditor(ri,mi){
+  syncAppVisualViewport();
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.rounds?.[ri]?.matches?.[mi];
@@ -6436,6 +6558,7 @@ function resetRRMatch(i){
 }
 
 function openRRMatch(i){
+  syncAppVisualViewport();
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
   let m=ev.finalRR.matches[i];
@@ -7429,9 +7552,13 @@ function showTab(t){
   if(t==='referee')renderReferee();
   else stopRefereeCodeRotation();
 }
-function renderReferee(){
+async function renderReferee(){
   normalizeEvent();
   normalizeRefereeClaims();
+
+  if(!ev.testOnly && (isAdmin||isReferee)){
+    await refreshRefereeClaimsNow();
+  }
 
   const invite=new URLSearchParams(location.search).get('ref')==='1';
   const myUid=currentRefereeUid();
@@ -7441,9 +7568,11 @@ function renderReferee(){
     const mine=!!(claim && myUid && claim.uid===myUid);
     const taken=!!claim && !mine;
     const me=getMyReferee();
-    const selected=mine && me===name;
+    const localSelected=me===name;
+    const selected=mine || localSelected;
+    const organizer=hasOrganizerAccess();
 
-    return `<div class="refIdentityRow ${taken?'claimed':''}">
+    return `<div class="refIdentityRow ${(taken||claim)?'claimed':''}">
       <button
         type=button
         class="${selected?'':'secondary'} refIdentityBtn"
@@ -7451,9 +7580,9 @@ function renderReferee(){
         onclick='setMyReferee(${JSON.stringify(name)})'
       >
         ${selected?'✓ ':''}⚖ ${esc(name)}
-        ${taken?'・已被領取':mine?'・你已領取':''}
+        ${taken?'・已被領取':mine?'・你已領取':localSelected?'・本機已選':''}
       </button>
-      ${(mine||hasOrganizerAccess())&&claim
+      ${((mine||localSelected)&&isReferee || organizer&&claim)
         ? `<button type=button class="danger refReleaseBtn" onclick="releaseRefereeSlot(${index})">釋放</button>`
         : ''
       }
@@ -7469,9 +7598,9 @@ function renderReferee(){
         <span class=num>${i+1}</span>
         <input id="refName${i}" value="${esc(name)}" placeholder="裁判 ${i+1}" ${claimed?'disabled':''}>
         ${claimed?`<span class=refClaimState>${isMyRefereeClaim(i)?'你已領取':'使用中'}</span>`:''}
-        ${!claimed && n>1
-          ? `<button type=button class="danger mini" onclick="removeReferee(${i})">刪除</button>`
-          : ''
+        ${claimed
+          ? `<button type=button class="danger mini" onclick="releaseRefereeSlot(${i})">釋放</button>`
+          : (n>1?`<button type=button class="danger mini" onclick="removeReferee(${i})">刪除</button>`:'')
         }
       </div>`;
     }).join('');
@@ -7986,6 +8115,33 @@ async function bootstrapCloud(){
 
   renderSavedEvents();
 }
+
+
+function syncAppVisualViewport(){
+  try{
+    const vv=window.visualViewport;
+    const top=vv ? Math.max(0,Number(vv.offsetTop)||0) : 0;
+    const height=vv ? Math.max(320,Number(vv.height)||window.innerHeight) : window.innerHeight;
+
+    document.documentElement.style.setProperty('--app-vv-top',`${top}px`);
+    document.documentElement.style.setProperty('--app-vv-height',`${height}px`);
+  }catch(e){
+    document.documentElement.style.setProperty('--app-vv-top','0px');
+    document.documentElement.style.setProperty('--app-vv-height',`${window.innerHeight}px`);
+  }
+}
+
+syncAppVisualViewport();
+
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',syncAppVisualViewport,{passive:true});
+  window.visualViewport.addEventListener('scroll',syncAppVisualViewport,{passive:true});
+}
+window.addEventListener('resize',syncAppVisualViewport,{passive:true});
+window.addEventListener('orientationchange',()=>{
+  setTimeout(syncAppVisualViewport,50);
+  setTimeout(syncAppVisualViewport,250);
+});
 
 bootstrapCloud();
 </script>
