@@ -1718,6 +1718,21 @@ html,body{max-width:100%;overflow-x:hidden}
 .regAdminInfoItem.wide{grid-column:1/-1}
 .regAdminInfoItem.deadline{grid-column:1/-1;border-color:#efb2a4;background:color-mix(in srgb,#ff654d 9%,var(--panel2))}
 .regAdminInfoItem.deadline .k,.regAdminInfoItem.deadline .v{color:#c74936}
+.regAdminTop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.regAdminTop h2{margin:0;line-height:1.15}
+.regAdminTop button{align-self:center;flex:0 0 auto}
+.regNoticeModal,.regSuccessModal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.58);display:flex;align-items:center;justify-content:center;padding:18px}
+.regNoticeModal.hidden,.regSuccessModal.hidden{display:none}
+.regNoticeCard,.regSuccessCard{width:min(560px,100%);max-height:82vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.28)}
+.regNoticeCard h2,.regSuccessCard h2{margin:0 0 12px}
+.regNoticeBody{white-space:pre-wrap;line-height:1.75;font-size:15px}
+.regSuccessMain{text-align:center;padding:6px 0 14px}
+.regSuccessMark{font-size:46px;line-height:1}
+.regSuccessLabel{font-size:24px;font-weight:900;margin-top:8px}
+.regSuccessEntry{display:inline-block;margin-top:8px;padding:7px 13px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-weight:850}
+.regSuccessInfo{display:grid;gap:8px;margin-top:12px}
+.regSuccessInfo>div{padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:var(--panel2);font-weight:750}
+
 .regManualAdd{margin:12px 0 4px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
 .regManualAddHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .regManualAddBody{margin-top:10px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
@@ -1851,7 +1866,7 @@ html,body{max-width:100%;overflow-x:hidden}
    <div><label>正選人數上限<span class="requiredMark">*</span></label><input id="regFormMax" required type="number" min="2" max="256" value="24"></div>
    <div><label>備選人數上限（選填）</label><input id="regFormWaitlistMax" type="number" min="0" max="256" placeholder="不需要備選可以留空"></div>
   </div>
-  <label>宣傳內文（選填）</label><textarea id="regFormDesc" rows="8" maxlength="3000" placeholder="例如：
+  <label>賽事公告（選填）</label><textarea id="regFormDesc" rows="8" maxlength="3000" placeholder="例如：
 🏆 大會獎項
 ⚠️ 注意事項
 📣 其他活動說明
@@ -1867,17 +1882,6 @@ html,body{max-width:100%;overflow-x:hidden}
 <section id="registrationPublic" class="hidden">
  <div class="card regPublicHero"><div class="muted">Beyblade X 線上報名</div><h2 id="regPublicTitle">報名表</h2><div id="regPublicStatus" class="muted"></div></div>
  <div class="card regPublicForm">
-  <div class="regPublicInfo">
-   <div id="regPublicDate" class="regLinkBox hidden"></div>
-   <div id="regPublicCheckIn" class="regLinkBox hidden"></div>
-   <div id="regPublicStart" class="regLinkBox hidden"></div>
-   <div id="regPublicAddress" class="regLinkBox hidden"></div>
-   <div id="regPublicFee" class="regLinkBox hidden"></div>
-  </div>
-  <div id="regPublicDescWrap" class="regPublicDescWrap hidden">
-   <div class="regPublicDescTitle">📣 賽事公告 / 宣傳內容</div>
-   <div id="regPublicDesc" style="white-space:pre-wrap"></div>
-  </div>
   <div class="regPublicEntryTitle">填寫報名資料</div>
   <label>選手名稱 *</label><input id="regPlayerName" maxlength="40" placeholder="比賽現場使用的名稱">
   <label>手機後三碼 *</label><input id="regPhoneLast3" type="tel" inputmode="numeric" maxlength="3" pattern="[0-9]{3}" placeholder="例如：168">
@@ -1888,8 +1892,9 @@ html,body{max-width:100%;overflow-x:hidden}
 
 <section id="registrationAdmin" class="hidden">
  <div class="card">
-  <div class="row"><div style="min-width:0;flex:1"><h2 id="regAdminTitle" style="margin:0 0 5px">報名管理</h2><div id="regAdminMeta" class="regAdminInfoGrid"></div></div><button class="ghost" type="button" onclick="openRegistrationHub()">返回報名系統</button></div>
-  <div class="regStatRow"><span id="regTotalStat" class="regStat">報名 0</span><span id="regSelectedStat" class="regStat">已勾選 0</span></div>
+  <div class="regAdminTop"><h2 id="regAdminTitle">報名管理</h2><button class="ghost" type="button" onclick="openRegistrationHub()">返回報名系統</button></div>
+  <div id="regAdminMeta" class="regAdminInfoGrid"></div>
+  
   <div id="regShareUrl" class="regLinkBox"></div>
   <div class="toolbar" style="margin-top:10px"><button class="secondary" type="button" onclick="copyRegistrationLink()">複製報名連結</button><button id="regToggleOpenBtn" class="secondary" type="button" onclick="toggleRegistrationOpen()">關閉報名</button></div>
  </div>
@@ -1905,11 +1910,32 @@ html,body{max-width:100%;overflow-x:hidden}
   </div>
   <div id="registrationList" class="regList"></div>
   <div class="regStickyTools">
-   <div id="regSelectedPreview" class="muted">尚未勾選選手。</div>
+   <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">報名 0</span><span id="regSelectedStat" class="regStat">已勾選 0</span></div>
    <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已勾選名單</button><button type="button" onclick="importSelectedToTournament()">📥 匯入建立賽事</button></div>
   </div>
  </div>
 </section>
+
+<div id="registrationNoticeModal" class="regNoticeModal hidden">
+ <div class="regNoticeCard">
+  <div class="muted">Beyblade X 線上報名</div>
+  <h2>📣 賽事公告</h2>
+  <div id="registrationNoticeBody" class="regNoticeBody"></div>
+  <button type="button" style="width:100%;margin-top:18px;padding:14px" onclick="closeRegistrationNotice()">開始報名</button>
+ </div>
+</div>
+
+<div id="registrationSuccessModal" class="regSuccessModal hidden">
+ <div class="regSuccessCard">
+  <div class="regSuccessMain">
+   <div class="regSuccessMark">✅</div>
+   <div class="regSuccessLabel">報名成功</div>
+   <div id="registrationSuccessEntry" class="regSuccessEntry"></div>
+  </div>
+  <div id="registrationSuccessInfo" class="regSuccessInfo"></div>
+  <button type="button" style="width:100%;margin-top:16px;padding:14px" onclick="closeRegistrationSuccess()">完成</button>
+ </div>
+</div>
 
 <div id="registrationImportModal" class="importModal hidden" onclick="if(event.target===this)closeImportRegistration()"><div class="importCard">
  <div class="row"><div><h3 style="margin:0">從報名表匯入</h3><div class="muted">選擇報名表，再勾選要放進參賽名單的人。</div></div><button class="ghost" type="button" onclick="closeImportRegistration()">關閉</button></div>
@@ -3525,7 +3551,7 @@ function toggleRegistrationSelected(id,on){if(on)registrationSelected.add(id);el
 function updateRegistrationSelectedUI(){
   const names=[...registrationSelected].map(id=>activeRegistrations[id]?.playerName).filter(Boolean);
   $('regSelectedStat').textContent=`已勾選 ${names.length}`;
-  $('regSelectedPreview').textContent=names.length?`已選：${names.join('、')}`:'尚未勾選選手。';
+  
 }
 async function deleteRegistration(id){
   if(!confirm('確定刪除這筆報名嗎？'))return;
@@ -3639,23 +3665,38 @@ async function openPublicRegistration(formId){
     const timeClosed=Number(f.deadline||0)>0 && Number(f.deadline)<Date.now();
     const closed=f.open===false || timeClosed;
     $('regPublicStatus').textContent=closed?'報名已截止':`報名截止：${formatRegDate(f.deadline)}｜正選上限 ${maxPlayers} 人${waitlistMax>0?`｜備選上限 ${waitlistMax} 人`:''}`;
-    const dateBox=$('regPublicDate');
-    dateBox.classList.toggle('hidden',!f.eventDate);dateBox.textContent=f.eventDate?`📅 比賽日期：${f.eventDate}`:'';
-    const checkInBox=$('regPublicCheckIn');
-    checkInBox.classList.toggle('hidden',!f.checkInTime);checkInBox.textContent=f.checkInTime?`🕘 報到時間：${f.checkInTime}`:'';
-    const startBox=$('regPublicStart');
-    startBox.classList.toggle('hidden',!f.startTime);startBox.textContent=f.startTime?`🕤 比賽時間：${f.startTime}`:'';
-    const addr=$('regPublicAddress');
-    addr.classList.toggle('hidden',!f.address);addr.textContent=f.address?`📍 舉辦地點 / 店面名稱：${f.address}`:'';
-    const feeBox=$('regPublicFee');
-    feeBox.classList.toggle('hidden',f.fee===undefined||f.fee===null||f.fee==='');feeBox.textContent=(f.fee===undefined||f.fee===null||f.fee==='')?'':`💰 報名費：${Number(f.fee)===0?'免費':`NT$ ${Number(f.fee)} / 人`}`;
-    const descWrap=$('regPublicDescWrap');
-    descWrap.classList.toggle('hidden',!f.description);
-    $('regPublicDesc').textContent=f.description||'';
-    $('regSubmitBtn').disabled=closed;$('regSubmitBtn').textContent=closed?'報名已截止':'送出報名';
+    $('regSubmitBtn').disabled=closed;
+    $('regSubmitBtn').textContent=closed?'報名已截止':'送出報名';
     $('regSubmitResult').textContent='';
+    if(f.description && String(f.description).trim()){
+      $('registrationNoticeBody').textContent=String(f.description).trim();
+      $('registrationNoticeModal').classList.remove('hidden');
+    }else{
+      $('registrationNoticeModal').classList.add('hidden');
+    }
   }catch(e){$('regPublicStatus').textContent='無法讀取報名表';$('regSubmitBtn').disabled=true;$('regSubmitResult').textContent=e?.message||e}
 }
+function closeRegistrationNotice(){
+  $('registrationNoticeModal')?.classList.add('hidden');
+}
+function formatRegistrationFeeValue(fee){
+  const n=Number(fee);
+  return Number.isFinite(n) && n===0 ? '免費' : (Number.isFinite(n) ? `NT$ ${n} / 人` : '—');
+}
+function showRegistrationSuccess(assigned,form){
+  $('registrationSuccessEntry').textContent=assigned||'報名完成';
+  const rows=[];
+  if(form?.eventDate)rows.push(`<div>📅 比賽日期：${esc(form.eventDate)}</div>`);
+  if(form?.checkInTime)rows.push(`<div>🕘 報到時間：${esc(form.checkInTime)}</div>`);
+  if(form?.address)rows.push(`<div>📍 舉辦地址 / 店面名稱：${esc(form.address)}</div>`);
+  rows.push(`<div>💰 報名費：${esc(formatRegistrationFeeValue(form?.fee))}</div>`);
+  $('registrationSuccessInfo').innerHTML=rows.join('');
+  $('registrationSuccessModal').classList.remove('hidden');
+}
+function closeRegistrationSuccess(){
+  $('registrationSuccessModal')?.classList.add('hidden');
+}
+
 async function submitRegistration(){
   const f=activeRegistrationForm;if(!f)return;
   if(f.open===false || (Number(f.deadline||0)>0&&Number(f.deadline)<Date.now()))return alert('這份報名表已截止。');
@@ -3687,8 +3728,9 @@ async function submitRegistration(){
       btn.textContent='報名已額滿';
       return;
     }
-    $('regSubmitResult').textContent=`✅ 報名完成｜${assigned}`;
+    $('regSubmitResult').textContent='';
     $('regPlayerName').value='';$('regPhoneLast3').value='';
+    showRegistrationSuccess(assigned,f);
   }catch(e){
     $('regSubmitResult').textContent='送出失敗：'+(e?.message||e)+'；請通知主辦確認 Firebase Rules。';
   }finally{
