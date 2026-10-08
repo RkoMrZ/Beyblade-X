@@ -4739,6 +4739,15 @@ async function createTournament(){
       return;
     }
 
+    if(
+      draftMode==='free' &&
+      $('freeFinal').value==='rr3' &&
+      !canFreeReachThree(r.length)
+    ){
+      alert(`目前 ${r.length} 人無法用「一路兩兩淘汰，剩 3 人後三人循環」自然淘汰到 3 人。\n\n請調整人數，或把自由編排目標改成「一路兩兩淘汰至冠軍」。`);
+      return;
+    }
+
     const testOnly=draftStorage==='test';
     let pairing=$('pairMode').value;
     if(pairing==='random')r=shuffle(r);
@@ -4874,8 +4883,24 @@ async function createTournament(){
   }
 }
 function nextPow2(n){let p=1;while(p<n)p*=2;return p}
+function canFreeReachThree(n){
+  n=Math.max(0,Math.floor(Number(n)||0));
+  if(n===3)return true;
+  while(n>3)n=Math.ceil(n/2);
+  return n===3;
+}
 function buildFirst(){
  let r=[...ev.roster], slots=[];
+
+ if(ev.mode==='free'&&ev.freeFinal==='rr3'&&r.length===3){
+   ev.rounds=[];
+   ev.finalRR={
+     players:[...r],
+     matches:[match(r[0],r[1]),match(r[1],r[2]),match(r[0],r[2])]
+   };
+   return;
+ }
+
  if(ev.mode==='single'){
    let p=nextPow2(r.length), byes=p-r.length;
    // distribute BYEs by pairing a player with BYE first, then normal pairs
@@ -5016,8 +5041,10 @@ function pick(ri,mi,side){
  ensureNext();
  put();
 }
-function score(ri,mi){
+async function score(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
+  await cancelQueuedMatchCloud('round',ri,mi);
 
   let m=ev.rounds[ri].matches[mi];
   if(!canEditMatchScore(m)||!canCompleteMatch(m))return;
@@ -5073,6 +5100,8 @@ async function resetScoreOnly(){
 
   if(!m)return alert('找不到這場比賽資料。');
 
+  await cancelQueuedMatchCloud(t.kind,t.ri,t.mi);
+
   if(m.winner&&!m._previousWinner)m._previousWinner=m.winner;
 
   m.winner=null;
@@ -5105,6 +5134,8 @@ async function clearMatchAll(){
     : ev.rounds?.[t.ri]?.matches?.[t.mi];
 
   if(!m)return alert('找不到這場比賽資料。');
+
+  await cancelQueuedMatchCloud(t.kind,t.ri,t.mi);
 
   const before=cloneJson(ev);
   const hadWinner=!!(m._previousWinner||m.winner);
@@ -5170,6 +5201,7 @@ async function claimRRMatchAs(i){
     }
 
     await releaseMyOtherMatchesCloud(who,'rr',0,i);
+    await cancelQueuedMatchCloud('rr',0,i);
 
     const result=await atomicClaimMatch('rr',0,i,who);
 
@@ -5192,8 +5224,10 @@ async function claimRRMatchAs(i){
   }
 }
 
-function rrScore(i){
+async function rrScore(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
+  await cancelQueuedMatchCloud('rr',0,i);
 
   let m=ev.finalRR.matches[i];
   if(!canEditMatchScore(m)||!canCompleteMatch(m))return;
@@ -5230,7 +5264,8 @@ function renderBracketMatch(m,ri,mi){
   const pendingA=m.a==='待定', pendingB=m.b==='待定';
   const scoreA=pendingA?'':(m.sa===''?'–':m.sa);
   const scoreB=pendingB?'':(m.sb===''?'–':m.sb);
-  const canEdit=(isAdmin||isReferee||!!ev?.testOnly) && !pendingA && !pendingB;
+  const autoAdvance=m.a==='BYE'||m.b==='BYE';
+  const canEdit=(isAdmin||isReferee||!!ev?.testOnly) && !pendingA && !pendingB && !autoAdvance;
   return `<button type="button" class="bracketMatch ${m.winner?'done':''} ${m.refereeActive?'judging':''}" data-ri="${ri}" data-mi="${mi}" ${canEdit?`onclick="openMatchEditor(${ri},${mi})"`:'aria-disabled="true"'}><span class=tapEdit>${canEdit?'點擊編輯':(pendingA||pendingB?'等待出線':'觀看')}</span><div class=matchNo>第 ${mi+1} 場</div>
     <div class="bSide ${pendingA?'pending':''} ${m.winner===m.a?'winner':''}"><span class=bName>${m.winner===m.a?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.a)}</span></span><span class=bScore>${esc(scoreA)}</span></div>
     <div class="bSide ${pendingB?'pending':''} ${m.winner===m.b?'winner':''}"><span class=bName>${m.winner===m.b?'<span class=winnerDot>●</span>':''}<span class=playerLabel>${esc(m.b)}</span></span><span class=bScore>${esc(scoreB)}</span></div>${m.refereeActive?`<span class="refTag live">⚖ 執裁中：${esc(m.referee)}</span>`:''}</button>`;
@@ -5522,43 +5557,23 @@ async function refreshEventBeforeCriticalAction(){
 }
 
 
-async function cloudSet(path,value,timeoutMs=3000){
+async function cloudSet(path,value,timeoutMs=5000){
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
   if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
 
-  try{
-    await Promise.race([
-      fbDb.ref(path).set(value),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase SDK 單筆寫入逾時')),timeoutMs))
-    ]);
-    return true;
-  }catch(e){
-    console.warn('cloudSet SDK failed/timeout, fallback REST PUT',path,e);
-
-    // iOS Safari 若 Firebase SDK set() 卡住，3 秒後改走 REST PUT。
-    // REST 最多再等 5 秒，避免現場操作等待過久。
-    await rtdbRestPut(path,value,5000);
-    return true;
-  }
+  // 所有雲端寫入固定走 REST。
+  // 不再同時啟動 Firebase SDK set/update + timeout fallback，
+  // 避免 SDK 延遲完成後把較新的比分/裁判狀態覆蓋回舊資料。
+  await rtdbRestPut(path,value,Math.max(3000,timeoutMs));
+  return true;
 }
 
 async function cloudUpdate(updates,timeoutMs=8000){
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
   if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
 
-  try{
-    await Promise.race([
-      fbDb.ref().update(updates),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Firebase SDK 寫入逾時')),timeoutMs))
-    ]);
-    return true;
-  }catch(e){
-    console.warn('cloudUpdate SDK failed/timeout, fallback REST PATCH',e);
-
-    // 建立賽事、裁判設定等低頻操作若 SDK 在 iOS Safari 卡住，
-    // 自動改用已有 timeout 的 REST PATCH，避免畫面永久停在「建立中…」。
-    return await rtdbRestPatchRoot(updates,10000);
-  }
+  await rtdbRestPatchRoot(updates,Math.max(5000,timeoutMs));
+  return true;
 }
 
 function matchCloudPath(kind,ri,mi){
@@ -5570,8 +5585,29 @@ function matchCloudPath(kind,ri,mi){
 
 const matchSyncTimers=new Map();
 const matchSyncRetry=new Map();
+const matchSyncInFlight=new Map();
+const matchSyncGeneration=new Map();
 let eventSyncTimer=null;
 let lastBackgroundSyncAlert=0;
+
+async function cancelQueuedMatchCloud(kind,ri,mi){
+  const key=`${kind}:${ri}:${mi}`;
+  matchSyncGeneration.set(key,(matchSyncGeneration.get(key)||0)+1);
+
+  const timer=matchSyncTimers.get(key);
+  if(timer){
+    clearTimeout(timer);
+    matchSyncTimers.delete(key);
+  }
+  matchSyncRetry.delete(key);
+
+  // 如果舊的快速比分已經送出 HTTP 請求，就等它結束後再做
+  // 「完成 / 重設 / 釋放」的最終寫入，確保最後一筆一定是新狀態。
+  const inFlight=matchSyncInFlight.get(key);
+  if(inFlight){
+    try{await inFlight}catch(e){}
+  }
+}
 
 function cloneJson(v){
   return JSON.parse(JSON.stringify(v));
@@ -5599,25 +5635,47 @@ function queueSingleMatchCloud(kind,ri,mi,delay=100){
   const key=`${kind}:${ri}:${mi}`;
   const path=matchCloudPath(kind,ri,mi);
   const snapshot=cloneJson(m);
+  const generation=matchSyncGeneration.get(key)||0;
 
   if(matchSyncTimers.has(key))clearTimeout(matchSyncTimers.get(key));
 
   matchSyncTimers.set(key,setTimeout(async()=>{
     matchSyncTimers.delete(key);
+
+    // 如果這筆在等待期間已被「完成 / 重設 / 釋放」取消，就不要再送。
+    if((matchSyncGeneration.get(key)||0)!==generation)return;
+
+    const writePromise=rtdbRestPut(path,snapshot,3000);
+    matchSyncInFlight.set(key,writePromise);
+
     try{
-      await rtdbRestPut(path,snapshot,3000);
-      matchSyncRetry.delete(key);
+      await writePromise;
+      if((matchSyncGeneration.get(key)||0)===generation){
+        matchSyncRetry.delete(key);
+      }
     }catch(e){
       console.warn('background match sync failed',key,e);
+
+      // 已被新的最終操作取消，不准舊資料再重試。
+      if((matchSyncGeneration.get(key)||0)!==generation)return;
+
       const retry=(matchSyncRetry.get(key)||0)+1;
       matchSyncRetry.set(key,retry);
 
       if(retry<=1){
-        setTimeout(()=>queueSingleMatchCloud(kind,ri,mi,0),350);
+        setTimeout(()=>{
+          if((matchSyncGeneration.get(key)||0)===generation){
+            queueSingleMatchCloud(kind,ri,mi,0);
+          }
+        },350);
       }else{
         matchSyncRetry.delete(key);
         backgroundSyncAlert('這次比分沒有成功寫入 Firebase，將重新讀取雲端資料避免衝突。');
         backgroundRefreshCurrentEvent(ev.id);
+      }
+    }finally{
+      if(matchSyncInFlight.get(key)===writePromise){
+        matchSyncInFlight.delete(key);
       }
     }
   },delay));
@@ -5958,7 +6016,10 @@ function backToBracketFromMatch(){
 function openMatchEditor(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
 
-  let m=ev.rounds[ri].matches[mi];
+  let m=ev.rounds?.[ri]?.matches?.[mi];
+  if(!m)return;
+  if(m.a==='待定'||m.b==='待定')return alert('這場尚未確定出線選手。');
+  if(m.a==='BYE'||m.b==='BYE')return alert('這是自動晉級場，不需要執裁。');
 
   const scoreEnabled=canEditMatchScore(m);
   const finishLocked=scoreEnabled && matchReachedFinishThreshold(m);
@@ -6741,6 +6802,11 @@ async function atomicClaimMatch(kind,ri,mi,who){
 async function claimMatchAs(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有執裁權限。');
 
+  const target=ev?.rounds?.[ri]?.matches?.[mi];
+  if(!target)return alert('找不到這場比賽資料。');
+  if(target.a==='待定'||target.b==='待定')return alert('這場尚未確定出線選手。');
+  if(target.a==='BYE'||target.b==='BYE')return alert('這是自動晉級場，不需要執裁。');
+
   const who=currentRefereeName();
   if(!who)return alert('請先到裁判頁選擇你的裁判名稱。');
 
@@ -6763,6 +6829,7 @@ async function claimMatchAs(ri,mi){
     }
 
     await releaseMyOtherMatchesCloud(who,'round',ri,mi);
+    await cancelQueuedMatchCloud('round',ri,mi);
 
     const result=await atomicClaimMatch('round',ri,mi,who);
 
@@ -6784,8 +6851,10 @@ async function claimMatchAs(ri,mi){
     }
   }
 }
-function releaseMatchAny(ri,mi){
+async function releaseMatchAny(ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
+  await cancelQueuedMatchCloud('round',ri,mi);
 
   let m=ev.rounds[ri].matches[mi];
   const me=currentRefereeName();
@@ -6801,8 +6870,10 @@ function releaseMatchAny(ri,mi){
   queueSingleMatchCloud('round',ri,mi,0);
   openMatchEditor(ri,mi);
 }
-function releaseRRMatchAny(i){
+async function releaseRRMatchAny(i){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return;
+
+  await cancelQueuedMatchCloud('rr',0,i);
 
   let m=ev.finalRR.matches[i];
   const me=currentRefereeName();
