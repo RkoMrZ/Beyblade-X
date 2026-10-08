@@ -1748,9 +1748,9 @@ body.bracketFullscreen{overflow:hidden}body.bracketFullscreen .bracketShell{posi
 </div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.8.0/firebase-database-compat.js"></script>
 <script>
 const THEME_KEY='bx_theme';
 const FIREBASE_CONFIG = {
@@ -1935,27 +1935,81 @@ function selectStorageMode(mode){
   localStorage.setItem(KEEP,mode==='test'?'1':'0');
   renderHomeSelections();
 }
+let googleLoginBusy=false;
+
+function isInAppBrowser(){
+  const ua=navigator.userAgent||'';
+  return /Line\/|FBAN|FBAV|Instagram|MicroMessenger|Twitter/i.test(ua);
+}
+
+function setGoogleLoginBusy(busy){
+  googleLoginBusy=!!busy;
+  const b=$('googleLoginBtn');
+  if(!b)return;
+  b.disabled=!!busy;
+  if(busy){
+    b.classList.remove('logged');
+    b.textContent='Google 登入中…';
+  }else{
+    renderHeaderAuth();
+  }
+}
+
 async function requireGoogleLogin(){
-  if(!(await initCloud()))return false;
   if(isGoogleUser())return true;
+  if(googleLoginBusy)return false;
+
+  if(isInAppBrowser()){
+    alert('目前使用的是 App 內建瀏覽器，Google 登入容易失敗。\n\n請先用 Safari 或 Chrome 直接開啟網站，再按 Google 登入。');
+    return false;
+  }
+
+  if(!(await initCloud()))return false;
+
+  setGoogleLoginBusy(true);
+
   try{
     const provider=new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({prompt:'select_account'});
-    const result=await fbAuth.signInWithPopup(provider);
-    fbUser=result.user||fbAuth.currentUser;
+
+    // 正式版固定使用 popup，不使用 redirect。
+    const loginPromise=fbAuth.signInWithPopup(provider);
+    const timeoutPromise=new Promise((_,reject)=>{
+      setTimeout(()=>{
+        const err=new Error('Google 登入逾時');
+        err.code='auth/login-timeout';
+        reject(err);
+      },20000);
+    });
+
+    const result=await Promise.race([loginPromise,timeoutPromise]);
+    fbUser=result?.user||fbAuth.currentUser;
     renderHeaderAuth();
     renderHomeSelections();
     return isGoogleUser();
+
   }catch(e){
     console.error('Google popup login failed',e);
+
     if(e?.code==='auth/popup-blocked'){
-      alert('Google 登入視窗被瀏覽器阻擋，請允許彈出式視窗後再試一次。');
+      alert('Google 登入視窗被瀏覽器阻擋。\n\n請允許彈出式視窗，或改用 Safari / Chrome 後再試一次。');
     }else if(e?.code==='auth/popup-closed-by-user'){
-      // 使用者自行關閉，不顯示錯誤。
+      // 使用者主動關閉，不顯示錯誤。
+    }else if(e?.code==='auth/cancelled-popup-request'){
+      // 重複點擊造成舊 popup 被取消。
+    }else if(e?.code==='auth/login-timeout'){
+      alert('Google 登入等待過久，已停止等待。\n\n請重新整理後再試一次；如果是從 LINE 開啟，請先改用 Safari / Chrome。');
+    }else if(e?.code==='auth/network-request-failed'){
+      alert('Google 登入失敗：網路連線不穩定，請確認網路後再試一次。');
+    }else if(e?.code==='auth/unauthorized-domain'){
+      alert('Google 登入失敗：目前網址尚未加入 Firebase Authorized domains。');
     }else{
       alert('Google 登入失敗：'+(e?.message||e));
     }
+
     return false;
+  }finally{
+    setGoogleLoginBusy(false);
   }
 }
 async function proceedCreate(){
