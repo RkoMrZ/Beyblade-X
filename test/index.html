@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：淺色模式改為 iOS 中性灰白風格，深色模式維持原設計 -->
-<title>Beyblade X Tournament</title>
+<title>[TEST] Beyblade X Tournament</title>
 <!-- BUILD: 2026-10-09 PRODUCTION cloud-only + 200-device optimized + champion/bronze placement -->
 
 <script>
@@ -1961,10 +1961,32 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+<!-- BUILD: TEST REGISTRATION-CREATE-FIX2 2026-10-09 -->
+
+<style id="testEnvironmentBadgeStyle">
+.testEnvBadge{
+  position:fixed;
+  right:14px;
+  bottom:calc(14px + env(safe-area-inset-bottom));
+  z-index:9999;
+  padding:9px 14px;
+  border-radius:999px;
+  font-weight:800;
+  font-size:13px;
+  letter-spacing:.2px;
+  background:#6b2cff;
+  color:#fff;
+  box-shadow:0 6px 18px rgba(0,0,0,.28);
+  pointer-events:none;
+}
+</style>
+
 </head>
 <body>
+<div class="testEnvBadge">🧪 TEST 測試環境</div>
+
 <header><div class="wrap brand">
-  <div><h1>⚔️ Beyblade X Tournament</h1><small id="headSub">戰鬥陀螺賽程表</small></div>
+  <div><h1>🧪 Beyblade X Tournament</h1><small id="headSub">測試環境・戰鬥陀螺賽程表</small></div>
   <div class="headActions">
     <button class="themeBtn secondary" id="themeToggleBtn" type="button" onclick="toggleTheme()" aria-label="切換深淺模式">🌙</button>
     <button class="loginBtn" id="googleLoginBtn" type="button" onclick="handleHeaderLogin()">Google 登入</button>
@@ -3774,18 +3796,6 @@ function handleRegistrationTimeChange(source){
   }
 }
 
-function randomCode(len=7){
-  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out='';
-  if(window.crypto?.getRandomValues){
-    const buf=new Uint32Array(len);
-    window.crypto.getRandomValues(buf);
-    for(let i=0;i<len;i++)out+=chars[buf[i]%chars.length];
-    return out;
-  }
-  for(let i=0;i<len;i++)out+=chars[Math.floor(Math.random()*chars.length)];
-  return out;
-}
 
 let registrationCreateBusy=false;
 async function createRegistrationForm(){
@@ -3807,15 +3817,25 @@ async function createRegistrationForm(){
   registrationCreateBusy=true;
   if(btn){btn.disabled=true;btn.textContent='建立中…';}
 
+  let createdId='';
   try{
     const uid=fbAuth.currentUser.uid;
-    const id='RF'+randomCode(8);
     const now=Date.now();
 
-    // 名單管理版只保留真正需要的欄位。
-    // maxPlayers 使用 256 作為內部名額上限，避免手動新增/匯入時被舊邏輯卡住。
+    // 不再依賴 舊版隨機函式。
+    // 使用時間戳 + Web Crypto 產生穩定唯一 ID。
+    let suffix='';
+    if(window.crypto?.getRandomValues){
+      const a=new Uint32Array(2);
+      window.crypto.getRandomValues(a);
+      suffix=(a[0].toString(36)+a[1].toString(36)).toUpperCase().slice(0,10);
+    }else{
+      suffix=Math.random().toString(36).slice(2,12).toUpperCase();
+    }
+    createdId=`RF${now.toString(36).toUpperCase()}${suffix}`.slice(0,24);
+
     const form={
-      id,
+      id:createdId,
       ownerUid:uid,
       created:now,
       title:title.slice(0,80),
@@ -3824,16 +3844,28 @@ async function createRegistrationForm(){
       open:false
     };
 
+    // 只有 Firebase 寫入失敗，才顯示「建立失敗」。
     await rtdbRestMultiUpdate({
-      [`registrationForms/${id}`]:form,
-      [`userRegistrationForms/${uid}/${id}`]:true
+      [`registrationForms/${createdId}`]:form,
+      [`userRegistrationForms/${uid}/${createdId}`]:true
     },9000);
 
     if($('regCreateTitle'))$('regCreateTitle').value='';
-    await loadRegistrationHub();
-    await loadRegistrationAdmin(id);
   }catch(e){
     alert('建立活動名單失敗：'+(e?.message||e));
+    registrationCreateBusy=false;
+    if(btn){btn.disabled=false;btn.textContent='建立活動名單';}
+    return;
+  }
+
+  // 寫入已成功。之後就算畫面刷新失敗，也不應再誤報「建立失敗」。
+  try{
+    await loadRegistrationHub();
+    await loadRegistrationAdmin(createdId);
+  }catch(e){
+    console.warn('活動名單已建立，但畫面重新載入失敗',e);
+    alert('活動名單已建立成功。畫面重新載入失敗，返回「報名名單管理」即可看到剛建立的名單。');
+    openRegistrationHub();
   }finally{
     registrationCreateBusy=false;
     if(btn){btn.disabled=false;btn.textContent='建立活動名單';}
