@@ -3773,6 +3773,20 @@ function handleRegistrationTimeChange(source){
     alert(`因為新的時間設定不符合規則，以下欄位已恢復為未設定：\n\n${uniq.join('、')}\n\n規則：名單截止 ≤ 報到時間 < 比賽時間。`);
   }
 }
+
+function randomCode(len=7){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out='';
+  if(window.crypto?.getRandomValues){
+    const buf=new Uint32Array(len);
+    window.crypto.getRandomValues(buf);
+    for(let i=0;i<len;i++)out+=chars[buf[i]%chars.length];
+    return out;
+  }
+  for(let i=0;i<len;i++)out+=chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
 let registrationCreateBusy=false;
 async function createRegistrationForm(){
   if(registrationCreateBusy)return;
@@ -3795,7 +3809,7 @@ async function createRegistrationForm(){
 
   try{
     const uid=fbAuth.currentUser.uid;
-    const id='RF'+randomCode(7);
+    const id='RF'+randomCode(8);
     const now=Date.now();
 
     // 名單管理版只保留真正需要的欄位。
