@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：淺色模式改為 iOS 中性灰白風格，深色模式維持原設計 -->
-<title>[TEST V4] Beyblade X Tournament</title>
+<title>[TEST V5] Beyblade X Tournament</title>
 <!-- BUILD: 2026-10-09 PRODUCTION cloud-only + 200-device optimized + champion/bronze placement -->
 
 <script>
@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST REGISTRATION-MANAGER-V4 2026-10-13 -->
+<!-- BUILD: TEST V5 PUBLIC-PROJECTION 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -1983,7 +1983,7 @@ html,body{max-width:100%;overflow-x:hidden}
 
 </head>
 <body>
-<div class="testEnvBadge">🧪 TEST V4 測試環境</div>
+<div class="testEnvBadge">🧪 TEST V5 測試環境</div>
 
 <header><div class="wrap brand">
   <div><h1>🧪 Beyblade X Tournament</h1><small id="headSub">測試環境・戰鬥陀螺賽程表</small></div>
@@ -3117,6 +3117,253 @@ function localEventSave(){
   }
 }
 
+
+function publicMatchView(m){
+  if(!m)return null;
+  return {
+    a:m.a??'待定',
+    b:m.b??'待定',
+    sa:m.sa??'',
+    sb:m.sb??'',
+    winner:m.winner??null
+  };
+}
+
+function publicRoundView(r){
+  if(!r)return null;
+  return {
+    name:r.name||'',
+    placementFinal:r.placementFinal===true,
+    matches:Array.isArray(r.matches)?r.matches.map(publicMatchView):[]
+  };
+}
+
+function publicFinalRRView(rr){
+  if(!rr)return null;
+  return {
+    players:Array.isArray(rr.players)?[...rr.players]:[],
+    matches:Array.isArray(rr.matches)?rr.matches.map(publicMatchView):[]
+  };
+}
+
+function publicEventProjectionFromEvent(e){
+  if(!e)return null;
+  return {
+    meta:{
+      id:e.id,
+      name:e.name||'Beyblade X Tournament',
+      mode:e.mode||'free',
+      pairing:e.pairing||'ordered',
+      freeFinal:e.freeFinal||'champ',
+      roster:Array.isArray(e.roster)?[...e.roster]:[],
+      created:Number(e.created)||Date.now(),
+      cloudVersion:Number(e.cloudVersion)||2,
+      publicOpen:e.publicOpen!==false,
+      publicUntil:Number(e.publicUntil)||0
+    },
+    rounds:Array.isArray(e.rounds)?e.rounds.map(publicRoundView):[],
+    finalRR:publicFinalRRView(e.finalRR)
+  };
+}
+
+function publicMatchCloudPath(kind,ri,mi){
+  return kind==='rr'
+    ? `publicEvents/${ev.id}/finalRR/matches/${mi}`
+    : `publicEvents/${ev.id}/rounds/${ri}/matches/${mi}`;
+}
+
+async function writeMatchCloudBoth(kind,ri,mi,m,timeoutMs=5000){
+  const updates={};
+  updates[matchCloudPath(kind,ri,mi)]=cloneJson(m);
+  updates[publicMatchCloudPath(kind,ri,mi)]=publicMatchView(m);
+  await rtdbRestPatchRoot(updates,Math.max(4000,timeoutMs));
+  return true;
+}
+
+function publicProjectionRootUpdate(e){
+  return {[`publicEvents/${e.id}`]:publicEventProjectionFromEvent(e)};
+}
+
+async function ensurePublicProjectionForOwner(){
+  if(!ev || ev.testOnly || !hasOrganizerAccess())return false;
+  try{
+    await rtdbRestPut(`publicEvents/${ev.id}`,publicEventProjectionFromEvent(ev),7000);
+    return true;
+  }catch(e){
+    console.warn('ensurePublicProjectionForOwner failed',e);
+    return false;
+  }
+}
+
+function listenPublicProjectionEvent(id){
+  if(!cloudReady||!ev)return;
+  if(cloudUnsub)cloudUnsub();
+
+  const unsubs=[];
+  const boundRounds=new Set();
+  let renderTimer=null;
+
+  const scheduleRender=()=>{
+    if(renderTimer)return;
+    renderTimer=setTimeout(()=>{
+      renderTimer=null;
+      if(ev?.id)cloudEventsCache[ev.id]=ev;
+      if($('admin')&&!$('admin').classList.contains('hidden'))renderAdmin();
+    },120);
+  };
+
+  const onValue=(path,cb)=>{
+    const ref=fbDb.ref(path);
+    ref.on('value',cb,err=>console.warn('public listener error',path,err));
+    unsubs.push(()=>ref.off('value',cb));
+  };
+
+  const bindRoundMatches=ri=>{
+    if(boundRounds.has(ri))return;
+    boundRounds.add(ri);
+    const ref=fbDb.ref(`publicEvents/${id}/rounds/${ri}/matches`);
+
+    const apply=s=>{
+      const mi=Number(s.key);
+      if(!Number.isInteger(mi))return;
+      if(!ev.rounds[ri])ev.rounds[ri]={name:`第 ${ri+1} 輪`,matches:[]};
+      if(!Array.isArray(ev.rounds[ri].matches))ev.rounds[ri].matches=[];
+      ev.rounds[ri].matches[mi]=s.val();
+      scheduleRender();
+    };
+    const remove=s=>{
+      const mi=Number(s.key);
+      if(Number.isInteger(mi)&&ev.rounds?.[ri]?.matches){
+        ev.rounds[ri].matches.splice(mi,1);
+        scheduleRender();
+      }
+    };
+
+    ref.on('child_added',apply);
+    ref.on('child_changed',apply);
+    ref.on('child_removed',remove);
+    unsubs.push(()=>{
+      ref.off('child_added',apply);
+      ref.off('child_changed',apply);
+      ref.off('child_removed',remove);
+    });
+  };
+
+  // round child_added 只在「新增一輪」時多傳一輪，不會因單場比分更新而整包 round 重傳。
+  const roundsRef=fbDb.ref(`publicEvents/${id}/rounds`);
+  const roundAdded=s=>{
+    const ri=Number(s.key);
+    if(!Number.isInteger(ri))return;
+    const data=s.val()||{};
+    ev.rounds[ri]={
+      name:data.name||`第 ${ri+1} 輪`,
+      placementFinal:data.placementFinal===true,
+      matches:Array.isArray(data.matches)?data.matches:[]
+    };
+    bindRoundMatches(ri);
+    scheduleRender();
+  };
+  const roundRemoved=s=>{
+    const ri=Number(s.key);
+    if(Number.isInteger(ri)&&Array.isArray(ev.rounds)){
+      ev.rounds.splice(ri,1);
+      scheduleRender();
+    }
+  };
+  roundsRef.on('child_added',roundAdded);
+  roundsRef.on('child_removed',roundRemoved);
+  unsubs.push(()=>{
+    roundsRef.off('child_added',roundAdded);
+    roundsRef.off('child_removed',roundRemoved);
+  });
+
+  onValue(`publicEvents/${id}/finalRR/players`,s=>{
+    const players=s.exists()?s.val():null;
+    if(players){
+      ev.finalRR=ev.finalRR||{players:[],matches:[]};
+      ev.finalRR.players=Array.isArray(players)?players:[];
+    }else{
+      ev.finalRR=null;
+    }
+    scheduleRender();
+  });
+
+  const rrRef=fbDb.ref(`publicEvents/${id}/finalRR/matches`);
+  const rrApply=s=>{
+    const mi=Number(s.key);
+    if(!Number.isInteger(mi))return;
+    ev.finalRR=ev.finalRR||{players:[],matches:[]};
+    ev.finalRR.matches[mi]=s.val();
+    scheduleRender();
+  };
+  const rrRemove=s=>{
+    const mi=Number(s.key);
+    if(Number.isInteger(mi)&&ev.finalRR?.matches){
+      ev.finalRR.matches.splice(mi,1);
+      scheduleRender();
+    }
+  };
+  rrRef.on('child_added',rrApply);
+  rrRef.on('child_changed',rrApply);
+  rrRef.on('child_removed',rrRemove);
+  unsubs.push(()=>{
+    rrRef.off('child_added',rrApply);
+    rrRef.off('child_changed',rrApply);
+    rrRef.off('child_removed',rrRemove);
+  });
+
+  onValue(`publicEvents/${id}/meta/publicOpen`,s=>{
+    if(s.exists())ev.publicOpen=!!s.val();
+  });
+  onValue(`publicEvents/${id}/meta/publicUntil`,s=>{
+    if(s.exists())ev.publicUntil=Number(s.val())||0;
+  });
+
+  cloudUnsub=()=>{
+    if(renderTimer)clearTimeout(renderTimer);
+    unsubs.forEach(fn=>{try{fn()}catch{}});
+  };
+}
+
+async function loadPublicProjectionEvent(id){
+  if(!(await initCloud()))return 'error';
+  try{
+    const meta=await publicCloudGet(`publicEvents/${id}/meta`,7000);
+    if(!meta)return 'missing';
+
+    ev={
+      ...meta,
+      rounds:[],
+      finalRR:null,
+      testOnly:false,
+      publicViewOnly:true,
+      refereeNames:[],
+      refereeCount:0,
+      refereeClaims:{}
+    };
+
+    isAdmin=false;
+    isReferee=false;
+    cloudEventsCache[id]=ev;
+
+    $('home').classList.add('hidden');
+    $('create').classList.add('hidden');
+    $('admin').classList.remove('hidden');
+
+    if(isAdmin)ensurePublicProjectionForOwner();
+
+    renderAdmin();
+    listenPublicProjectionEvent(id);
+    showTab('bracket');
+    return 'ok';
+  }catch(e){
+    console.error('loadPublicProjectionEvent failed',e);
+    const msg=String(e?.message||e);
+    if(msg.includes('Permission')||msg.includes('401')||msg.includes('403'))return 'expired';
+    return 'error';
+  }
+}
+
 function cloudOrganizerUpdatesFromEvent(){
   if(!ev||ev.testOnly)return {};
   const base=`events/${ev.id}`;
@@ -3129,6 +3376,7 @@ function cloudOrganizerUpdatesFromEvent(){
   }
 
   updates[`${base}/syncVersion`]=Date.now();
+  updates[`publicEvents/${ev.id}`]=publicEventProjectionFromEvent(ev);
   return updates;
 }
 
@@ -3167,12 +3415,18 @@ async function syncBracketDiff(beforeEvent,afterEvent=ev){
   addDeepDiff(updates,beforeEvent?.rounds||[],afterEvent.rounds||[],`events/${afterEvent.id}/rounds`);
   addDeepDiff(updates,beforeEvent?.finalRR??null,afterEvent.finalRR??null,`events/${afterEvent.id}/finalRR`);
 
+  const beforePub=publicEventProjectionFromEvent(beforeEvent);
+  const afterPub=publicEventProjectionFromEvent(afterEvent);
+  addDeepDiff(updates,beforePub?.rounds||[],afterPub?.rounds||[],`publicEvents/${afterEvent.id}/rounds`);
+  addDeepDiff(updates,beforePub?.finalRR??null,afterPub?.finalRR??null,`publicEvents/${afterEvent.id}/finalRR`);
+
   const beforeShape=JSON.stringify((beforeEvent?.rounds||[]).map(r=>[r?.name,(r?.matches||[]).length]))+'|'+JSON.stringify((beforeEvent?.finalRR?.matches||[]).length);
   const afterShape=JSON.stringify((afterEvent?.rounds||[]).map(r=>[r?.name,(r?.matches||[]).length]))+'|'+JSON.stringify((afterEvent?.finalRR?.matches||[]).length);
 
   if(beforeShape!==afterShape){
     afterEvent.syncVersion=Date.now();
     updates[`events/${afterEvent.id}/syncVersion`]=afterEvent.syncVersion;
+    updates[`publicEvents/${afterEvent.id}/meta`]=publicEventProjectionFromEvent(afterEvent).meta;
   }
 
   localEventSave();
@@ -3231,6 +3485,11 @@ async function refreshAdminState(id){
 }
 function listenCloudEvent(id){
   if(!cloudReady||!ev)return;
+
+  if(ev.publicViewOnly){
+    listenPublicProjectionEvent(id);
+    return;
+  }
 
   if(cloudUnsub)cloudUnsub();
 
@@ -3465,6 +3724,14 @@ async function waitForAuthRestore(timeoutMs=5000){
 async function loadCloudEvent(id){
   if(!(await initCloud()))return 'error';
 
+  const params=new URLSearchParams(location.search);
+  const wantsPrivileged=params.get('admin')==='1' || params.get('ref')==='1' || cloudEventIds.includes(id);
+
+  // 公開觀眾直接走 publicEvents 投影，不再下載完整 events。
+  if(!wantsPrivileged){
+    return await loadPublicProjectionEvent(id);
+  }
+
   try{
     let data=null;
 
@@ -3484,11 +3751,11 @@ async function loadCloudEvent(id){
           data=await rtdbRestGet(`events/${id}`,7000);
         }catch(retryErr){
           console.warn('authenticated retry failed, fallback public read',retryErr);
-          data=await publicCloudGet(`events/${id}`,7000);
+          return await loadPublicProjectionEvent(id);
         }
       }
     }else{
-      data=await publicCloudGet(`events/${id}`,7000);
+      return await loadPublicProjectionEvent(id);
     }
 
     if(!data)return 'missing';
@@ -5142,7 +5409,10 @@ async function createTournament(){
     reservedSlot=slot.slot;
 
     if(createBtn)createBtn.textContent='寫入賽事…';
-    await cloudSet(`events/${ev.id}`,ev,3000);
+    await cloudUpdate({
+      [`events/${ev.id}`]:ev,
+      [`publicEvents/${ev.id}`]:publicEventProjectionFromEvent(ev)
+    },6000);
 
     const code=String(Math.floor(100000+Math.random()*900000));
     const expiresAt=Date.now()+30000;
@@ -5483,7 +5753,7 @@ async function resetScoreOnly(){
 
   if(!ev.testOnly){
     try{
-      await rtdbRestPut(matchCloudPath(t.kind,t.ri,t.mi),cloneJson(m),3500);
+      await writeMatchCloudBoth(t.kind,t.ri,t.mi,cloneJson(m),4500);
     }catch(e){
       alert('比分重設沒有成功寫入 Firebase，將重新載入雲端資料。');
       await backgroundRefreshCurrentEvent(ev.id);
@@ -6079,7 +6349,7 @@ function queueSingleMatchCloud(kind,ri,mi,delay=100){
     // 如果這筆在等待期間已被「完成 / 重設 / 釋放」取消，就不要再送。
     if((matchSyncGeneration.get(key)||0)!==generation)return;
 
-    const writePromise=rtdbRestPut(path,snapshot,3000);
+    const writePromise=writeMatchCloudBoth(kind,ri,mi,snapshot,4000);
     matchSyncInFlight.set(key,writePromise);
 
     try{
@@ -6134,7 +6404,7 @@ async function saveSingleMatchCloud(kind,ri,mi){
   localEventSave();
 
   try{
-    await rtdbRestPut(matchCloudPath(kind,ri,mi),cloneJson(m),3500);
+    await writeMatchCloudBoth(kind,ri,mi,cloneJson(m),4500);
     return true;
   }catch(e){
     console.error('single match sync failed',e);
