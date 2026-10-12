@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST V5 PUBLIC-LIST-FIX 2026-10-13 -->
+<!-- BUILD: TEST V5 PUBLIC-LIST-TABLE 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -2030,6 +2030,7 @@ html,body{max-width:100%;overflow-x:hidden}
 </style>
 
 
+
 <style id="publicRegistrationListLiteV5">
 #registrationPublicList{
   max-width:980px;
@@ -2050,76 +2051,21 @@ html,body{max-width:100%;overflow-x:hidden}
   padding:18px;
   border-bottom:1px solid var(--line);
 }
-.publicListTop h2{
-  margin:2px 0 4px;
-}
+.publicListTop h2{margin:2px 0 4px}
 .publicListEyebrow{
   font-size:12px;
   font-weight:850;
   color:var(--muted);
 }
-.publicRegListRows{
-  display:grid;
-  gap:0;
-  margin:0;
-}
+.publicRegHeader,
 .publicRegRow{
   display:grid;
-  grid-template-columns:minmax(0,1fr) 88px 96px;
+  grid-template-columns:minmax(0,1fr) 92px 96px;
   gap:10px;
   align-items:center;
-  padding:14px 18px;
-  border-bottom:1px solid var(--line);
-  background:transparent;
 }
-.publicRegRow:last-child{border-bottom:0}
-.publicRegName{
-  font-weight:900;
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.publicRegType,.publicRegStatus{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height:30px;
-  padding:5px 8px;
-  border-radius:999px;
-  border:1px solid var(--line);
-  background:var(--panel2);
-  font-size:12px;
-  font-weight:850;
-  white-space:nowrap;
-}
-.publicRegStatus.on{
-  border-color:#2e9b63;
-  background:rgba(46,155,99,.14);
-  color:#45b97d;
-}
-@media(max-width:560px){
-  #registrationPublicList{padding-left:10px;padding-right:10px}
-  .publicListTop{padding:14px}
-  .publicRegRow{
-    grid-template-columns:minmax(0,1fr) 72px 82px;
-    padding:12px 14px;
-    gap:7px;
-  }
-  .publicRegType,.publicRegStatus{
-    font-size:11px;
-    min-width:0;
-  }
-}
-</style>
-
-
-<style id="publicRegistrationListFixV5">
 .publicRegHeader{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 88px 96px;
-  gap:10px;
-  padding:10px 18px;
+  padding:10px 16px;
   border-bottom:1px solid var(--line);
   background:var(--panel2);
   color:var(--muted);
@@ -2127,15 +2073,57 @@ html,body{max-width:100%;overflow-x:hidden}
   font-weight:850;
 }
 .publicRegHeader span:nth-child(2),
-.publicRegHeader span:nth-child(3){text-align:center}
+.publicRegHeader span:nth-child(3){
+  text-align:center;
+}
+.publicRegListRows{
+  display:block;
+  margin:0;
+}
+.publicRegRow{
+  padding:12px 16px;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+}
+.publicRegRow:last-child{border-bottom:0}
+.publicRegName{
+  font-weight:800;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.publicRegType,
+.publicRegStatus{
+  text-align:center;
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
+  color:var(--text);
+}
+.publicRegStatus.on{
+  color:#45b97d;
+}
 @media(max-width:560px){
-  .publicRegHeader{
-    grid-template-columns:minmax(0,1fr) 72px 82px;
-    padding:9px 14px;
+  #registrationPublicList{
+    padding-left:10px;
+    padding-right:10px;
+  }
+  .publicListTop{padding:14px}
+  .publicRegHeader,
+  .publicRegRow{
+    grid-template-columns:minmax(0,1fr) 74px 82px;
     gap:7px;
+  }
+  .publicRegHeader{padding:9px 12px}
+  .publicRegRow{padding:11px 12px}
+  .publicRegType,
+  .publicRegStatus{
+    font-size:12px;
   }
 }
 </style>
+
 
 </head>
 <body>
@@ -4805,8 +4793,8 @@ function renderPublicRegistrationRows(rowMap){
   $('publicRegListRows').innerHTML=rows.length?rows.map(([,r])=>`
     <div class="publicRegRow">
       <div class="publicRegName">${esc(r.playerName)}</div>
-      <span class="publicRegType">${esc(r.entryLabel||'')}</span>
-      <span class="publicRegStatus${r.checkedIn===true?' on':''}">${r.checkedIn===true?'✓ 已報到':'未報到'}</span>
+      <div class="publicRegType">${esc(r.entryLabel||'')}</div>
+      <div class="publicRegStatus${r.checkedIn===true?' on':''}">${r.checkedIn===true?'已報到':'未報到'}</div>
     </div>
   `).join(''):'<div class="savedEmpty" style="padding:20px">目前名單尚未建立。</div>';
 }
