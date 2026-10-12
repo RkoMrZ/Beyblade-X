@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：淺色模式改為 iOS 中性灰白風格，深色模式維持原設計 -->
-<title>[TEST] Beyblade X Tournament</title>
+<title>[TEST V4] Beyblade X Tournament</title>
 <!-- BUILD: 2026-10-09 PRODUCTION cloud-only + 200-device optimized + champion/bronze placement -->
 
 <script>
@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST REGISTRATION-CREATE-FIX2 2026-10-09 -->
+<!-- BUILD: TEST REGISTRATION-MANAGER-V4 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -1983,7 +1983,7 @@ html,body{max-width:100%;overflow-x:hidden}
 
 </head>
 <body>
-<div class="testEnvBadge">🧪 TEST 測試環境</div>
+<div class="testEnvBadge">🧪 TEST V4 測試環境</div>
 
 <header><div class="wrap brand">
   <div><h1>🧪 Beyblade X Tournament</h1><small id="headSub">測試環境・戰鬥陀螺賽程表</small></div>
@@ -2068,15 +2068,21 @@ html,body{max-width:100%;overflow-x:hidden}
 <section id="registrationCreate" class="hidden">
  <div class="card">
   <div class="regAdminTop">
-   <div><h2 style="margin:0">＋ 建立活動名單</h2><div class="muted">只需要一個名稱。建立後即可手動新增選手，或從 Google 表單 / Google Sheets 匯入。</div></div>
+   <div>
+    <h2 style="margin:0">＋ 建立活動名單</h2>
+    <div class="muted">先設定正選人數。超過正選上限後，後續匯入或手動新增的選手會自動列為備選；備選不設人數上限。</div>
+   </div>
    <button class="ghost" type="button" onclick="openRegistrationHub()">取消</button>
   </div>
-
   <div style="margin-top:16px">
    <label>活動 / 賽事名稱 *</label>
-   <input id="regCreateTitle" maxlength="80" placeholder="例如：Beyblade X 秋季盃">
+   <input id="regCreateTitle" maxlength="80" placeholder="例如：Beyblade X 金魚杯">
   </div>
-
+  <div style="margin-top:16px">
+   <label>正選人數上限 *</label>
+   <input id="regCreateMaxPlayers" type="number" inputmode="numeric" min="2" max="256" step="1" value="32" placeholder="例如：32">
+   <div class="fieldHint">超過這個人數後，自動排入備選。備選不限人數。</div>
+  </div>
   <div class="toolbar" style="margin-top:18px">
    <button id="regCreateBtn" type="button" onclick="createRegistrationForm()">建立活動名單</button>
   </div>
@@ -2213,7 +2219,7 @@ const CLOUD_LOCAL_POLICY_VERSION=1; // 雲端賽事：Firebase only；本機只�
 let draftMode=null, draftStorage=null, ev=null;
 let cloudEventsCache={}, cloudEventIds=[], cloudEventSlots={}; // 僅 RAM，重新載入即清空。
 let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
-let activeRegistrationFormId='',activeRegistrationForm=null,activeRegistrations={},registrationSelected=new Set(),registrationSearchPhone='',importRegistrationRows={},importRegistrationSelected=new Set(),registrationFormCache={};
+let activeRegistrationFormId='',activeRegistrationForm=null,activeRegistrations={},activeRegistrationRows={},registrationSelected=new Set(),registrationSearchPhone='',importRegistrationRows={},importRegistrationSelected=new Set(),registrationFormCache={};
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function events(){
   let localTests={};
@@ -3800,16 +3806,22 @@ function handleRegistrationTimeChange(source){
 let registrationCreateBusy=false;
 async function createRegistrationForm(){
   if(registrationCreateBusy)return;
-
   if(!isGoogleUser()){
     alert('請先使用 Google 登入，才能建立活動名單。');
     return;
   }
 
   const title=String($('regCreateTitle')?.value||'').trim();
+  const maxPlayers=Math.floor(Number($('regCreateMaxPlayers')?.value||0));
+
   if(!title){
     alert('請輸入活動 / 賽事名稱。');
     $('regCreateTitle')?.focus();
+    return;
+  }
+  if(!Number.isInteger(maxPlayers) || maxPlayers<2 || maxPlayers>256){
+    alert('正選人數請設定 2～256 人。');
+    $('regCreateMaxPlayers')?.focus();
     return;
   }
 
@@ -3821,9 +3833,6 @@ async function createRegistrationForm(){
   try{
     const uid=fbAuth.currentUser.uid;
     const now=Date.now();
-
-    // 不再依賴 舊版隨機函式。
-    // 使用時間戳 + Web Crypto 產生穩定唯一 ID。
     let suffix='';
     if(window.crypto?.getRandomValues){
       const a=new Uint32Array(2);
@@ -3839,18 +3848,14 @@ async function createRegistrationForm(){
       ownerUid:uid,
       created:now,
       title:title.slice(0,80),
-      maxPlayers:256,
-      waitlistMax:0,
+      maxPlayers,
       open:false
     };
 
-    // 只有 Firebase 寫入失敗，才顯示「建立失敗」。
     await rtdbRestMultiUpdate({
       [`registrationForms/${createdId}`]:form,
       [`userRegistrationForms/${uid}/${createdId}`]:true
     },9000);
-
-    if($('regCreateTitle'))$('regCreateTitle').value='';
   }catch(e){
     alert('建立活動名單失敗：'+(e?.message||e));
     registrationCreateBusy=false;
@@ -3858,18 +3863,18 @@ async function createRegistrationForm(){
     return;
   }
 
-  // 寫入已成功。之後就算畫面刷新失敗，也不應再誤報「建立失敗」。
-  try{
-    await loadRegistrationHub();
-    await loadRegistrationAdmin(createdId);
-  }catch(e){
-    console.warn('活動名單已建立，但畫面重新載入失敗',e);
-    alert('活動名單已建立成功。畫面重新載入失敗，返回「報名名單管理」即可看到剛建立的名單。');
-    openRegistrationHub();
-  }finally{
-    registrationCreateBusy=false;
-    if(btn){btn.disabled=false;btn.textContent='建立活動名單';}
+  const ok=await openRegistrationAdmin(createdId).then(()=>true).catch(e=>{
+    console.warn('活動名單已建立，但管理頁開啟失敗',e);
+    return false;
+  });
+
+  if(!ok){
+    alert('活動名單已建立成功。請回到「報名名單管理」後按「管理」。');
+    await openRegistrationHub();
   }
+
+  registrationCreateBusy=false;
+  if(btn){btn.disabled=false;btn.textContent='建立活動名單';}
 }
 async function loadMyRegistrationForms(){
   const box=$('myRegForms'), badge=$('myRegFormCount');
@@ -3884,7 +3889,7 @@ async function loadMyRegistrationForms(){
     }
     rows.sort((a,b)=>(b.created||0)-(a.created||0));
     badge.textContent=rows.length+' 份';
-    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">${f.eventDate?`📅 比賽日期 ${esc(f.eventDate)}｜`:''}正選 ${Number(f.maxPlayers)||0} 人${Number(f.waitlistMax)>0?`｜備選 ${Number(f.waitlistMax)} 人`:''}｜🔒 主辦管理</div>${f.deadline?`<div class="regDeadlineLine">⏰ 報名截止 ${esc(formatRegDate(f.deadline))}</div>`:''}</div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有活動名單。</div>';
+    box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">正選 ${Number(f.maxPlayers)||0} 人｜備選不限｜🔒 主辦管理</div>${f.deadline?`<div class="regDeadlineLine">⏰ 報名截止 ${esc(formatRegDate(f.deadline))}</div>`:''}</div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有活動名單。</div>';
   }catch(e){box.innerHTML=`<div class="notice">讀取失敗：${esc(e?.message||e)}</div>`}
 }
 async function deleteRegistrationForm(id){
@@ -3939,14 +3944,25 @@ async function loadRegistrationAdmin(id){
     const [form,regs]=await Promise.all([rtdbRestGet(`registrationForms/${id}`,6000),rtdbRestGet(`registrations/${id}`,6000).catch(()=>null)]);
     if(!form)return alert('找不到這份活動名單。');
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份活動名單的建立者。');
-    activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};
+    activeRegistrationForm=form;registrationFormCache[id]=form;activeRegistrations=regs||{};activeRegistrationRows=activeRegistrations;
     registrationSelected=new Set(Object.entries(activeRegistrations).filter(([,r])=>r?.checkedIn===true).map(([regId])=>regId));
     if($('regSearchPhone'))$('regSearchPhone').value='';
-    await backfillRegistrationNameLocks(id,form,activeRegistrations);
     $('regAdminTitle').textContent=form.title;
-    $('regAdminMeta').innerHTML=`<div class="regAdminInfoItem"><b>${esc(form.title||'活動名單')}</b><span>主辦名單管理</span></div><div class="regAdminInfoItem"><b>${Object.keys(activeRegistrationRows||{}).length} 人</b><span>目前名單人數</span></div>`;
+    {
+      const all=Object.values(activeRegistrations||{}).filter(r=>r?.playerName);
+      const mainCount=all.filter(r=>r.entryType!=='waitlist').length;
+      const waitCount=all.filter(r=>r.entryType==='waitlist').length;
+      $('regAdminMeta').innerHTML=
+        `<div class="regAdminInfoItem"><b>正選 ${mainCount} / ${Number(form.maxPlayers)||0}</b><span>正選人數</span></div>`+
+        `<div class="regAdminInfoItem"><b>備選 ${waitCount}</b><span>備選不限人數</span></div>`;
+    }
     renderRegistrationList();
-  }catch(e){alert('讀取名單資料失敗：'+(e?.message||e))}
+  }catch(e){
+    console.error('loadRegistrationAdmin failed',e);
+    alert('讀取名單資料失敗：'+(e?.message||e));
+    return false;
+  }
+  return true;
 }
 function orderedRegistrationEntries(){
   const rows=Object.entries(activeRegistrations||{}).filter(([,r])=>r&&r.playerName);
@@ -3992,17 +4008,20 @@ function clearRegistrationSearch(){
 }
 function renderRegistrationList(){
   const allRows=orderedRegistrationEntries(), box=$('registrationList');
-  $('regTotalStat').textContent=`報名 ${allRows.length}`;
+  $('regTotalStat').textContent=`名單 ${allRows.length}`;
 
-  const query=registrationSearchPhone;
+  const query=registrationSearchPhone.toLowerCase();
   const rows=query
-    ? allRows.filter(([,r])=>String(r.phoneLast3||'').includes(query))
+    ? allRows.filter(([,r])=>
+        String(r.playerName||'').toLowerCase().includes(query) ||
+        String(r.phoneLast3||'').includes(query)
+      )
     : allRows;
 
   if($('regSearchResult')){
     $('regSearchResult').textContent=query
       ? `搜尋「${query}」：找到 ${rows.length} 人`
-      : `顯示全部 ${allRows.length} 位報名者`;
+      : `顯示全部 ${allRows.length} 位選手`;
   }
 
   if(!allRows.length){
@@ -4011,7 +4030,7 @@ function renderRegistrationList(){
     return;
   }
   if(query && !rows.length){
-    box.innerHTML='<div class="savedEmpty">找不到符合這組手機後三碼的報名者。</div>';
+    box.innerHTML='<div class="savedEmpty">找不到符合名稱或手機後三碼的選手。</div>';
     updateRegistrationSelectedUI();
     return;
   }
@@ -4219,10 +4238,6 @@ async function deleteRegistration(id){
     delete activeRegistrations[id];
     registrationSelected.delete(id);
 
-    // 只有真的沒有其他同名報名者時才移除名稱鎖；
-    // 若是舊資料曾有重複同名，會把鎖重新指向剩下最早的一筆。
-    await repairRegistrationNameLockAfterDelete(activeRegistrationFormId,row);
-
     renderRegistrationList();
   }catch(e){
     alert('刪除失敗：'+(e?.message||e));
@@ -4359,20 +4374,17 @@ async function commitRegistrationImport(){
 
   try{
     const latest=(await rtdbRestGet(`registrations/${activeRegistrationFormId}`,7000))||{};
-    const maxPlayers=Number(activeRegistrationForm.maxPlayers)||256;
-    const waitlistMax=Number(activeRegistrationForm.waitlistMax)||0;
-    const totalCapacity=maxPlayers+waitlistMax;
-    if(totalCapacity<=0)throw new Error('活動名單沒有可用名額。');
+    const maxPlayers=Math.max(2,Number(activeRegistrationForm.maxPlayers)||2);
 
     const existingNames=new Set(
       Object.values(latest).filter(Boolean).map(r=>normalizeRegistrationName(r.playerName)).filter(Boolean)
     );
     const batchNames=new Set();
     const accepted=[];
-    let skippedDuplicate=0, skippedFull=0;
+    let skippedDuplicate=0;
 
     const freeSlots=[];
-    for(let position=1;position<=totalCapacity;position++){
+    for(let position=1;position<=9999 && freeSlots.length<incoming.length;position++){
       const slotId=`S${String(position).padStart(4,'0')}`;
       if(!latest[slotId])freeSlots.push({position,slotId});
     }
@@ -4384,13 +4396,13 @@ async function commitRegistrationImport(){
         continue;
       }
       const slot=freeSlots.shift();
-      if(!slot){skippedFull++;continue;}
+      if(!slot)throw new Error('名單已達系統技術上限 9999 人。');
       batchNames.add(norm);
       accepted.push({...row,...slot});
     }
 
     if(!accepted.length){
-      return alert(`沒有新增任何選手。\n\n略過重複：${skippedDuplicate} 人\n名額已滿：${skippedFull} 人`);
+      return alert(`沒有新增任何選手。\n\n略過重複：${skippedDuplicate} 人`);
     }
 
     const ownerUid=fbAuth.currentUser.uid;
@@ -4401,31 +4413,20 @@ async function commitRegistrationImport(){
       const a=accepted[i];
       const isMain=a.position<=maxPlayers;
       const entryNo=isMain?a.position:a.position-maxPlayers;
-      const nameKey=await registrationNameKey(a.playerName);
-      const created=now+i;
-      const row={
+      updates[`registrations/${activeRegistrationFormId}/${a.slotId}`]={
         playerName:a.playerName.slice(0,40),
         phoneLast3:a.phoneLast3||'',
-        nameKey,
         submitterUid:ownerUid,
         entryLabel:isMain?`正選 ${entryNo}`:`備選 ${entryNo}`,
         entryNo,
         entryType:isMain?'main':'waitlist',
-        created
-      };
-      updates[`registrations/${activeRegistrationFormId}/${a.slotId}`]=row;
-      updates[`registrationNames/${activeRegistrationFormId}/${nameKey}`]={
-        uid:ownerUid,
-        created,
-        expiresAt:registrationLockExpiry(activeRegistrationForm),
-        status:'final',
-        slotId:a.slotId
+        created:now+i
       };
     }
 
     await rtdbRestMultiUpdate(updates,12000);
     await loadRegistrationAdmin(activeRegistrationFormId);
-    alert(`匯入完成：新增 ${accepted.length} 人\n略過重複 ${skippedDuplicate} 人${skippedFull?`\n名額已滿未匯入 ${skippedFull} 人`:''}`);
+    alert(`匯入完成：新增 ${accepted.length} 人\n略過重複 ${skippedDuplicate} 人`);
   }catch(e){
     alert('匯入失敗：'+(e?.message||e));
   }finally{
@@ -4433,7 +4434,6 @@ async function commitRegistrationImport(){
     if(btn){btn.disabled=false;btn.textContent=oldText;}
   }
 }
-
 
 let manualRegistrationBusy=false;
 async function manualAddRegistration(){
@@ -4448,112 +4448,54 @@ async function manualAddRegistration(){
   if(!playerName)return alert('請輸入選手名稱。');
   if(phoneLast3 && !/^\d{3}$/.test(phoneLast3))return alert('手機後三碼若有填寫，請輸入 3 位數字。');
 
-  const maxPlayers=Number(activeRegistrationForm.maxPlayers)||256;
-  const waitlistMax=Number(activeRegistrationForm.waitlistMax)||0;
-  const totalCapacity=maxPlayers+waitlistMax;
-  if(totalCapacity<=0)return alert('這份活動名單尚未設定可用名額。');
-
+  const maxPlayers=Math.max(2,Number(activeRegistrationForm.maxPlayers)||2);
   manualRegistrationBusy=true;
   const oldText=btn?.textContent||'新增選手';
   if(btn){btn.disabled=true;btn.textContent='新增中…';}
 
-  let nameKey='';
-  let lockClaimed=false;
-
   try{
     const latest=(await rtdbRestGet(`registrations/${activeRegistrationFormId}`,6000))||{};
     activeRegistrations=latest;
+    activeRegistrationRows=activeRegistrations;
 
     const normalized=normalizeRegistrationName(playerName);
     const sameName=Object.values(latest).some(r=>r?.playerName && normalizeRegistrationName(r.playerName)===normalized);
     if(sameName)throw new Error('名稱重複，請更改選手名稱。');
 
-    nameKey=await registrationNameKey(playerName);
-    const ownerUid=fbAuth.currentUser.uid;
-    const pendingLock={
-      uid:ownerUid,
-      created:Date.now(),
-      expiresAt:registrationPendingExpiry(),
-      status:'pending'
+    let position=1, assignedId='';
+    for(;position<=9999;position++){
+      const slotId=`S${String(position).padStart(4,'0')}`;
+      if(!latest[slotId]){assignedId=slotId;break;}
+    }
+    if(!assignedId)throw new Error('名單已達系統技術上限 9999 人。');
+
+    const isMain=position<=maxPlayers;
+    const entryNo=isMain?position:position-maxPlayers;
+    const row={
+      playerName,
+      phoneLast3,
+      submitterUid:fbAuth.currentUser.uid,
+      entryLabel:isMain?`正選 ${entryNo}`:`備選 ${entryNo}`,
+      entryNo,
+      entryType:isMain?'main':'waitlist',
+      created:Date.now()
     };
 
-    const lockResult=await rtdbRestPutIfEmpty(
-      `registrationNames/${activeRegistrationFormId}/${nameKey}`,
-      pendingLock,
-      6000
-    );
-    if(!lockResult.ok)throw new Error('名稱重複，請更改選手名稱。');
-    lockClaimed=true;
+    await rtdbRestPut(`registrations/${activeRegistrationFormId}/${assignedId}`,row,6000);
+    activeRegistrations[assignedId]=row;
+    activeRegistrationRows=activeRegistrations;
 
-    let assigned=null;
-    let assignedId='';
-
-    for(let position=1;position<=totalCapacity;position++){
-      const slotId=`S${String(position).padStart(4,'0')}`;
-      if(latest[slotId])continue;
-
-      const isMain=position<=maxPlayers;
-      const entryNo=isMain?position:position-maxPlayers;
-      const row={
-        playerName,
-        phoneLast3,
-        nameKey,
-        submitterUid:ownerUid,
-        entryLabel:isMain?`正選 ${entryNo}`:`備選 ${entryNo}`,
-        entryNo,
-        entryType:isMain?'main':'waitlist',
-        created:Date.now()
-      };
-      const finalLock={
-        uid:ownerUid,
-        created:pendingLock.created,
-        expiresAt:registrationLockExpiry(activeRegistrationForm),
-        status:'final',
-        slotId
-      };
-
-      try{
-        // 名額 + 名稱 final 鎖一次原子寫入，避免只成功其中一半。
-        await rtdbRestMultiUpdate({
-          [`registrations/${activeRegistrationFormId}/${slotId}`]:row,
-          [`registrationNames/${activeRegistrationFormId}/${nameKey}`]:finalLock
-        },6000);
-        assigned=row;
-        assignedId=slotId;
-        lockClaimed=false;
-        break;
-      }catch(e){
-        const msg=String(e?.message||e);
-        if(msg.includes('401')||msg.includes('403')||msg.includes('Permission denied')||msg.includes('PERMISSION_DENIED')){
-          continue;
-        }
-        throw e;
-      }
-    }
-
-    if(!assigned){
-      if(lockClaimed)await releaseRegistrationNameLock(activeRegistrationFormId,nameKey);
-      lockClaimed=false;
-      await loadRegistrationAdmin(activeRegistrationFormId);
-      throw new Error('正選與備選名額都已滿。若要再新增，請先刪除一筆或調整活動名單名額。');
-    }
-
-    activeRegistrations[assignedId]=assigned;
     nameEl.value='';
     phoneEl.value='';
     renderRegistrationList();
-    alert(`已新增「${playerName}」｜${assigned.entryLabel}`);
+    alert(`已新增「${playerName}」｜${row.entryLabel}`);
   }catch(e){
-    if(lockClaimed&&nameKey){
-      await releaseRegistrationNameLock(activeRegistrationFormId,nameKey);
-    }
-    alert('新增選手失敗：'+(e?.message||e));
+    alert('新增失敗：'+(e?.message||e));
   }finally{
     manualRegistrationBusy=false;
     if(btn){btn.disabled=false;btn.textContent=oldText;}
   }
 }
-
 async function toggleRegistrationOpen(){
   alert('公開線上報名已停用；請直接管理名單或使用 Google 表單。');
 }
