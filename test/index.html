@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST V5 PUBLIC-PROJECTION 2026-10-13 -->
+<!-- BUILD: TEST V5 PUBLIC-PROJECTION UI-CLEANUP 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -1978,6 +1978,16 @@ html,body{max-width:100%;overflow-x:hidden}
   color:#fff;
   box-shadow:0 6px 18px rgba(0,0,0,.28);
   pointer-events:none;
+}
+</style>
+
+
+<style id="registrationUiCleanupV5">
+#regList{
+  margin-top:14px;
+}
+#registrationAdmin .regSearchBox{
+  margin-top:14px;
 }
 </style>
 
@@ -2092,14 +2102,13 @@ html,body{max-width:100%;overflow-x:hidden}
 <section id="registrationAdmin" class="hidden">
  <div class="card">
   <div class="regAdminTop"><h2 id="regAdminTitle">名單管理</h2><button class="ghost" type="button" onclick="openRegistrationHub()">返回名單管理</button></div>
-  <div id="regAdminMeta" class="regAdminInfoGrid"></div>
-  <div class="notice" style="margin-top:12px">
+<div class="notice" style="margin-top:12px">
    <b>🔒 主辦專用名單</b><br>
    本網站不提供公開線上報名。參賽者可填 Google 表單；主辦再從表單回覆試算表下載 CSV，或直接複製 Google Sheets 資料貼到下方匯入。
   </div>
  </div>
  <div class="card">
-  <div class="row"><h3 style="margin:0">參賽名單</h3><button class="secondary" type="button" onclick="loadRegistrationAdmin(activeRegistrationFormId)">重新整理</button></div><button class="secondary" type="button" onclick="loadRegistrationAdmin(activeRegistrationFormId)">重新整理</button></div>
+  <button class="secondary" type="button" onclick="loadRegistrationAdmin(activeRegistrationFormId)">重新整理</button></div>
   <div class="regManualAdd">
    <div class="regManualAddHead"><div><b>＋ 主辦手動新增選手</b><div class="muted" style="font-size:12px;margin-top:3px">會自動補進目前最前面的空缺名額。</div></div></div>
    <div class="regManualAddBody">
@@ -2147,7 +2156,7 @@ html,body{max-width:100%;overflow-x:hidden}
   </div>
   <div id="registrationList" class="regList"></div>
   <div class="regStickyTools">
-   <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">名單 0</span><span id="regSelectedStat" class="regStat">已報到 0</span></div>
+   <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">名單人數 0</span><span id="regSelectedStat" class="regStat">已報到 0</span></div>
    <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已報到名單</button><button type="button" onclick="importSelectedToTournament()">📥 匯入已報到建立賽事</button></div>
   </div>
  </div>
@@ -4219,10 +4228,7 @@ async function loadRegistrationAdmin(id){
       const all=Object.values(activeRegistrations||{}).filter(r=>r?.playerName);
       const mainCount=all.filter(r=>r.entryType!=='waitlist').length;
       const waitCount=all.filter(r=>r.entryType==='waitlist').length;
-      $('regAdminMeta').innerHTML=
-        `<div class="regAdminInfoItem"><b>正選 ${mainCount} / ${Number(form.maxPlayers)||0}</b><span>正選人數</span></div>`+
-        `<div class="regAdminInfoItem"><b>備選 ${waitCount}</b><span>備選不限人數</span></div>`;
-    }
+}
     renderRegistrationList();
   }catch(e){
     console.error('loadRegistrationAdmin failed',e);
@@ -4275,7 +4281,7 @@ function clearRegistrationSearch(){
 }
 function renderRegistrationList(){
   const allRows=orderedRegistrationEntries(), box=$('registrationList');
-  $('regTotalStat').textContent=`名單 ${allRows.length}`;
+  $('regTotalStat').textContent=`名單人數 ${allRows.length}`;
 
   const query=registrationSearchPhone.toLowerCase();
   const rows=query
