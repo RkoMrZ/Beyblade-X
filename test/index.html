@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST V5 PUBLIC-LIST-LITE 2026-10-13 -->
+<!-- BUILD: TEST V5 PUBLIC-LIST-FIX 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -2109,6 +2109,30 @@ html,body{max-width:100%;overflow-x:hidden}
   .publicRegType,.publicRegStatus{
     font-size:11px;
     min-width:0;
+  }
+}
+</style>
+
+
+<style id="publicRegistrationListFixV5">
+.publicRegHeader{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 88px 96px;
+  gap:10px;
+  padding:10px 18px;
+  border-bottom:1px solid var(--line);
+  background:var(--panel2);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:850;
+}
+.publicRegHeader span:nth-child(2),
+.publicRegHeader span:nth-child(3){text-align:center}
+@media(max-width:560px){
+  .publicRegHeader{
+    grid-template-columns:minmax(0,1fr) 72px 82px;
+    padding:9px 14px;
+    gap:7px;
   }
 }
 </style>
@@ -2281,12 +2305,6 @@ html,body{max-width:100%;overflow-x:hidden}
   <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已報到名單</button><button type="button" onclick="importSelectedRegistrationNames()">📥 匯入已報到建立賽事</button></div>
  </div>
 </section>
-
-<div id="registrationSuccessInfo" class="regSuccessInfo"></div>
-  <button type="button" style="width:100%;margin-top:16px;padding:14px" onclick="closeRegistrationSuccess()">完成</button>
- </div>
-</div>
-
 <div id="registrationImportModal" class="importModal hidden" onclick="if(event.target===this)closeImportRegistration()"><div class="importCard">
  <div class="row"><div><h3 style="margin:0">從活動名單匯入</h3><div class="muted">選擇活動名單，再勾選要放進參賽名單的人。</div></div><button class="ghost" type="button" onclick="closeImportRegistration()">關閉</button></div>
  <label>選擇活動名單</label><select id="importRegFormSelect" onchange="loadImportRegistrations(this.value)"></select>
@@ -2302,7 +2320,12 @@ html,body{max-width:100%;overflow-x:hidden}
     <h2 id="publicRegListTitle">報名名單</h2>
     <div id="publicRegListCount" class="muted"></div>
    </div>
-   <button class="ghost" type="button" onclick="goHome()">首頁</button>
+   <button class="ghost" type="button" onclick="publicRegistrationBack()">返回</button>
+  </div>
+  <div class="publicRegHeader">
+   <span>比賽名稱</span>
+   <span>正／備選</span>
+   <span>已／未報到</span>
   </div>
   <div id="publicRegListRows" class="publicRegListRows"></div>
  </div>
@@ -4684,6 +4707,15 @@ function publicRegistrationListProjection(form,rows){
   };
 }
 
+
+function publicRegistrationBack(){
+  if(document.referrer && document.referrer.startsWith(location.origin)){
+    history.back();
+  }else{
+    location.href=location.pathname;
+  }
+}
+
 function publicRegistrationListUrl(formId){
   const base=`${location.origin}${location.pathname}`;
   return `${base}?list=${encodeURIComponent(formId)}`;
@@ -4732,9 +4764,12 @@ async function patchPublicRegistrationRow(regId,row){
   }
 }
 
-function copyPublicRegistrationListLink(){
+async function copyPublicRegistrationListLink(){
   if(!activeRegistrationFormId)return;
+
+  await syncPublicRegistrationListProjection();
   const url=publicRegistrationListUrl(activeRegistrationFormId);
+
   navigator.clipboard?.writeText(url).then(()=>{
     alert('已複製公開名單查詢連結。');
   }).catch(()=>{
@@ -4742,8 +4777,15 @@ function copyPublicRegistrationListLink(){
   });
 }
 
-function openPublicRegistrationList(formId){
+async function openPublicRegistrationList(formId){
   if(!formId)return;
+
+  // 先把目前主辦名單完整同步到公開投影，再進查看頁。
+  // 避免剛進頁面時 meta 已存在但 rows 還沒寫完，顯示 0 人。
+  if(activeRegistrationFormId===formId && activeRegistrationForm){
+    await syncPublicRegistrationListProjection();
+  }
+
   location.href=publicRegistrationListUrl(formId);
 }
 
@@ -4793,6 +4835,10 @@ async function showPublicRegistrationList(formId){
     }
 
     $('publicRegListTitle').textContent=meta.title||'報名名單';
+
+    // 先讀一次現有 rows，避免 child_added 尚未回來前顯示 0 人。
+    const initialRows=await publicCloudGet(`publicRegistrationLists/${formId}/rows`,7000).catch(()=>null);
+    Object.assign(rows,initialRows||{});
     renderPublicRegistrationRows(rows);
 
     const ref=fbDb.ref(`publicRegistrationLists/${formId}/rows`);
