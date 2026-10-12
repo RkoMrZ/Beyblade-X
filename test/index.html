@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST V5 PUBLIC-PROJECTION UI-CLEANUP 2026-10-13 -->
+<!-- BUILD: TEST V5 PUBLIC-LIST-LITE 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -1991,6 +1991,128 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
+
+<style id="publicRegistrationListV5">
+.publicRegListRows{display:grid;gap:10px;margin-top:12px}
+.publicRegRow{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  gap:10px;
+  align-items:center;
+  padding:13px 14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--panel);
+}
+.publicRegName{font-weight:900;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.publicRegType,.publicRegStatus{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:74px;
+  padding:6px 9px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  font-size:12px;
+  font-weight:850;
+  white-space:nowrap;
+}
+.publicRegStatus.on{
+  border-color:#2e9b63;
+  background:rgba(46,155,99,.14);
+  color:#45b97d;
+}
+@media(max-width:560px){
+  .publicRegRow{grid-template-columns:minmax(0,1fr) auto}
+  .publicRegStatus{grid-column:2}
+}
+</style>
+
+
+<style id="publicRegistrationListLiteV5">
+#registrationPublicList{
+  max-width:980px;
+  margin:0 auto;
+  padding:14px 14px calc(40px + env(safe-area-inset-bottom));
+}
+.publicListShell{
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:var(--panel);
+  overflow:hidden;
+}
+.publicListTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:18px;
+  border-bottom:1px solid var(--line);
+}
+.publicListTop h2{
+  margin:2px 0 4px;
+}
+.publicListEyebrow{
+  font-size:12px;
+  font-weight:850;
+  color:var(--muted);
+}
+.publicRegListRows{
+  display:grid;
+  gap:0;
+  margin:0;
+}
+.publicRegRow{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 88px 96px;
+  gap:10px;
+  align-items:center;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+}
+.publicRegRow:last-child{border-bottom:0}
+.publicRegName{
+  font-weight:900;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.publicRegType,.publicRegStatus{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:30px;
+  padding:5px 8px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  font-size:12px;
+  font-weight:850;
+  white-space:nowrap;
+}
+.publicRegStatus.on{
+  border-color:#2e9b63;
+  background:rgba(46,155,99,.14);
+  color:#45b97d;
+}
+@media(max-width:560px){
+  #registrationPublicList{padding-left:10px;padding-right:10px}
+  .publicListTop{padding:14px}
+  .publicRegRow{
+    grid-template-columns:minmax(0,1fr) 72px 82px;
+    padding:12px 14px;
+    gap:7px;
+  }
+  .publicRegType,.publicRegStatus{
+    font-size:11px;
+    min-width:0;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="testEnvBadge">🧪 TEST V5 測試環境</div>
@@ -2007,7 +2129,7 @@ html,body{max-width:100%;overflow-x:hidden}
 <section id="home">
  <div class="registrationLaunch">
   <div class="registrationLaunchTop">
-   <div><h3>📋 報名名單管理</h3><div class="muted">不開放網站公開報名。由主辦手動新增，或從 Google 表單回覆的 CSV / Google Sheets 複製資料匯入。</div></div>
+   <div><h3>📋 報名名單管理</h3><div class="muted">不開放網站公開報名。由主辦匯入 Google 表單 CSV，或手動新增選手。</div></div>
    <button class="secondary" type="button" onclick="openRegistrationHub()">開啟名單管理</button>
   </div>
  </div>
@@ -2061,7 +2183,7 @@ html,body{max-width:100%;overflow-x:hidden}
 
 <section id="registrationHub" class="hidden">
  <div class="card">
-  <div><h2 style="margin:0 0 6px">📋 報名名單管理</h2><div class="muted">網站不接受參賽者自行送出報名。名單只由主辦 Google 帳號管理，可手動新增，或從 Google 表單回覆匯入。</div></div>
+  <div><h2 style="margin:0 0 6px">📋 報名名單管理</h2><div class="muted">網站不接受參賽者自行送出報名。名單只由主辦 Google 帳號管理，可手動新增，或從 Google 表單 CSV 匯入。</div></div>
  </div>
  <div class="card">
   <div class="row"><h3 style="margin:0">我的活動名單</h3><span id="myRegFormCount" class="badge">0 份</span></div>
@@ -2101,64 +2223,62 @@ html,body{max-width:100%;overflow-x:hidden}
 
 <section id="registrationAdmin" class="hidden">
  <div class="card">
-  <div class="regAdminTop"><h2 id="regAdminTitle">名單管理</h2><button class="ghost" type="button" onclick="openRegistrationHub()">返回名單管理</button></div>
-<div class="notice" style="margin-top:12px">
+  <div class="regAdminTop">
+   <h2 id="regAdminTitle">名單管理</h2>
+   <button class="ghost" type="button" onclick="openRegistrationHub()">返回名單管理</button>
+  </div>
+  <div class="notice" style="margin-top:12px">
    <b>🔒 主辦專用名單</b><br>
-   本網站不提供公開線上報名。參賽者可填 Google 表單；主辦再從表單回覆試算表下載 CSV，或直接複製 Google Sheets 資料貼到下方匯入。
+   參賽者先填 Google 表單；主辦人工審核後，再下載 CSV 匯入這裡。
+  </div>
+  <div class="toolbar" style="margin-top:12px">
+   <button class="secondary" type="button" onclick="openPublicRegistrationList(activeRegistrationFormId)">👀 查看公開名單</button>
+   <button class="secondary" type="button" onclick="copyPublicRegistrationListLink()">🔗 複製查詢連結</button>
   </div>
  </div>
- <div class="card">
-  <button class="secondary" type="button" onclick="loadRegistrationAdmin(activeRegistrationFormId)">重新整理</button></div>
-  <div class="regManualAdd">
-   <div class="regManualAddHead"><div><b>＋ 主辦手動新增選手</b><div class="muted" style="font-size:12px;margin-top:3px">會自動補進目前最前面的空缺名額。</div></div></div>
-   <div class="regManualAddBody">
-    <div><label>選手名稱 *</label><input id="regManualName" maxlength="40" placeholder="比賽現場使用名稱"></div>
-    <div><label>手機後三碼（選填）</label><input id="regManualPhone" type="tel" inputmode="numeric" maxlength="3" pattern="[0-9]{3}" placeholder="例如：168"></div>
-    <button id="regManualAddBtn" class="secondary" type="button" onclick="manualAddRegistration()">新增選手</button>
-   </div>
-  </div>
 
-  <div class="regManualAdd" style="margin-top:14px">
-   <div class="regManualAddHead">
-    <div><b>📥 Google 表單 / CSV 匯入</b><div class="muted" style="font-size:12px;margin-top:3px">Google 表單 → 回覆 → 連結 Google Sheets。可下載 CSV 匯入，或直接從 Sheets 複製整段資料貼上。</div></div>
-   </div>
-   <div class="regManualAddBody" style="display:block">
-    <div class="toolbar" style="margin-bottom:10px">
-     <label class="secondary" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin:0">
-      選擇 CSV
-      <input id="regCsvFile" type="file" accept=".csv,text/csv" style="display:none" onchange="handleRegistrationCsvFile(this.files?.[0])">
-     </label>
-     <button class="secondary" type="button" onclick="toggleRegistrationPasteImport()">從 Google Sheets 貼上</button>
-    </div>
-    <div id="regPasteImportBox" class="hidden">
-     <label>貼上 Google Sheets 資料</label>
-     <textarea id="regPasteData" rows="7" placeholder="在 Google Sheets 選取包含標題列的資料 → 複製 → 貼到這裡"></textarea>
-     <button class="secondary" type="button" onclick="parseRegistrationPasteData()">讀取貼上資料</button>
-    </div>
-    <div id="regImportMap" class="hidden" style="margin-top:12px">
-     <div class="regGrid">
-      <div><label>選手名稱欄 *</label><select id="regImportNameCol"></select></div>
-      <div><label>手機欄（選填）</label><select id="regImportPhoneCol"></select></div>
-     </div>
-     <div id="regImportPreview" class="muted" style="margin:8px 0 10px"></div>
-     <button id="regImportCommitBtn" type="button" onclick="commitRegistrationImport()">匯入名單</button>
-    </div>
+ <div class="regManualAdd" style="margin-top:14px">
+  <div class="regManualAddHead">
+   <div>
+    <b>📥 CSV 匯入</b>
+    <div class="muted" style="font-size:12px;margin-top:3px">只讀取 CSV 裡的「比賽名稱」與「手機後三碼」兩欄；其他欄位一律忽略。</div>
    </div>
   </div>
+  <div class="regManualAddBody" style="display:block">
+   <label class="secondary" style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0">
+    選擇 CSV 檔案
+    <input id="regCsvFile" type="file" accept=".csv,text/csv" style="display:none" onchange="handleRegistrationCsvFile(this.files?.[0])">
+   </label>
+   <div id="regImportPreview" class="muted" style="margin:10px 0 0"></div>
+   <button id="regImportCommitBtn" class="hidden" type="button" style="margin-top:10px" onclick="commitRegistrationImport()">匯入名單</button>
+  </div>
+ </div>
 
-  <div class="regSearchBox">
-   <div class="regSearchHead"><b>🔎 搜尋選手</b><span class="muted">依名稱或手機後三碼搜尋</span></div>
-   <div class="regSearchInputWrap">
-    <input id="regSearchPhone" type="tel" inputmode="numeric" maxlength="3" placeholder="輸入名稱或手機後三碼" oninput="handleRegistrationSearch(this.value)">
-    <button id="regSearchClearBtn" class="secondary regSearchClear hidden" type="button" onclick="clearRegistrationSearch()">清除</button>
-   </div>
-   <div id="regSearchResult" class="regSearchResult">顯示全部選手</div>
+ <div class="regManualAdd" style="margin-top:14px">
+  <div class="regManualAddHead">
+   <div><b>＋ 主辦手動新增選手</b><div class="muted" style="font-size:12px;margin-top:3px">會自動補進目前最前面的空缺名額。</div></div>
   </div>
-  <div id="registrationList" class="regList"></div>
-  <div class="regStickyTools">
-   <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">名單人數 0</span><span id="regSelectedStat" class="regStat">已報到 0</span></div>
-   <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已報到名單</button><button type="button" onclick="importSelectedToTournament()">📥 匯入已報到建立賽事</button></div>
+  <div class="regManualAddBody">
+   <div><label>選手名稱 *</label><input id="regManualName" maxlength="40" placeholder="比賽現場使用名稱"></div>
+   <div><label>手機後三碼（選填）</label><input id="regManualPhone" type="tel" inputmode="numeric" maxlength="3" pattern="[0-9]{3}" placeholder="例如：168"></div>
+   <button id="regManualAddBtn" class="secondary" type="button" onclick="manualAddRegistration()">新增選手</button>
   </div>
+ </div>
+
+ <div class="regSearchBox">
+  <div class="regSearchHead"><b>🔎 搜尋選手</b><span class="muted">依名稱或手機後三碼搜尋</span></div>
+  <div class="regSearchInputWrap">
+   <input id="regSearchPhone" maxlength="40" placeholder="輸入名稱或手機後三碼" oninput="handleRegistrationSearch(this.value)">
+   <button id="regSearchClearBtn" class="secondary regSearchClear hidden" type="button" onclick="clearRegistrationSearch()">清除</button>
+  </div>
+  <div id="regSearchResult" class="regSearchResult">顯示全部選手</div>
+ </div>
+
+ <div id="registrationList" class="regList"></div>
+
+ <div class="regStickyTools">
+  <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">名單人數 0</span><span id="regSelectedStat" class="regStat">已報到 0</span></div>
+  <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已報到名單</button><button type="button" onclick="importSelectedRegistrationNames()">📥 匯入已報到建立賽事</button></div>
  </div>
 </section>
 
@@ -2173,6 +2293,20 @@ html,body{max-width:100%;overflow-x:hidden}
  <div id="importRegList" class="regList" style="margin-top:12px"></div>
  <div class="regStickyTools"><div id="importRegCount" class="muted">已選 0 人</div><div class="toolbar"><button class="secondary" type="button" onclick="selectAllImportRegs(true)">全選</button><button class="secondary" type="button" onclick="selectAllImportRegs(false)">取消全選</button><button type="button" onclick="applyImportRegistrations()">匯入參賽名單</button></div></div>
 </div></div>
+
+<section id="registrationPublicList" class="hidden">
+ <div class="publicListShell">
+  <div class="publicListTop">
+   <div>
+    <div class="publicListEyebrow">📋 報名名單</div>
+    <h2 id="publicRegListTitle">報名名單</h2>
+    <div id="publicRegListCount" class="muted"></div>
+   </div>
+   <button class="ghost" type="button" onclick="goHome()">首頁</button>
+  </div>
+  <div id="publicRegListRows" class="publicRegListRows"></div>
+ </div>
+</section>
 
 <section id="admin" class="hidden">
  <div class="adminTabs"><button class="secondary" data-tab-btn="bracket" onclick="showTab('bracket')">🏆 對戰表</button><button id="drawTopBtn" class="secondary" data-tab-btn="draw" onclick="showTab('draw')">🎁 抽籤</button><button class="secondary" data-tab-btn="share" onclick="showTab('share')">🔗 QR／分享</button><button id="rosterTopBtn" class="secondary" data-tab-btn="roster" onclick="showTab('roster')">👥 參賽名單</button></div>
@@ -4188,6 +4322,7 @@ async function deleteRegistrationForm(id){
     await rtdbRestDelete(`registrationNames/${id}`,7000).catch(e=>{
       if(!String(e?.message||e).includes('404'))console.warn('刪除名稱索引失敗',e);
     });
+    await rtdbRestDelete(`publicRegistrationLists/${id}`,7000).catch(()=>{});
     await rtdbRestDelete(`registrationForms/${id}`,7000);
     await rtdbRestDelete(`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`,7000);
 
@@ -4230,6 +4365,7 @@ async function loadRegistrationAdmin(id){
       const waitCount=all.filter(r=>r.entryType==='waitlist').length;
 }
     renderRegistrationList();
+    syncPublicRegistrationListProjection();
   }catch(e){
     console.error('loadRegistrationAdmin failed',e);
     alert('讀取名單資料失敗：'+(e?.message||e));
@@ -4361,6 +4497,7 @@ async function toggleRegistrationSelected(id,on){
 
   try{
     await rtdbRestPut(`registrations/${activeRegistrationFormId}/${id}/checkedIn`,!!on,5000);
+    await patchPublicRegistrationRow(id,row);
   }catch(e){
     // 回復原狀
     row.checkedIn=!on;
@@ -4508,6 +4645,7 @@ async function deleteRegistration(id){
   const row=activeRegistrations[id]||null;
   try{
     await rtdbRestDelete(`registrations/${activeRegistrationFormId}/${id}`,5000);
+    await patchPublicRegistrationRow(id,null);
     delete activeRegistrations[id];
     registrationSelected.delete(id);
 
@@ -4518,12 +4656,174 @@ async function deleteRegistration(id){
 }
 
 
+
+function publicRegistrationRow(row){
+  if(!row)return null;
+  return {
+    playerName:String(row.playerName||'').slice(0,40),
+    entryLabel:String(row.entryLabel||''),
+    entryNo:Number(row.entryNo)||0,
+    entryType:row.entryType==='waitlist'?'waitlist':'main',
+    checkedIn:row.checkedIn===true
+  };
+}
+
+function publicRegistrationListProjection(form,rows){
+  const outRows={};
+  for(const [id,row] of Object.entries(rows||{})){
+    if(row?.playerName)outRows[id]=publicRegistrationRow(row);
+  }
+  return {
+    meta:{
+      id:form.id,
+      title:form.title||'報名名單',
+      maxPlayers:Number(form.maxPlayers)||0,
+      updated:Date.now()
+    },
+    rows:outRows
+  };
+}
+
+function publicRegistrationListUrl(formId){
+  const base=`${location.origin}${location.pathname}`;
+  return `${base}?list=${encodeURIComponent(formId)}`;
+}
+
+async function syncPublicRegistrationListProjection(){
+  if(!activeRegistrationFormId||!activeRegistrationForm||!isGoogleUser())return false;
+  if(activeRegistrationForm.ownerUid!==fbAuth.currentUser.uid)return false;
+  try{
+    await rtdbRestPut(
+      `publicRegistrationLists/${activeRegistrationFormId}`,
+      publicRegistrationListProjection(activeRegistrationForm,activeRegistrations),
+      7000
+    );
+    return true;
+  }catch(e){
+    console.warn('syncPublicRegistrationListProjection failed',e);
+    return false;
+  }
+}
+
+async function patchPublicRegistrationRow(regId,row){
+  if(!activeRegistrationFormId||!activeRegistrationForm||!isGoogleUser())return false;
+  try{
+    if(row){
+      await rtdbRestPut(
+        `publicRegistrationLists/${activeRegistrationFormId}/rows/${regId}`,
+        publicRegistrationRow(row),
+        5000
+      );
+    }else{
+      await rtdbRestDelete(
+        `publicRegistrationLists/${activeRegistrationFormId}/rows/${regId}`,
+        5000
+      );
+    }
+    await rtdbRestPut(
+      `publicRegistrationLists/${activeRegistrationFormId}/meta/updated`,
+      Date.now(),
+      5000
+    ).catch(()=>{});
+    return true;
+  }catch(e){
+    console.warn('patchPublicRegistrationRow failed',e);
+    return false;
+  }
+}
+
+function copyPublicRegistrationListLink(){
+  if(!activeRegistrationFormId)return;
+  const url=publicRegistrationListUrl(activeRegistrationFormId);
+  navigator.clipboard?.writeText(url).then(()=>{
+    alert('已複製公開名單查詢連結。');
+  }).catch(()=>{
+    prompt('複製這個公開名單查詢連結：',url);
+  });
+}
+
+function openPublicRegistrationList(formId){
+  if(!formId)return;
+  location.href=publicRegistrationListUrl(formId);
+}
+
+let publicRegListUnsub=null;
+
+function renderPublicRegistrationRows(rowMap){
+  const rows=Object.entries(rowMap||{}).filter(([,r])=>r?.playerName);
+  rows.sort((a,b)=>{
+    const ra=a[1], rb=b[1];
+    const ta=ra.entryType==='waitlist'?1:0;
+    const tb=rb.entryType==='waitlist'?1:0;
+    if(ta!==tb)return ta-tb;
+    return (Number(ra.entryNo)||0)-(Number(rb.entryNo)||0);
+  });
+
+  $('publicRegListCount').textContent=`名單人數 ${rows.length}`;
+  $('publicRegListRows').innerHTML=rows.length?rows.map(([,r])=>`
+    <div class="publicRegRow">
+      <div class="publicRegName">${esc(r.playerName)}</div>
+      <span class="publicRegType">${esc(r.entryLabel||'')}</span>
+      <span class="publicRegStatus${r.checkedIn===true?' on':''}">${r.checkedIn===true?'✓ 已報到':'未報到'}</span>
+    </div>
+  `).join(''):'<div class="savedEmpty" style="padding:20px">目前名單尚未建立。</div>';
+}
+
+async function showPublicRegistrationList(formId){
+  if(!(await initCloud()))return;
+
+  if(publicRegListUnsub){
+    try{publicRegListUnsub()}catch{}
+    publicRegListUnsub=null;
+  }
+
+  ['home','create','admin','registrationHub','registrationCreate','registrationAdmin'].forEach(id=>$(id)?.classList.add('hidden'));
+  $('registrationPublicList')?.classList.remove('hidden');
+
+  const rows={};
+
+  try{
+    // 只讀 meta 一次；名單更新使用 child listener。
+    const meta=await publicCloudGet(`publicRegistrationLists/${formId}/meta`,7000);
+    if(!meta){
+      $('publicRegListTitle').textContent='報名名單';
+      $('publicRegListCount').textContent='';
+      $('publicRegListRows').innerHTML='<div class="savedEmpty" style="padding:20px">目前查不到這份名單。</div>';
+      return;
+    }
+
+    $('publicRegListTitle').textContent=meta.title||'報名名單';
+    renderPublicRegistrationRows(rows);
+
+    const ref=fbDb.ref(`publicRegistrationLists/${formId}/rows`);
+
+    const apply=s=>{
+      rows[s.key]=s.val();
+      renderPublicRegistrationRows(rows);
+    };
+    const remove=s=>{
+      delete rows[s.key];
+      renderPublicRegistrationRows(rows);
+    };
+
+    ref.on('child_added',apply);
+    ref.on('child_changed',apply);
+    ref.on('child_removed',remove);
+    publicRegListUnsub=()=>{
+      ref.off('child_added',apply);
+      ref.off('child_changed',apply);
+      ref.off('child_removed',remove);
+    };
+  }catch(e){
+    $('publicRegListRows').innerHTML=`<div class="notice" style="margin:16px">讀取名單失敗：${esc(e?.message||e)}</div>`;
+  }
+}
+
 let registrationImportRows=[];
 let registrationImportHeaders=[];
+let registrationImportAutoNameCol=0;
+let registrationImportAutoPhoneCol=-1;
 
-function toggleRegistrationPasteImport(){
-  $('regPasteImportBox')?.classList.toggle('hidden');
-}
 
 function parseCsvText(raw){
   const rows=[];
@@ -4547,45 +4847,42 @@ function parseCsvText(raw){
   return rows;
 }
 
-function parseSheetPasteText(raw){
-  const lines=String(raw||'').replace(/\r/g,'').split('\n').filter(line=>line.trim()!=='');
-  return lines.map(line=>line.split('\t'));
-}
 
 function guessImportColumn(headers,kind){
-  const hs=headers.map(h=>String(h||'').trim().toLowerCase());
-  const keys=kind==='name'
-    ? ['選手名稱','選手姓名','參賽名稱','參賽者','姓名','名稱','暱稱','name','player']
-    : ['手機後三碼','電話後三碼','手機末三碼','電話末三碼','手機','電話','phone','mobile'];
-  for(const key of keys){
-    const idx=hs.findIndex(h=>h===key || h.includes(key));
-    if(idx>=0)return idx;
-  }
-  return kind==='name'?0:-1;
+  const normalized=headers.map(h=>String(h||'').trim());
+  const target=kind==='name'?'比賽名稱':'手機後三碼';
+  return normalized.findIndex(h=>h===target);
 }
 
 function setupRegistrationImportTable(rows){
-  if(!Array.isArray(rows)||rows.length<2)return alert('沒有讀到可匯入的資料。請確認第一列是欄位名稱，下面至少有一筆資料。');
+  if(!Array.isArray(rows)||rows.length<2){
+    registrationImportHeaders=[];
+    registrationImportRows=[];
+    if($('regImportPreview'))$('regImportPreview').textContent='CSV 內沒有可匯入的資料。';
+    $('regImportCommitBtn')?.classList.add('hidden');
+    return;
+  }
+
   const maxCols=Math.max(...rows.map(r=>r.length));
-  const headers=Array.from({length:maxCols},(_,i)=>String(rows[0]?.[i]||`欄位 ${i+1}`).trim()||`欄位 ${i+1}`);
+  const headers=Array.from({length:maxCols},(_,i)=>String(rows[0]?.[i]||'').trim());
+  const nameIdx=guessImportColumn(headers,'name');
+  const phoneIdx=guessImportColumn(headers,'phone');
+
+  if(nameIdx<0){
+    registrationImportHeaders=[];
+    registrationImportRows=[];
+    if($('regImportPreview'))$('regImportPreview').innerHTML='找不到欄位：<b>比賽名稱</b>。請確認 CSV 第一列欄位名稱。';
+    $('regImportCommitBtn')?.classList.add('hidden');
+    return;
+  }
+
   registrationImportHeaders=headers;
   registrationImportRows=rows.slice(1).filter(r=>r.some(v=>String(v||'').trim()!==''));
+  registrationImportAutoNameCol=nameIdx;
+  registrationImportAutoPhoneCol=phoneIdx;
 
-  const nameSel=$('regImportNameCol'), phoneSel=$('regImportPhoneCol');
-  if(!nameSel||!phoneSel)return;
-  const opts=headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');
-  nameSel.innerHTML=opts;
-  phoneSel.innerHTML=`<option value="-1">不匯入手機欄</option>${opts}`;
-
-  const nameGuess=guessImportColumn(headers,'name');
-  const phoneGuess=guessImportColumn(headers,'phone');
-  nameSel.value=String(Math.max(0,nameGuess));
-  phoneSel.value=String(phoneGuess);
-
-  $('regImportMap')?.classList.remove('hidden');
   updateRegistrationImportPreview();
-  nameSel.onchange=updateRegistrationImportPreview;
-  phoneSel.onchange=updateRegistrationImportPreview;
+  $('regImportCommitBtn')?.classList.toggle('hidden',preparedRegistrationImportRows().length===0);
 }
 
 async function handleRegistrationCsvFile(file){
@@ -4594,16 +4891,16 @@ async function handleRegistrationCsvFile(file){
     const raw=await file.text();
     setupRegistrationImportTable(parseCsvText(raw));
   }catch(e){
+    registrationImportHeaders=[];
+    registrationImportRows=[];
+    $('regImportCommitBtn')?.classList.add('hidden');
+    if($('regImportPreview'))$('regImportPreview').textContent='';
     alert('讀取 CSV 失敗：'+(e?.message||e));
   }finally{
     if($('regCsvFile'))$('regCsvFile').value='';
   }
 }
 
-function parseRegistrationPasteData(){
-  const raw=$('regPasteData')?.value||'';
-  setupRegistrationImportTable(parseSheetPasteText(raw));
-}
 
 function normalizedImportPhone(v){
   const digits=String(v||'').replace(/\D/g,'');
@@ -4612,8 +4909,8 @@ function normalizedImportPhone(v){
 }
 
 function preparedRegistrationImportRows(){
-  const nameIdx=Number($('regImportNameCol')?.value??0);
-  const phoneIdx=Number($('regImportPhoneCol')?.value??-1);
+  const nameIdx=Number(registrationImportAutoNameCol??0);
+  const phoneIdx=Number(registrationImportAutoPhoneCol??-1);
   const out=[];
   for(const r of registrationImportRows){
     const playerName=String(r?.[nameIdx]||'').trim();
@@ -4627,8 +4924,10 @@ function preparedRegistrationImportRows(){
 function updateRegistrationImportPreview(){
   const rows=preparedRegistrationImportRows();
   const unique=new Set(rows.map(r=>normalizeRegistrationName(r.playerName)));
-  if($('regImportPreview'))$('regImportPreview').textContent=
-    `讀到 ${rows.length} 筆有效資料｜名稱去重後 ${unique.size} 人。匯入時會自動略過目前名單內的同名選手與檔案內重複名稱。`;
+  const phoneText=registrationImportAutoPhoneCol>=0?'已讀取手機後三碼':'未找到手機後三碼欄（仍可匯入）';
+  if($('regImportPreview')){
+    $('regImportPreview').innerHTML=`讀到 <b>${rows.length}</b> 筆有效資料｜${phoneText}<br>名稱去重後 ${unique.size} 人；其他 CSV 欄位全部忽略。`;
+  }
 }
 
 let registrationBulkImportBusy=false;
@@ -4686,7 +4985,7 @@ async function commitRegistrationImport(){
       const a=accepted[i];
       const isMain=a.position<=maxPlayers;
       const entryNo=isMain?a.position:a.position-maxPlayers;
-      updates[`registrations/${activeRegistrationFormId}/${a.slotId}`]={
+      const importedRow={
         playerName:a.playerName.slice(0,40),
         phoneLast3:a.phoneLast3||'',
         submitterUid:ownerUid,
@@ -4695,8 +4994,11 @@ async function commitRegistrationImport(){
         entryType:isMain?'main':'waitlist',
         created:now+i
       };
+      updates[`registrations/${activeRegistrationFormId}/${a.slotId}`]=importedRow;
+      updates[`publicRegistrationLists/${activeRegistrationFormId}/rows/${a.slotId}`]=publicRegistrationRow(importedRow);
     }
 
+    updates[`publicRegistrationLists/${activeRegistrationFormId}/meta`]={id:activeRegistrationFormId,title:activeRegistrationForm.title||'報名名單',maxPlayers:Number(activeRegistrationForm.maxPlayers)||0,updated:Date.now()};
     await rtdbRestMultiUpdate(updates,12000);
     await loadRegistrationAdmin(activeRegistrationFormId);
     alert(`匯入完成：新增 ${accepted.length} 人\n略過重複 ${skippedDuplicate} 人`);
@@ -4755,6 +5057,7 @@ async function manualAddRegistration(){
     };
 
     await rtdbRestPut(`registrations/${activeRegistrationFormId}/${assignedId}`,row,6000);
+    await patchPublicRegistrationRow(assignedId,row);
     activeRegistrations[assignedId]=row;
     activeRegistrationRows=activeRegistrations;
 
@@ -4838,8 +5141,12 @@ function goHome(){
     cloudUnsub();
     cloudUnsub=null;
   }
+  if(publicRegListUnsub){
+    try{publicRegListUnsub()}catch{}
+    publicRegListUnsub=null;
+  }
 
-  ['create','admin','registrationHub','registrationCreate','registrationPublic','registrationAdmin'].forEach(x=>$(x)?.classList.add('hidden'));
+  ['create','admin','registrationHub','registrationCreate','registrationPublic','registrationAdmin','registrationPublicList'].forEach(x=>$(x)?.classList.add('hidden'));
   $('registrationImportModal')?.classList.add('hidden');
   $('home').classList.remove('hidden');
 
@@ -8722,9 +9029,20 @@ async function bootstrapCloud(){
 
   draftMode=null;
   draftStorage=null;
-  await initCloud();
 
   const params=new URLSearchParams(location.search);
+  const publicList=params.get('list');
+
+  // 公開名單跟公開賽程一樣走最輕量唯讀路徑：
+  // 不等 Google Auth、不讀主辦狀態、不讀 local active view。
+  if(publicList){
+    await initCloud();
+    await showPublicRegistrationList(publicList);
+    return;
+  }
+
+  await initCloud();
+
   const saved=readActiveView();
   const signupForm=params.get('signup');
   const regHub=params.get('reg');
