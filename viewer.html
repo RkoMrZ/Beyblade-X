@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>Beyblade X 即時查看</title>
+<!-- RELEASE BUILD: 2026-10-13 PUBLIC VIEWER -->
+<style>
+:root{--bg:#0b0d12;--panel:#151922;--panel2:#101620;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif}
+body{min-height:100dvh}
+header{position:sticky;top:0;z-index:20;background:#0b0d12ee;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:11px 12px}
+.wrap{max-width:960px;margin:auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brandTitle{min-width:0}.brandTitle b{font-size:18px;display:block}.brandTitle small{display:block;color:var(--muted);margin-top:3px}
+button{font:inherit;border:0;border-radius:11px;padding:10px 12px;background:#171e2b;border:1px solid #354157;color:#fff;font-weight:800}
+main{padding:10px}
+.hidden{display:none!important}.muted{color:var(--muted);font-size:12px}
+.status{display:flex;align-items:center;gap:8px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--line);border-radius:13px;background:#10151e;color:#cfd6e4;font-size:13px}
+.status.error{border-color:#71302a;background:#2b1717;color:#ffb1a5}
+.status.ok{border-color:#285e45;background:#10251b;color:#9be7bd}
+.hero{background:linear-gradient(180deg,#151a24,#10151e);border:1px solid var(--line);border-radius:18px;padding:13px;margin-bottom:10px}
+.hero h1{font-size:22px;margin:3px 0 8px;line-height:1.15}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{padding:6px 9px;border:1px solid var(--line);border-radius:999px;background:#0e141d;color:#cfd6e4;font-size:11px}
+.bracketShell{position:relative;border:1px solid #242d3c;border-radius:16px;background:radial-gradient(circle at 50% 0,#151d2a 0,#0b0d12 42%);overflow:hidden}
+.bracketTools{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:#0d1119eb;border-bottom:1px solid #242d3c;backdrop-filter:blur(8px)}
+.zoomGroup{display:flex;align-items:center;gap:5px}.zoomGroup button,.viewToggle{padding:7px 9px}.zoomLabel{min-width:44px;text-align:center;color:#cdd6e5;font-size:11px}
+.bracketScroll{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:9px 8px 24px;min-height:460px}
+.bracketStage{position:relative;min-width:1px;min-height:1px}
+.bracketCanvas{position:relative;display:flex;align-items:flex-start;gap:38px;width:max-content;transform-origin:top left;padding:7px 18px 26px 4px}
+.bracketLinks{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:3}.bracketLinks path{fill:none;stroke:#718096;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;opacity:.95}.bracketLinks path.live{stroke:#d6a84a;stroke-width:3;opacity:1}.roundCol,.rrPanel{z-index:4}
+.roundCol{position:relative;width:184px;flex:0 0 184px;z-index:1}.roundHead{min-height:50px;padding:4px 4px 9px;background:linear-gradient(180deg,#0b0d12 68%,transparent);margin-bottom:7px}.roundHead h3{margin:0;font-size:15px;line-height:1.1}.roundHead .sub{color:var(--muted);font-size:10px;margin-top:4px}
+.roundMatches{display:flex;flex-direction:column;gap:var(--gap,16px);padding-top:var(--top,0px)}
+.bracketMatch{position:relative;width:100%;height:104px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:12px;padding:7px;color:var(--text);box-shadow:0 6px 18px #0004}
+.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 6px 18px #0004}.matchNo{height:16px;line-height:16px;margin:0 0 3px;color:#8792a4;font-size:10px;font-weight:800}
+.bSide{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:5px;align-items:center;height:31px;padding:3px 5px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bSide.pending{opacity:.48}
+.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:12px}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.winnerDot{font-size:9px;color:#ff9b54}.bScore{display:flex;align-items:center;justify-content:center;width:34px;height:23px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px}.winner .bScore{border-color:#a8672e;color:#ffb371}
+.compact32 .bracketMatch{height:98px}.compact32 .roundMatches{--compact:1}.compact64 .bracketMatch{height:88px}.compact64 .bSide{height:27px}.compact64 .roundHead{min-height:44px}.compact64 .roundCol{width:174px;flex-basis:174px}
+.rrPanel{position:relative;width:214px;flex:0 0 214px;z-index:1;background:linear-gradient(180deg,#281e14,#141820);border:1px solid #855521;border-radius:14px;padding:10px;box-shadow:0 0 22px #ff8a2a18}.rrHead b{font-size:14px}.rrRanks{margin-top:7px}.rrRankRow{display:grid;grid-template-columns:30px minmax(80px,1fr) auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #4a3827;font-size:12px}.rrPos{font-weight:900;color:#ffb45f;text-align:center}.rrGames{display:grid;gap:6px;margin-top:8px}.rrMini{background:#141a24;border:1px solid #3c465a;border-radius:9px;padding:7px;font-size:10px;display:flex;justify-content:space-between;gap:7px}.rrMini span{color:var(--muted)}
+.rrStatBox{margin-top:9px;border:1px solid #3a4658;border-radius:11px;padding:8px;background:#101722}.rrStatTitle{font-size:11px;font-weight:900;margin-bottom:4px}.rrStatRow{display:grid;grid-template-columns:1fr auto auto auto;gap:5px;padding:6px 0;border-top:1px solid #2b3545;font-size:9px}.rrStatRow span{text-align:right;color:#c8d1df}
+.finalPlacings{margin-top:10px;width:100%;max-width:none}.finalPlacings .rrRankRow{grid-template-columns:30px minmax(80px,1fr) minmax(90px,1fr);font-size:13px}.finalPlacings .rrRankRow span:last-child{text-align:right}
+body.fullscreen{overflow:hidden}body.fullscreen header{display:none}body.fullscreen .bracketShell{position:fixed;inset:0;z-index:40;border:0;border-radius:0}body.fullscreen .bracketScroll{height:calc(100dvh - 50px);min-height:0;padding-bottom:60px}
+@media(min-width:641px){main{padding:16px}.roundCol{width:204px;flex-basis:204px}.bracketCanvas{gap:48px}.rrPanel{width:236px;flex-basis:236px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap brand">
+    <div class="brandTitle"><b>⚔️ Beyblade X Tournament</b><small id="pageSub">公開即時查看</small></div>
+    <button type="button" onclick="goBack()">返回</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="status" class="status">正在連線即時資料…</div>
+
+  <section id="eventView" class="hidden">
+    <div id="hero" class="hero"></div>
+    <div class="bracketShell">
+      <div class="bracketTools">
+        <div class="zoomGroup">
+          <button type="button" onclick="zoom(-.1)">−</button>
+          <span class="zoomLabel">100%</span>
+          <button type="button" onclick="zoom(.1)">＋</button>
+          <button type="button" onclick="fit()">全覽</button>
+        </div>
+        <button class="viewToggle" type="button" onclick="toggleFull()">⛶</button>
+      </div>
+      <div class="bracketScroll"><div class="bracketStage"><div class="bracketCanvas"><svg class="bracketLinks"></svg><div id="bracketCols" style="display:contents"></div></div></div></div>
+    </div>
+    <div id="finalBox"></div>
+  </section>
+</main>
+
+<script>
+const DB='https://ljt-beyblade-x-default-rtdb.asia-southeast1.firebasedatabase.app';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const params=new URLSearchParams(location.search);
+const eventId=params.get('event')||'';
+let data=null, stream=null, renderTimer=null, scale=1, gotFirst=false, failureCheckBusy=false;
+let streamKind='',streamId='',streamGeneration=0,streamOpenedOnce=false;
+let reconnectResyncTimer=null,resyncPromise=null,lastResyncAt=0;
+let reconnectCount=0,lastStreamOpenAt=0;
+let receivedEventSerial=0;
+
+function goBack(){
+  try{stream?.close()}catch{}
+  stream=null;
+  streamGeneration++;
+  clearTimeout(reconnectResyncTimer);
+
+  // viewer 是純觀看頁，返回一律完整載入管理首頁，
+  // 不依賴 iOS Safari 的 bfcache。
+  location.replace('index.html');
+}
+function setStatus(text,kind=''){
+  const el=$('status'); el.textContent=text; el.className='status'+(kind?' '+kind:'');
+}
+function pathParts(path){return String(path||'/').split('/').filter(Boolean)}
+function setAtPath(root,path,value){
+  const parts=pathParts(path);
+  if(!parts.length)return value;
+  if(root==null||typeof root!=='object')root={};
+  let cur=root;
+  for(let i=0;i<parts.length-1;i++){
+    const k=parts[i];
+    if(cur[k]==null||typeof cur[k]!=='object')cur[k]={};
+    cur=cur[k];
+  }
+  const key=parts[parts.length-1];
+  if(value===null){
+    if(Array.isArray(cur) && /^\d+$/.test(key))cur[Number(key)]=null;
+    else delete cur[key];
+  }else cur[key]=value;
+  return root;
+}
+function patchAtPath(root,path,patch){
+  if(patch==null)return setAtPath(root,path,null);
+  if(typeof patch!=='object'||Array.isArray(patch))return setAtPath(root,path,patch);
+  for(const [k,v] of Object.entries(patch)){
+    const p=(path==='/'?'':path.replace(/\/$/,''))+'/'+k;
+    root=setAtPath(root,p,v);
+  }
+  return root;
+}
+function applyServerEvent(type,payload){
+  receivedEventSerial++;
+  if(!payload||typeof payload.path!=='string')return;
+  if(type==='put')data=setAtPath(data,payload.path,payload.data);
+  else data=patchAtPath(data,payload.path,payload.data);
+  gotFirst=true;
+  scheduleRender();
+}
+function scheduleRender(){
+  if(renderTimer)return;
+  renderTimer=setTimeout(()=>{renderTimer=null;render()},90);
+}
+function streamUrl(kind,id){
+  return `${DB}/${kind}/${encodeURIComponent(id)}.json`;
+}
+
+function publicReadErrorText(){
+  return '公開連結已關閉或過期。';
+}
+
+async function fetchFreshSnapshot(kind,id,{quiet=false}={}){
+  const generation=streamGeneration;
+  const requestSerial=receivedEventSerial;
+
+  try{
+    const r=await fetch(streamUrl(kind,id),{
+      cache:'no-store',
+      headers:{'Accept':'application/json'}
+    });
+
+    if(generation!==streamGeneration)return false;
+
+    if(r.status===401||r.status===403){
+      setStatus(publicReadErrorText(),'error');
+      try{stream?.close()}catch{}
+      return false;
+    }
+
+    if(!r.ok){
+      if(!quiet)setStatus('目前無法重新同步資料，正在保留即時連線…');
+      return false;
+    }
+
+    const fresh=await r.json();
+    if(generation!==streamGeneration)return false;
+    // 若 GET 期間已收到更新的 SSE 事件，不能用較早快照蓋掉它。
+    if(receivedEventSerial!==requestSerial)return false;
+
+    if(!fresh){
+      setStatus('找不到資料。','error');
+      return false;
+    }
+
+    // SSE 斷線後，以 Firebase 最新完整快照校正本機狀態。
+    // 快照寫入後，後續 SSE patch 會繼續套用在這份最新資料上。
+    data=fresh;
+    gotFirst=true;
+    lastResyncAt=Date.now();
+    scheduleRender();
+    setStatus('已重新同步・即時連線中','ok');
+    return true;
+  }catch(e){
+    if(generation!==streamGeneration)return false;
+    if(!quiet)setStatus('重新同步暫時失敗，正在等待連線恢復…');
+    return false;
+  }
+}
+
+function scheduleReconnectResync(kind,id,reason='reconnect'){
+  clearTimeout(reconnectResyncTimer);
+
+  // 多台手機同時恢復連線時加入少量 jitter，
+  // 避免 200+ viewer 在同一毫秒全部 GET Firebase。
+  const jitter=250+Math.floor(Math.random()*1250);
+
+  reconnectResyncTimer=setTimeout(()=>{
+    reconnectResyncTimer=null;
+
+    if(resyncPromise)return;
+
+    resyncPromise=fetchFreshSnapshot(kind,id,{quiet:false})
+      .finally(()=>{resyncPromise=null});
+  },jitter);
+}
+
+function hardReconnect(reason='manual'){
+  if(!streamKind||!streamId)return;
+
+  const kind=streamKind,id=streamId;
+  try{stream?.close()}catch{}
+  stream=null;
+
+  setStatus('正在重新建立即時連線…');
+  startStream(kind,id,{isRestart:true,reason});
+}
+
+function startStream(kind,id,{isRestart=false,reason='initial'}={}){
+  streamKind=kind;
+  streamId=id;
+  streamGeneration++;
+  const generation=streamGeneration;
+
+  clearTimeout(reconnectResyncTimer);
+  try{stream?.close()}catch{}
+  stream=null;
+
+  if(!isRestart){
+    gotFirst=false;
+    streamOpenedOnce=false;
+    reconnectCount=0;
+    setStatus('正在連線即時資料…');
+  }
+
+  const es=new EventSource(streamUrl(kind,id));
+  stream=es;
+
+  es.addEventListener('open',()=>{
+    if(generation!==streamGeneration || stream!==es)return;
+
+    lastStreamOpenAt=Date.now();
+
+    if(streamOpenedOnce || isRestart){
+      reconnectCount++;
+      setStatus('連線已恢復，正在校正最新資料…');
+      scheduleReconnectResync(kind,id,'sse-open');
+    }else{
+      streamOpenedOnce=true;
+      setStatus('即時連線已建立，正在載入資料…');
+    }
+  });
+
+  es.addEventListener('put',e=>{
+    if(generation!==streamGeneration || stream!==es)return;
+    try{
+      applyServerEvent('put',JSON.parse(e.data));
+      setStatus('即時同步中','ok');
+    }catch(err){
+      console.error(err);
+      scheduleReconnectResync(kind,id,'bad-put');
+    }
+  });
+
+  es.addEventListener('patch',e=>{
+    if(generation!==streamGeneration || stream!==es)return;
+    try{
+      applyServerEvent('patch',JSON.parse(e.data));
+      setStatus('即時同步中','ok');
+    }catch(err){
+      console.error(err);
+      scheduleReconnectResync(kind,id,'bad-patch');
+    }
+  });
+
+  es.addEventListener('cancel',()=>{
+    if(generation!==streamGeneration || stream!==es)return;
+    setStatus(publicReadErrorText(),'error');
+    try{es.close()}catch{}
+  });
+
+  es.addEventListener('auth_revoked',()=>{
+    if(generation!==streamGeneration || stream!==es)return;
+    setStatus('公開讀取權限已失效。','error');
+    try{es.close()}catch{}
+  });
+
+  es.onerror=()=>{
+    if(generation!==streamGeneration || stream!==es)return;
+
+    if(gotFirst){
+      setStatus('連線中斷，Firebase 正在自動重連…');
+      // EventSource 本身會自動重連。
+      // 真正重新 open 時，再做完整 GET 校正，避免漏掉背景期間的更新。
+      return;
+    }
+
+    checkFailure(kind,id);
+  };
+}
+
+async function checkFailure(kind,id){
+  if(failureCheckBusy)return;
+  failureCheckBusy=true;
+  try{
+    const r=await fetch(streamUrl(kind,id),{
+      cache:'no-store',
+      headers:{'Accept':'application/json'}
+    });
+
+    if(r.status===401||r.status===403){
+      setStatus(publicReadErrorText(),'error');
+      try{stream?.close()}catch{}
+    }else if(r.ok){
+      const j=await r.json();
+      if(j){
+        data=j;
+        gotFirst=true;
+        lastResyncAt=Date.now();
+        scheduleRender();
+        setStatus('已重新同步・即時連線中','ok');
+      }else{
+        setStatus('找不到資料。','error');
+      }
+    }else{
+      setStatus('目前無法讀取資料，請稍後重試。','error');
+    }
+  }catch(e){
+    setStatus('網路連線異常，Firebase 正在自動重連…');
+  }finally{
+    failureCheckBusy=false;
+  }
+}
+
+// iOS Safari / Web App 從背景回前景時，SSE 有可能看似存在但其實已停住。
+// 回前景直接「重建 SSE + GET 最新快照」，不相信舊連線狀態。
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && streamKind && streamId){
+    hardReconnect('visibility');
+  }
+});
+
+window.addEventListener('pageshow',e=>{
+  if(e.persisted && streamKind && streamId){
+    hardReconnect('bfcache');
+  }
+});
+
+window.addEventListener('online',()=>{
+  if(streamKind && streamId){
+    hardReconnect('online');
+  }
+});
+
+// 若頁面長時間開著，每 4 分鐘做一次低頻安全校正。
+// 200 台 viewer 約等於平均每分鐘 50 次小型 GET，遠低於逐秒/逐分輪詢。
+setInterval(()=>{
+  if(!streamKind||!streamId||document.visibilityState!=='visible')return;
+  if(Date.now()-lastResyncAt<210000)return;
+  if(resyncPromise)return;
+
+  resyncPromise=fetchFreshSnapshot(streamKind,streamId,{quiet:true})
+    .finally(()=>{resyncPromise=null});
+},240000+Math.floor(Math.random()*60000));
+
+function eventCount(){
+  const m=data?.meta||{};
+  if(Array.isArray(m.roster))return m.roster.length;
+  const rs=rounds();
+  return Number(m.rosterCount)||((rs[0]?.matches?.length||0)*2);
+}
+function rounds(){
+  const r=data?.rounds;
+  if(Array.isArray(r))return r.filter(Boolean);
+  if(r&&typeof r==='object')return Object.keys(r).sort((a,b)=>Number(a)-Number(b)).map(k=>r[k]).filter(Boolean);
+  return [];
+}
+function matchesOf(r){
+  if(Array.isArray(r?.matches))return r.matches.filter(Boolean);
+  const m=r?.matches;
+  if(m&&typeof m==='object')return Object.keys(m).sort((a,b)=>Number(a)-Number(b)).map(k=>m[k]).filter(Boolean);
+  return [];
+}
+function usesRR(){return data?.meta?.freeFinal==='rr3'}
+function flowLabel(){
+  const n=eventCount();
+  if(!usesRR())return '兩兩淘汰至冠軍＋季軍賽';
+  if(n<=3)return `${n} → 3・最後三人循環`;
+  const steps=[n];let cur=n;
+  while(cur>6){cur=Math.ceil(cur/2);steps.push(cur)}
+  if(steps[steps.length-1]!==3)steps.push(3);
+  return `${steps.join(' → ')}・最後三人循環`;
+}
+function stageLabel(ri,r){
+  if(r?.placementFinal===true)return '冠軍 / 季軍賽';
+  if(usesRR()){
+    if(ri===0)return `第一輪（${eventCount()}強）`;
+    return `${matchesOf(r).length*2}強`;
+  }
+  return r?.name||`第 ${ri+1} 輪`;
+}
+function layout(ri){
+  const count=eventCount();
+  const cardH=count>=64?88:count>=32?98:104;
+  const pitch=count>=64?98:count>=32?108:120;
+  const minGap=count>=64?10:count>=32?12:16;
+  const mult=Math.pow(2,ri);
+  return {top:Math.round((pitch/2)*(mult-1)),gap:Math.max(minGap,Math.round(pitch*mult-cardH))}
+}
+function matchHtml(m,ri,mi,r){
+  const a=m?.a??'待定',b=m?.b??'待定';
+  const pa=a==='待定',pb=b==='待定';
+  const sa=pa?'':(m?.sa===''||m?.sa==null?'–':m.sa);
+  const sb=pb?'':(m?.sb===''||m?.sb==null?'–':m.sb);
+  const title=r?.placementFinal===true?(mi===0?'🏆 冠軍賽':'🥉 季軍賽'):`第 ${mi+1} 場`;
+  return `<div class="bracketMatch ${m?.winner?'done':''}" data-ri="${ri}" data-mi="${mi}">
+    <div class="matchNo">${title}</div>
+    <div class="bSide ${pa?'pending':''} ${m?.winner===a?'winner':''}">
+      <span class="bName">${m?.winner===a?'<span class="winnerDot">●</span>':''}<span class="playerLabel">${esc(a)}</span></span><span class="bScore">${esc(sa)}</span>
+    </div>
+    <div class="bSide ${pb?'pending':''} ${m?.winner===b?'winner':''}">
+      <span class="bName">${m?.winner===b?'<span class="winnerDot">●</span>':''}<span class="playerLabel">${esc(b)}</span></span><span class="bScore">${esc(sb)}</span>
+    </div>
+  </div>`;
+}
+function rrHtml(){
+  const f=data?.finalRR;if(!f)return '';
+  const players=Array.isArray(f.players)?f.players:Object.values(f.players||{});
+  const games=Array.isArray(f.matches)?f.matches.filter(Boolean):Object.values(f.matches||{}).filter(Boolean);
+  const stat={};players.forEach(p=>stat[p]={w:0,l:0,pf:0,pa:0});
+  games.forEach(m=>{
+    if(!stat[m.a])stat[m.a]={w:0,l:0,pf:0,pa:0};
+    if(!stat[m.b])stat[m.b]={w:0,l:0,pf:0,pa:0};
+    const hasA=m.sa!==''&&m.sa!=null,hasB=m.sb!==''&&m.sb!=null;
+    if(hasA&&hasB){
+      const a=Number(m.sa)||0,b=Number(m.sb)||0;
+      stat[m.a].pf+=a;stat[m.a].pa+=b;stat[m.b].pf+=b;stat[m.b].pa+=a;
+      if(a>b){stat[m.a].w++;stat[m.b].l++}else if(b>a){stat[m.b].w++;stat[m.a].l++}
+    }
+  });
+  const ranked=[...players].sort((a,b)=>{
+    const sa=stat[a],sb=stat[b];if(sb.w!==sa.w)return sb.w-sa.w;
+    const da=sa.pf-sa.pa,db=sb.pf-sb.pa;if(db!==da)return db-da;return sb.pf-sa.pf;
+  });
+  return `<section class="rrPanel">
+    <div class="rrHead"><b>👑 最後三人循環</b><div class="muted">決定最終名次</div></div>
+    <div class="rrRanks">${ranked.map((p,i)=>`<div class="rrRankRow"><span class="rrPos">${i+1}</span><b>${esc(p)}</b><span>${stat[p].w}-${stat[p].l}</span></div>`).join('')}</div>
+    <div class="rrGames">${games.map(m=>`<div class="rrMini"><b>${esc(m.a)} vs ${esc(m.b)}</b><span>${m.sa===''?'–':esc(m.sa)} : ${m.sb===''?'–':esc(m.sb)}</span></div>`).join('')}</div>
+    <div class="rrStatBox"><div class="rrStatTitle">📊 循環賽得失分</div>${ranked.map(p=>{const s=stat[p],d=s.pf-s.pa;return `<div class="rrStatRow"><b>${esc(p)}</b><span>得 ${s.pf}</span><span>失 ${s.pa}</span><span>淨 ${d>0?'+':''}${d}</span></div>`}).join('')}</div>
+  </section>`;
+}
+function finalHtml(rs){
+  const fr=rs.find(r=>r?.placementFinal===true),ms=matchesOf(fr);
+  if(!fr||ms.length<2)return '';
+  const champ=ms[0],bronze=ms[1];
+  const loser=m=>!m?.winner?'':m.winner===m.a?m.b:m.winner===m.b?m.a:'';
+  const rows=[
+    ['🥇','第一名',champ?.winner||'待定'],['🥈','第二名',loser(champ)||'待定'],
+    ['🥉','第三名',bronze?.winner||'待定'],['4️⃣','第四名',loser(bronze)||'待定']
+  ];
+  return `<section class="rrPanel finalPlacings"><div class="rrHead"><b>🏆 最終名次</b><div class="muted">冠軍賽＋季軍賽完成後自動產生 1～4 名</div></div>
+  <div class="rrRanks">${rows.map(([i,l,n])=>`<div class="rrRankRow"><span class="rrPos">${i}</span><b>${l}</b><span>${esc(n)}</span></div>`).join('')}</div></section>`;
+}
+function renderEvent(){
+  const meta=data?.meta;if(!meta)return;
+  $('eventView').classList.remove('hidden');
+  $('pageSub').textContent='公開即時賽程';
+  const count=eventCount();
+  $('hero').innerHTML=`<div class="muted">🏆 賽程表</div><h1>${esc(meta.name||'Beyblade X Tournament')}</h1>
+    <div class="chips"><span class="chip">👤 ${count} 人</span><span class="chip">${meta.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class="chip">⌘ ${esc(flowLabel())}</span></div>`;
+  const rs=rounds();
+  const cols=rs.map((r,ri)=>{const l=layout(ri),ms=matchesOf(r);return `<section class="roundCol" data-round="${ri}">
+    <div class="roundHead"><h3>${esc(stageLabel(ri,r))}</h3><div class="sub">${ms.length} 場對戰</div></div>
+    <div class="roundMatches" style="--top:${l.top}px;--gap:${l.gap}px">${ms.map((m,mi)=>matchHtml(m,ri,mi,r)).join('')}</div></section>`}).join('')+(data.finalRR?rrHtml():'');
+  const canvas=document.querySelector('.bracketCanvas');
+  canvas.classList.toggle('compact32',count>=32&&count<64);canvas.classList.toggle('compact64',count>=64);
+  $('bracketCols').innerHTML=cols;
+  $('finalBox').innerHTML=finalHtml(rs);
+  requestAnimationFrame(()=>{autoScale();requestAnimationFrame(drawLinks)});
+}
+
+function render(){
+  if(!data)return;
+  renderEvent();
+}
+function drawLinks(){
+  if(!eventId)return;
+
+  const canvas=document.querySelector('.bracketCanvas');
+  const svg=document.querySelector('.bracketLinks');
+  if(!canvas||!svg)return;
+
+  const rs=rounds();
+  const cr=canvas.getBoundingClientRect();
+  const inv=1/(scale||1);
+  const width=canvas.scrollWidth;
+  const height=canvas.scrollHeight;
+
+  svg.setAttribute('width',width);
+  svg.setAttribute('height',height);
+  svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+  svg.style.width=width+'px';
+  svg.style.height=height+'px';
+
+  const point=(el,side='center')=>{
+    const r=el.getBoundingClientRect();
+    const x=side==='right'?r.right:(side==='left'?r.left:(r.left+r.width/2));
+    return {
+      x:(x-cr.left)*inv,
+      y:(r.top+r.height/2-cr.top)*inv
+    };
+  };
+
+  const paths=[];
+
+  for(let ri=0;ri<rs.length-1;ri++){
+    const src=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${ri}"]`)];
+    const dst=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${ri+1}"]`)];
+
+    dst.forEach((target,j)=>{
+      const t=point(target,'left');
+      const pair=[src[j*2],src[j*2+1]].filter(Boolean);
+      if(!pair.length)return;
+
+      const sourcePoints=pair.map(el=>({el,...point(el,'right')}));
+      const maxSourceX=Math.max(...sourcePoints.map(p=>p.x));
+      const elbowX=maxSourceX+Math.max(16,(t.x-maxSourceX)*0.52);
+
+      sourcePoints.forEach(p=>{
+        const live=p.el.classList.contains('done')?'live':'';
+        paths.push(
+          `<path class="${live}" d="M ${p.x.toFixed(1)} ${p.y.toFixed(1)} H ${elbowX.toFixed(1)} V ${t.y.toFixed(1)} H ${t.x.toFixed(1)}"/>`
+        );
+      });
+    });
+  }
+
+  if(data.finalRR){
+    const last=rs.length-1;
+    const src=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${last}"]`)];
+    const target=canvas.querySelector('.rrPanel');
+
+    if(target&&src.length){
+      const t=point(target,'left');
+      const sourcePoints=src.map(el=>({el,...point(el,'right')}));
+      const maxSourceX=Math.max(...sourcePoints.map(p=>p.x));
+      const elbowX=maxSourceX+Math.max(16,(t.x-maxSourceX)*0.52);
+
+      sourcePoints.forEach((p,k)=>{
+        const live=p.el.classList.contains('done')?'live':'';
+        const ty=t.y+(k-(sourcePoints.length-1)/2)*12;
+        paths.push(
+          `<path class="${live}" d="M ${p.x.toFixed(1)} ${p.y.toFixed(1)} H ${elbowX.toFixed(1)} V ${ty.toFixed(1)} H ${t.x.toFixed(1)}"/>`
+        );
+      });
+    }
+  }
+
+  svg.innerHTML=paths.join('');
+}
+function setScale(v){
+  scale=Math.max(.30,Math.min(1.2,v));
+  const c=document.querySelector('.bracketCanvas'),st=document.querySelector('.bracketStage');if(!c||!st)return;
+  c.style.transform=`scale(${scale})`;st.style.width=Math.ceil(c.scrollWidth*scale)+'px';st.style.height=Math.ceil(c.scrollHeight*scale)+'px';
+  const z=document.querySelector('.zoomLabel');if(z)z.textContent=Math.round(scale*100)+'%';
+}
+function zoom(d){setScale(scale+d);requestAnimationFrame(drawLinks)}
+function fit(){
+  const sc=document.querySelector('.bracketScroll'),c=document.querySelector('.bracketCanvas');if(!sc||!c)return;
+  setScale(Math.max(.30,Math.min(.92,(sc.clientWidth-14)/c.scrollWidth)));sc.scrollTo({left:0,top:0,behavior:'smooth'});requestAnimationFrame(drawLinks)
+}
+function autoScale(){
+  const n=eventCount();
+  setScale(innerWidth<=640?(n>=64?.52:n>=32?.60:.72):(n>=64?.68:n>=32?.78:.9))
+}
+function toggleFull(){document.body.classList.toggle('fullscreen');setTimeout(()=>{autoScale();drawLinks()},80)}
+addEventListener('resize',()=>{if(eventId){clearTimeout(window.__rz);window.__rz=setTimeout(()=>{autoScale();drawLinks()},120)}});
+
+window.addEventListener('pagehide',()=>{
+  clearTimeout(reconnectResyncTimer);
+  try{stream?.close()}catch{}
+  stream=null;
+  streamGeneration++;
+});
+
+if(!DB.startsWith('https://'))setStatus('Firebase 資料庫網址設定錯誤。','error');
+else if(eventId)startStream('publicEvents',eventId);
+else setStatus('網址缺少 event 參數。','error');
+</script>
+</body>
+</html>
