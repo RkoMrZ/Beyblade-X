@@ -2,9 +2,9 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- V5 穩定版：公開資料投影 / 報名名單 / iOS Safari 優化 -->
+<meta name="theme-color" content="#0b0d12"><!-- V5 AUDITED：公開資料投影 / 200+ viewer / 報名名單 / iOS Safari 優化 -->
 <title>[TEST V5] Beyblade X Tournament</title>
-<!-- BUILD: 2026-10-09 PRODUCTION cloud-only + 200-device optimized + champion/bronze placement -->
+<!-- BUILD: 2026-10-13 V5 VIEWER-SPLIT FROM USER FILES -->
 
 <script>
 (function(){
@@ -2813,7 +2813,9 @@ async function closePublicEvent(id){
 
     await cloudUpdate({
       [`events/${id}/publicOpen`]:false,
-      [`events/${id}/publicUntil`]:now
+      [`events/${id}/publicUntil`]:now,
+      [`publicEvents/${id}/meta/publicOpen`]:false,
+      [`publicEvents/${id}/meta/publicUntil`]:now
     },5000);
 
     e.publicOpen=false;
@@ -2859,7 +2861,9 @@ async function extendPublicEvent(id){
 
     await cloudUpdate({
       [`events/${id}/publicOpen`]:true,
-      [`events/${id}/publicUntil`]:nextUntil
+      [`events/${id}/publicUntil`]:nextUntil,
+      [`publicEvents/${id}/meta/publicOpen`]:true,
+      [`publicEvents/${id}/meta/publicUntil`]:nextUntil
     },5000);
 
     e.publicOpen=true;
@@ -3282,7 +3286,8 @@ function publicEventProjectionFromEvent(e){
       freeFinal:e.freeFinal||'champ',
       roster:Array.isArray(e.roster)?[...e.roster]:[],
       created:Number(e.created)||Date.now(),
-      cloudVersion:Number(e.cloudVersion)||2,
+      cloudVersion:Number(e.cloudVersion)||5,
+      syncVersion:Number(e.syncVersion)||0,
       publicOpen:e.publicOpen!==false,
       publicUntil:Number(e.publicUntil)||0
     },
@@ -3325,8 +3330,9 @@ function listenPublicProjectionEvent(id){
   if(cloudUnsub)cloudUnsub();
 
   const unsubs=[];
-  const boundRounds=new Set();
   let renderTimer=null;
+  let structureReloadBusy=false;
+  let seenSyncVersion=Number(ev?.syncVersion)||0;
 
   const scheduleRender=()=>{
     if(renderTimer)return;
@@ -3343,20 +3349,16 @@ function listenPublicProjectionEvent(id){
     unsubs.push(()=>ref.off('value',cb));
   };
 
-  const bindRoundMatches=ri=>{
-    if(boundRounds.has(ri))return;
-    boundRounds.add(ri);
+  const bindExistingRound=ri=>{
     const ref=fbDb.ref(`publicEvents/${id}/rounds/${ri}/matches`);
 
-    const apply=s=>{
+    const changed=s=>{
       const mi=Number(s.key);
-      if(!Number.isInteger(mi))return;
-      if(!ev.rounds[ri])ev.rounds[ri]={name:`第 ${ri+1} 輪`,matches:[]};
-      if(!Array.isArray(ev.rounds[ri].matches))ev.rounds[ri].matches=[];
+      if(!Number.isInteger(mi)||!ev.rounds?.[ri]?.matches)return;
       ev.rounds[ri].matches[mi]=s.val();
       scheduleRender();
     };
-    const remove=s=>{
+    const removed=s=>{
       const mi=Number(s.key);
       if(Number.isInteger(mi)&&ev.rounds?.[ri]?.matches){
         ev.rounds[ri].matches.splice(mi,1);
@@ -3364,77 +3366,67 @@ function listenPublicProjectionEvent(id){
       }
     };
 
-    ref.on('child_added',apply);
-    ref.on('child_changed',apply);
-    ref.on('child_removed',remove);
+    ref.on('child_changed',changed);
+    ref.on('child_removed',removed);
     unsubs.push(()=>{
-      ref.off('child_added',apply);
-      ref.off('child_changed',apply);
-      ref.off('child_removed',remove);
+      ref.off('child_changed',changed);
+      ref.off('child_removed',removed);
     });
   };
 
-  // round child_added 只在「新增一輪」時多傳一輪，不會因單場比分更新而整包 round 重傳。
-  const roundsRef=fbDb.ref(`publicEvents/${id}/rounds`);
-  const roundAdded=s=>{
-    const ri=Number(s.key);
-    if(!Number.isInteger(ri))return;
-    const data=s.val()||{};
-    ev.rounds[ri]={
-      name:data.name||`第 ${ri+1} 輪`,
-      placementFinal:data.placementFinal===true,
-      matches:Array.isArray(data.matches)?data.matches:[]
+  (ev.rounds||[]).forEach((_,ri)=>bindExistingRound(ri));
+
+  if(ev.finalRR?.matches){
+    const ref=fbDb.ref(`publicEvents/${id}/finalRR/matches`);
+    const changed=s=>{
+      const mi=Number(s.key);
+      if(!Number.isInteger(mi)||!ev.finalRR?.matches)return;
+      ev.finalRR.matches[mi]=s.val();
+      scheduleRender();
     };
-    bindRoundMatches(ri);
-    scheduleRender();
-  };
-  const roundRemoved=s=>{
-    const ri=Number(s.key);
-    if(Number.isInteger(ri)&&Array.isArray(ev.rounds)){
-      ev.rounds.splice(ri,1);
-      scheduleRender();
-    }
-  };
-  roundsRef.on('child_added',roundAdded);
-  roundsRef.on('child_removed',roundRemoved);
-  unsubs.push(()=>{
-    roundsRef.off('child_added',roundAdded);
-    roundsRef.off('child_removed',roundRemoved);
-  });
+    const removed=s=>{
+      const mi=Number(s.key);
+      if(Number.isInteger(mi)&&ev.finalRR?.matches){
+        ev.finalRR.matches.splice(mi,1);
+        scheduleRender();
+      }
+    };
+    ref.on('child_changed',changed);
+    ref.on('child_removed',removed);
+    unsubs.push(()=>{
+      ref.off('child_changed',changed);
+      ref.off('child_removed',removed);
+    });
+  }
 
-  onValue(`publicEvents/${id}/finalRR/players`,s=>{
-    const players=s.exists()?s.val():null;
-    if(players){
-      ev.finalRR=ev.finalRR||{players:[],matches:[]};
-      ev.finalRR.players=Array.isArray(players)?players:[];
-    }else{
-      ev.finalRR=null;
+  onValue(`publicEvents/${id}/meta/syncVersion`,async s=>{
+    const v=Number(s.val())||0;
+    if(!v || v===seenSyncVersion)return;
+    seenSyncVersion=v;
+    if(structureReloadBusy)return;
+    structureReloadBusy=true;
+    try{
+      const latest=await publicCloudGet(`publicEvents/${id}`,7000);
+      if(latest?.meta){
+        ev={
+          ...latest.meta,
+          rounds:Array.isArray(latest.rounds)?latest.rounds:[],
+          finalRR:latest.finalRR||null,
+          testOnly:false,
+          publicViewOnly:true,
+          refereeNames:[],
+          refereeCount:0,
+          refereeClaims:{}
+        };
+        cloudEventsCache[id]=ev;
+        renderAdmin();
+        setTimeout(()=>listenPublicProjectionEvent(id),0);
+      }
+    }catch(e){
+      console.warn('public structure reload failed',e);
+    }finally{
+      structureReloadBusy=false;
     }
-    scheduleRender();
-  });
-
-  const rrRef=fbDb.ref(`publicEvents/${id}/finalRR/matches`);
-  const rrApply=s=>{
-    const mi=Number(s.key);
-    if(!Number.isInteger(mi))return;
-    ev.finalRR=ev.finalRR||{players:[],matches:[]};
-    ev.finalRR.matches[mi]=s.val();
-    scheduleRender();
-  };
-  const rrRemove=s=>{
-    const mi=Number(s.key);
-    if(Number.isInteger(mi)&&ev.finalRR?.matches){
-      ev.finalRR.matches.splice(mi,1);
-      scheduleRender();
-    }
-  };
-  rrRef.on('child_added',rrApply);
-  rrRef.on('child_changed',rrApply);
-  rrRef.on('child_removed',rrRemove);
-  unsubs.push(()=>{
-    rrRef.off('child_added',rrApply);
-    rrRef.off('child_changed',rrApply);
-    rrRef.off('child_removed',rrRemove);
   });
 
   onValue(`publicEvents/${id}/meta/publicOpen`,s=>{
@@ -3453,13 +3445,13 @@ function listenPublicProjectionEvent(id){
 async function loadPublicProjectionEvent(id){
   if(!(await initCloud()))return 'error';
   try{
-    const meta=await publicCloudGet(`publicEvents/${id}/meta`,7000);
-    if(!meta)return 'missing';
+    const data=await publicCloudGet(`publicEvents/${id}`,7000);
+    if(!data?.meta)return 'missing';
 
     ev={
-      ...meta,
-      rounds:[],
-      finalRR:null,
+      ...data.meta,
+      rounds:Array.isArray(data.rounds)?data.rounds:[],
+      finalRR:data.finalRR||null,
       testOnly:false,
       publicViewOnly:true,
       refereeNames:[],
@@ -3474,8 +3466,6 @@ async function loadPublicProjectionEvent(id){
     $('home').classList.add('hidden');
     $('create').classList.add('hidden');
     $('admin').classList.remove('hidden');
-
-    if(isAdmin)ensurePublicProjectionForOwner();
 
     renderAdmin();
     listenPublicProjectionEvent(id);
@@ -3500,7 +3490,9 @@ function cloudOrganizerUpdatesFromEvent(){
     updates[`${base}/${field}`]=cloneJson(ev[field]);
   }
 
-  updates[`${base}/syncVersion`]=Date.now();
+  const nextSyncVersion=Date.now();
+  ev.syncVersion=nextSyncVersion;
+  updates[`${base}/syncVersion`]=nextSyncVersion;
   updates[`publicEvents/${ev.id}`]=publicEventProjectionFromEvent(ev);
   return updates;
 }
@@ -4200,7 +4192,24 @@ function handleRegistrationTimeChange(source){
 
 async function getOwnedRegistrationFormIds(uid){
   const map=(await rtdbRestGet(`userRegistrationForms/${uid}`,6000))||{};
-  return Object.keys(map).filter(id=>map[id]===true);
+  const ids=Object.keys(map).filter(id=>map[id]===true);
+  const valid=[];
+  const cleanup={};
+
+  for(const id of ids){
+    try{
+      const form=await rtdbRestGet(`registrationForms/${id}`,5000);
+      if(form?.ownerUid===uid)valid.push(id);
+      else cleanup[`userRegistrationForms/${uid}/${id}`]=null;
+    }catch(e){
+      valid.push(id);
+    }
+  }
+
+  if(Object.keys(cleanup).length){
+    await rtdbRestMultiUpdate(cleanup,5000).catch(()=>{});
+  }
+  return valid;
 }
 
 async function getRegistrationFormSlots(uid){
@@ -4210,9 +4219,16 @@ async function getRegistrationFormSlots(uid){
 async function ensureRegistrationFormSlots(uid){
   const ids=await getOwnedRegistrationFormIds(uid);
   const slots=await getRegistrationFormSlots(uid);
-  const used=new Set(Object.values(slots).filter(v=>typeof v==='string'&&v));
   const updates={};
 
+  for(const [slot,id] of Object.entries(slots)){
+    if(!['0','1','2'].includes(String(slot)) || !ids.includes(id)){
+      updates[`registrationFormSlots/${uid}/${slot}`]=null;
+      delete slots[slot];
+    }
+  }
+
+  const used=new Set(Object.values(slots).filter(v=>typeof v==='string'&&v));
   for(const id of ids){
     if(used.has(id))continue;
     const free=['0','1','2'].find(s=>!slots[s] && updates[`registrationFormSlots/${uid}/${s}`]===undefined);
@@ -4562,8 +4578,11 @@ async function toggleRegistrationSelected(id,on){
   updateRegistrationSelectedUI();
 
   try{
-    await rtdbRestPut(`registrations/${activeRegistrationFormId}/${id}/checkedIn`,!!on,5000);
-    await patchPublicRegistrationRow(id,row);
+    await rtdbRestPatchRoot({
+      [`registrations/${activeRegistrationFormId}/${id}/checkedIn`]:!!on,
+      [`publicRegistrationLists/${activeRegistrationFormId}/rows/${id}`]:publicRegistrationRow(row),
+      [`publicRegistrationLists/${activeRegistrationFormId}/meta/updated`]:Date.now()
+    },6000);
   }catch(e){
     // 回復原狀
     row.checkedIn=!on;
@@ -4710,8 +4729,11 @@ async function deleteRegistration(id){
   if(!confirm('確定刪除這筆報名嗎？'))return;
   const row=activeRegistrations[id]||null;
   try{
-    await rtdbRestDelete(`registrations/${activeRegistrationFormId}/${id}`,5000);
-    await patchPublicRegistrationRow(id,null);
+    await rtdbRestPatchRoot({
+      [`registrations/${activeRegistrationFormId}/${id}`]:null,
+      [`publicRegistrationLists/${activeRegistrationFormId}/rows/${id}`]:null,
+      [`publicRegistrationLists/${activeRegistrationFormId}/meta/updated`]:Date.now()
+    },6000);
     delete activeRegistrations[id];
     registrationSelected.delete(id);
 
@@ -4770,8 +4792,11 @@ function publicRegistrationBack(){
 }
 
 function publicRegistrationListUrl(formId){
-  const base=`${location.origin}${location.pathname}`;
-  return `${base}?list=${encodeURIComponent(formId)}`;
+  const u=new URL('viewer.html',location.href);
+  u.search='';
+  u.hash='';
+  u.searchParams.set('list',formId);
+  return u.href;
 }
 
 async function syncPublicRegistrationListProjection(){
@@ -4901,16 +4926,24 @@ async function showPublicRegistrationList(formId){
 
     const ref=fbDb.ref(`publicRegistrationLists/${formId}/rows`);
 
+    let publicListRenderTimer=null;
+    const schedulePublicListRender=()=>{
+      if(publicListRenderTimer)return;
+      publicListRenderTimer=setTimeout(()=>{
+        publicListRenderTimer=null;
+        renderPublicRegistrationRows(rows);
+      },80);
+    };
     const apply=s=>{
       const next=s.val();
       const prev=rows[s.key];
       rows[s.key]=next;
       if(prev && JSON.stringify(prev)===JSON.stringify(next))return;
-      renderPublicRegistrationRows(rows);
+      schedulePublicListRender();
     };
     const remove=s=>{
       delete rows[s.key];
-      renderPublicRegistrationRows(rows);
+      schedulePublicListRender();
     };
 
     ref.on('child_added',apply);
@@ -5163,8 +5196,11 @@ async function manualAddRegistration(){
       created:Date.now()
     };
 
-    await rtdbRestPut(`registrations/${activeRegistrationFormId}/${assignedId}`,row,6000);
-    await patchPublicRegistrationRow(assignedId,row);
+    await rtdbRestPatchRoot({
+      [`registrations/${activeRegistrationFormId}/${assignedId}`]:row,
+      [`publicRegistrationLists/${activeRegistrationFormId}/rows/${assignedId}`]:publicRegistrationRow(row),
+      [`publicRegistrationLists/${activeRegistrationFormId}/meta/updated`]:Date.now()
+    },7000);
     activeRegistrations[assignedId]=row;
     activeRegistrationRows=activeRegistrations;
 
@@ -5768,7 +5804,7 @@ async function createTournament(){
         finalRR:null,
         created:Date.now(),
         testOnly:true,
-        cloudVersion:2
+        cloudVersion:5
       };
 
       buildFirst();
@@ -5808,7 +5844,7 @@ async function createTournament(){
       rounds:[],
       finalRR:null,
       created:now,
-      cloudVersion:2,
+      cloudVersion:5,
       ownerUid:fbUser.uid,
       publicOpen:true,
       publicUntil:now+PUBLIC_WINDOW_MS,
@@ -7497,8 +7533,64 @@ function syncTabButtons(t=currentAdminTab){
   });
 }
 
+
+function renderPublicBracketOnly(){
+  normalizeEvent();
+  ensureNext();
+
+  const flow=usesThreePlayerFinal()?freeFlowLabel(ev.roster.length):'兩兩淘汰至冠軍＋季軍賽';
+  const top=`<div class=adminHero>
+    <div class=adminHeroTop>
+      <div><div class=muted>🏆 賽程表</div><h2>${esc(ev.name)}</h2></div>
+    </div>
+    <div class=metaChips>
+      <span class=metaChip>👤 ${ev.roster.length} 人</span>
+      <span class=metaChip>${ev.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span>
+      <span class=metaChip>⌘ ${flow}</span>
+    </div>
+  </div>`;
+
+  let cols=ev.rounds.map((r,ri)=>{
+    const l=roundLayout(ri);
+    return `<section class="roundCol ${r?.placementFinal===true?'placementFinalCol':''}" data-round="${ri}">
+      <div class=roundHead><h3>${stageLabel(ri,r)}</h3><div class=roundSub>${r.matches.length} 場對戰</div></div>
+      <div class=roundMatches style="--top:${l.top}px;--gap:${l.gap}px">${r.matches.map((m,mi)=>renderBracketMatch(m,ri,mi)).join('')}</div>
+    </section>`;
+  }).join('');
+
+  if(ev.finalRR)cols+=renderRR();
+
+  $('bracketTab').innerHTML=top+`<div class=bracketShell>
+    <div class=bracketTools>
+      <div class=zoomGroup><button onclick="zoomBracket(-.1)">−</button><span class=zoomLabel>100%</span><button onclick="zoomBracket(.1)">＋</button><button onclick=fitBracket()>全覽</button></div>
+      <div class=bracketHint>拖曳查看即時賽程</div>
+      <button class=viewToggle onclick=toggleBracketFull()>⛶</button>
+    </div>
+    <div class=bracketScroll><div class=bracketStage><div class="bracketCanvas ${ev.roster.length>=64?'compact64':ev.roster.length>=32?'compact32':''}">
+      <svg class=bracketLinks></svg>${cols}
+    </div></div></div>
+  </div>${renderFinalPlacings()}`;
+
+  currentAdminTab='bracket';
+  ['draw','roster','referee','organizer','share'].forEach(x=>$(x+'Tab')?.classList.add('hidden'));
+  $('bracketTab')?.classList.remove('hidden');
+
+  requestAnimationFrame(()=>{
+    const n=ev?.roster?.length||0;
+    bracketScale=window.innerWidth<=640
+      ? (n>=64?.52:n>=32?.60:.72)
+      : (n>=64?.68:n>=32?.78:.9);
+    setBracketScale(bracketScale);
+    requestAnimationFrame(drawBracketLinks);
+  });
+}
+
 function renderAdmin(){
   if(!ev){$('admin').classList.add('hidden');$('home').classList.remove('hidden');return;}
+  if(ev.publicViewOnly){
+    renderPublicBracketOnly();
+    return;
+  }
   normalizeEvent();
   ensureNext();
   let flow=usesThreePlayerFinal()?freeFlowLabel(ev.roster.length):'兩兩淘汰至冠軍＋季軍賽';
@@ -8312,7 +8404,13 @@ async function startRefereeCodeRotation(){
 }
 
 function organizerUrl(){return location.origin+location.pathname+`?event=${encodeURIComponent(ev.id)}&admin=1`}
-function publicUrl(){return location.origin+location.pathname+`?event=${encodeURIComponent(ev.id)}`}
+function publicUrl(){
+  const u=new URL('viewer.html',location.href);
+  u.search='';
+  u.hash='';
+  u.searchParams.set('event',ev.id);
+  return u.href;
+}
 async function claimAdmin(){
   if(!(await initCloud()))return;
   const code=$('joinAdminCode')?.value.trim();
