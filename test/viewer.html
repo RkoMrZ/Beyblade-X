@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
 <title>Beyblade X 即時查看</title>
-<!-- BUILD: 2026-10-13 V5 VIEWER SSE-RESYNC -->
+<!-- BUILD: 2026-10-13 V5 TOURNAMENT VIEWER SSE-RESYNC -->
 <style>
 :root{--bg:#0b0d12;--panel:#151922;--panel2:#101620;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d}
 *{box-sizing:border-box}
@@ -42,8 +42,6 @@ main{padding:10px}
 .rrStatBox{margin-top:9px;border:1px solid #3a4658;border-radius:11px;padding:8px;background:#101722}.rrStatTitle{font-size:11px;font-weight:900;margin-bottom:4px}.rrStatRow{display:grid;grid-template-columns:1fr auto auto auto;gap:5px;padding:6px 0;border-top:1px solid #2b3545;font-size:9px}.rrStatRow span{text-align:right;color:#c8d1df}
 .finalPlacings{margin-top:10px;width:100%;max-width:none}.finalPlacings .rrRankRow{grid-template-columns:30px minmax(80px,1fr) minmax(90px,1fr);font-size:13px}.finalPlacings .rrRankRow span:last-child{text-align:right}
 body.fullscreen{overflow:hidden}body.fullscreen header{display:none}body.fullscreen .bracketShell{position:fixed;inset:0;z-index:40;border:0;border-radius:0}body.fullscreen .bracketScroll{height:calc(100dvh - 50px);min-height:0;padding-bottom:60px}
-.listCard{border:1px solid var(--line);border-radius:16px;background:#151922;overflow:hidden}.listHead{padding:15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:center}.listHead h1{margin:3px 0 4px;font-size:24px}.listCols,.listRow{display:grid;grid-template-columns:minmax(0,1fr) 94px 92px;align-items:center;gap:8px}.listCols{padding:9px 14px;background:#1b2230;color:#9eabbf;font-size:11px;font-weight:900}.listRow{padding:10px 14px;border-top:1px solid #273144;font-size:14px}.listName{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pill{display:inline-flex;justify-content:center;align-items:center;min-height:30px;padding:5px 8px;border:1px solid #37445a;border-radius:999px;background:#111722;font-size:11px;font-weight:850}.pill.on{border-color:#2f7c58;background:#153224;color:#a9efc8}
-.empty{padding:28px 14px;text-align:center;color:var(--muted)}
 @media(min-width:641px){main{padding:16px}.roundCol{width:204px;flex-basis:204px}.bracketCanvas{gap:48px}.rrPanel{width:236px;flex-basis:236px}}
 </style>
 </head>
@@ -74,14 +72,6 @@ body.fullscreen{overflow:hidden}body.fullscreen header{display:none}body.fullscr
     </div>
     <div id="finalBox"></div>
   </section>
-
-  <section id="listView" class="hidden">
-    <div class="listCard">
-      <div class="listHead"><div><div class="muted">📋 報名名單</div><h1 id="listTitle">報名名單</h1><div id="listCount" class="muted"></div></div></div>
-      <div class="listCols"><span>比賽名稱</span><span>正 / 備選</span><span>已 / 未報到</span></div>
-      <div id="listRows"></div>
-    </div>
-  </section>
 </main>
 
 <script>
@@ -90,7 +80,6 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const params=new URLSearchParams(location.search);
 const eventId=params.get('event')||'';
-const listId=params.get('list')||'';
 let data=null, stream=null, renderTimer=null, scale=1, gotFirst=false, failureCheckBusy=false;
 let streamKind='',streamId='',streamGeneration=0,streamOpenedOnce=false;
 let reconnectResyncTimer=null,resyncPromise=null,lastResyncAt=0;
@@ -151,10 +140,8 @@ function streamUrl(kind,id){
   return `${DB}/${kind}/${encodeURIComponent(id)}.json`;
 }
 
-function publicReadErrorText(kind){
-  return kind==='publicEvents'
-    ? '公開連結已關閉或過期。'
-    : '這份公開名單目前無法讀取。';
+function publicReadErrorText(){
+  return '公開連結已關閉或過期。';
 }
 
 async function fetchFreshSnapshot(kind,id,{quiet=false}={}){
@@ -169,7 +156,7 @@ async function fetchFreshSnapshot(kind,id,{quiet=false}={}){
     if(generation!==streamGeneration)return false;
 
     if(r.status===401||r.status===403){
-      setStatus(publicReadErrorText(kind),'error');
+      setStatus(publicReadErrorText(),'error');
       try{stream?.close()}catch{}
       return false;
     }
@@ -289,7 +276,7 @@ function startStream(kind,id,{isRestart=false,reason='initial'}={}){
 
   es.addEventListener('cancel',()=>{
     if(generation!==streamGeneration || stream!==es)return;
-    setStatus(publicReadErrorText(kind),'error');
+    setStatus(publicReadErrorText(),'error');
     try{es.close()}catch{}
   });
 
@@ -323,7 +310,7 @@ async function checkFailure(kind,id){
     });
 
     if(r.status===401||r.status===403){
-      setStatus(publicReadErrorText(kind),'error');
+      setStatus(publicReadErrorText(),'error');
       try{stream?.close()}catch{}
     }else if(r.ok){
       const j=await r.json();
@@ -477,7 +464,7 @@ function finalHtml(rs){
 }
 function renderEvent(){
   const meta=data?.meta;if(!meta)return;
-  $('eventView').classList.remove('hidden');$('listView').classList.add('hidden');
+  $('eventView').classList.remove('hidden');
   $('pageSub').textContent='公開即時賽程';
   const count=eventCount();
   $('hero').innerHTML=`<div class="muted">🏆 賽程表</div><h1>${esc(meta.name||'Beyblade X Tournament')}</h1>
@@ -492,20 +479,10 @@ function renderEvent(){
   $('finalBox').innerHTML=finalHtml(rs);
   requestAnimationFrame(()=>{autoScale();requestAnimationFrame(drawLinks)});
 }
-function renderList(){
-  const meta=data?.meta||{},map=data?.rows||{};
-  $('listView').classList.remove('hidden');$('eventView').classList.add('hidden');$('pageSub').textContent='公開報名名單';
-  $('listTitle').textContent=meta.title||'報名名單';
-  const rows=Object.values(map).filter(r=>r?.playerName).sort((a,b)=>{
-    const ta=a.entryType==='waitlist'?1:0,tb=b.entryType==='waitlist'?1:0;
-    return ta!==tb?ta-tb:(Number(a.entryNo)||0)-(Number(b.entryNo)||0)
-  });
-  $('listCount').textContent=`名單人數 ${rows.length}`;
-  $('listRows').innerHTML=rows.length?rows.map(r=>`<div class="listRow"><span class="listName">${esc(r.playerName)}</span><span class="pill">${esc(r.entryLabel||'')}</span><span class="pill ${r.checkedIn===true?'on':''}">${r.checkedIn===true?'已報到':'未報到'}</span></div>`).join(''):'<div class="empty">目前名單尚未建立。</div>';
-}
+
 function render(){
   if(!data)return;
-  if(eventId)renderEvent();else renderList();
+  renderEvent();
 }
 function drawLinks(){
   if(!eventId)return;
@@ -558,8 +535,7 @@ window.addEventListener('pagehide',()=>{
 });
 
 if(eventId)startStream('publicEvents',eventId);
-else if(listId)startStream('publicRegistrationLists',listId);
-else setStatus('網址缺少 event 或 list 參數。','error');
+else setStatus('網址缺少 event 參數。','error');
 </script>
 </body>
 </html>
