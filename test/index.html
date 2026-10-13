@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12"><!-- V5 TOURNAMENT ONLY：公開賽程投影 / 200+ viewer / iOS Safari 優化 -->
 <title>[TEST V5] Beyblade X Tournament</title>
-<!-- BUILD: 2026-10-13 V5 TOURNAMENT-ONLY -->
+<!-- BUILD: 2026-10-13 V5 TOURNAMENT-ONLY ROSTER-NAME-FIX -->
 
 <script>
 (function(){
@@ -3638,34 +3638,58 @@ function goHome(){
   }
 }
 function startCreate(m){selectHomeMode(m);proceedCreate()}
-$('bulkNames').addEventListener('input',updatePreview);
+let draftRoster=[];
 
-// 使用者手動修改名單後，就不再把「產生模擬名單」數字當成預期人數。
-document.addEventListener('input',e=>{
-  if(e.target?.id==='bulkNames')demoExpectedCount=null;
+$('bulkNames').addEventListener('input',()=>{
+  // 上方文字名單被直接修改時，才重新解析整份資料。
+  draftRoster=parseRosterText($('bulkNames').value);
+  demoExpectedCount=null;
+  renderRosterPreviewFromDraft();
 });
 
-function rosterFromText(){return $('bulkNames').value.split(/\n|,/).map(x=>x.trim()).filter(Boolean)}
+function parseRosterText(raw){
+  return String(raw||'')
+    .split(/\n|,/)
+    .map(x=>x.trim())
+    .filter(Boolean);
+}
+
+function rosterFromText(){
+  // 建立賽事時以目前 textarea 為最終來源，同時刷新 draft，
+  // 避免畫面與真正送出的名單不同步。
+  draftRoster=parseRosterText($('bulkNames').value);
+  return [...draftRoster];
+}
+
+function renderRosterPreviewFromDraft(){
+  $('countBadge').textContent=draftRoster.length+' 人';
+  $('rosterPreview').innerHTML=draftRoster.length
+    ?draftRoster.map((n,i)=>`<div class="player"><span class="num">${i+1}</span><input value="${esc(n)}" oninput="editPreviewName(${i},this.value)" aria-label="選手 ${i+1} 名稱"></div>`).join('')
+    :'輸入名單後會顯示在這裡。';
+}
+
 function updatePreview(){
- let a=rosterFromText();
- $('countBadge').textContent=a.length+' 人';
- $('rosterPreview').innerHTML=a.length
-   ?a.map((n,i)=>`<div class="player"><span class="num">${i+1}</span><input value="${esc(n)}" oninput="editPreviewName(${i},this.value)" aria-label="選手 ${i+1} 名稱"></div>`).join('')
-   :'輸入名單後會顯示在這裡。';
+  draftRoster=parseRosterText($('bulkNames').value);
+  renderRosterPreviewFromDraft();
 }
+
 function editPreviewName(i,v){
- let a=rosterFromText();
- if(i<0||i>=a.length)return;
- a[i]=String(v).replace(/\n/g,' ');
- $('bulkNames').value=a.join('\n');
- $('countBadge').textContent=a.length+' 人';
+  // 下方單一姓名編輯只允許改該索引，不再重新解析 textarea。
+  // 這可避免 iPhone/Safari 輸入法或快速輸入期間，其他列被意外吃掉。
+  if(i<0||i>=draftRoster.length)return;
+  const nv=String(v??'').replace(/[\r\n,]/g,' ').trim();
+  draftRoster[i]=nv || draftRoster[i];
+  $('bulkNames').value=draftRoster.join('\n');
+  $('countBadge').textContent=draftRoster.length+' 人';
 }
+
 let demoExpectedCount=null;
 function makeDemo(){
   let n=Math.max(2,+$('demoCount').value||24);
   demoExpectedCount=n;
-  $('bulkNames').value=Array.from({length:n},(_,i)=>`選手 ${i+1}`).join('\n');
-  updatePreview();
+  draftRoster=Array.from({length:n},(_,i)=>`選手 ${i+1}`);
+  $('bulkNames').value=draftRoster.join('\n');
+  renderRosterPreviewFromDraft();
 }
 function shuffle(a){a=[...a];for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function uid(){return Math.random().toString(36).slice(2,9).toUpperCase()}
