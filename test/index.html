@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12"><!-- V2 雲端架構重寫安全版：淺色模式改為 iOS 中性灰白風格，深色模式維持原設計 -->
+<meta name="theme-color" content="#0b0d12"><!-- V5 穩定版：公開資料投影 / 報名名單 / iOS Safari 優化 -->
 <title>[TEST V5] Beyblade X Tournament</title>
 <!-- BUILD: 2026-10-09 PRODUCTION cloud-only + 200-device optimized + champion/bronze placement -->
 
@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST V5 REG-LIMIT-3 FIXED-SLOTS 2026-10-13 -->
+<!-- BUILD: TEST V5 CASCADE-DELETE-FIX 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -3069,7 +3069,7 @@ function requestDeleteSavedEvent(id){
     text.innerHTML='這會刪除這支裝置上的<strong>本機賽事</strong>。<br>這場沒有雲端資料。';
     ok.textContent='刪除本機';
   }else{
-    text.innerHTML='這會<strong>永久刪除雲端賽事</strong>，包含 Firebase 上的賽程、管理員與驗證碼資料。<br><br>此動作無法復原。';
+    text.innerHTML='這會<strong>永久刪除整場雲端賽事</strong>，包含完整賽程、公開觀看投影、管理員、裁判權限、驗證碼與雲端名額。<br><br>只有全部刪除成功後，首頁才會移除這場賽事。此動作無法復原。';
     ok.textContent='刪除雲端';
   }
   modal.classList.remove('hidden');
@@ -3078,6 +3078,12 @@ function closeDeleteConfirm(){
   pendingDeleteId='';
   $('deleteConfirmModal')?.classList.add('hidden');
 }
+
+function cloudDeleteErrorLabel(step,e){
+  const msg=String(e?.message||e||'未知錯誤');
+  return `刪除停在「${step}」：${msg}`;
+}
+
 async function deleteSavedEvent(id){
   const cached=events()[id];
   if(!cached)return alert('找不到這場賽事資料。');
@@ -3109,6 +3115,7 @@ async function deleteSavedEvent(id){
     if(slot===undefined)throw new Error('找不到這場賽事的 owner slot，請重新整理後再試');
 
     const deps=[
+      ['公開賽程投影',`publicEvents/${id}`],
       ['裁判身分領取',`refereeClaims/${id}`],
       ['裁判登入權限',`refereeUsers/${id}`],
       ['裁判驗證碼',`refereeSecrets/${id}`],
@@ -4190,9 +4197,74 @@ function handleRegistrationTimeChange(source){
 }
 
 
+
+async function getOwnedRegistrationFormIds(uid){
+  const map=(await rtdbRestGet(`userRegistrationForms/${uid}`,6000))||{};
+  return Object.keys(map).filter(id=>map[id]===true);
+}
+
+async function getRegistrationFormSlots(uid){
+  return (await rtdbRestGet(`registrationFormSlots/${uid}`,6000).catch(()=>null))||{};
+}
+
+async function ensureRegistrationFormSlots(uid){
+  const ids=await getOwnedRegistrationFormIds(uid);
+  const slots=await getRegistrationFormSlots(uid);
+  const used=new Set(Object.values(slots).filter(v=>typeof v==='string'&&v));
+  const updates={};
+
+  for(const id of ids){
+    if(used.has(id))continue;
+    const free=['0','1','2'].find(s=>!slots[s] && updates[`registrationFormSlots/${uid}/${s}`]===undefined);
+    if(!free)break;
+    updates[`registrationFormSlots/${uid}/${free}`]=id;
+    slots[free]=id;
+    used.add(id);
+  }
+
+  if(Object.keys(updates).length){
+    await rtdbRestMultiUpdate(updates,6000);
+  }
+  return {ids,slots};
+}
+
+async function reserveRegistrationFormSlot(uid,formId){
+  const {ids,slots}=await ensureRegistrationFormSlots(uid);
+
+  if(ids.length>=REGISTRATION_FORM_LIMIT){
+    throw new Error('每個主辦帳號最多只能建立 3 份活動名單。');
+  }
+
+  for(const s of ['0','1','2']){
+    if(slots[s])continue;
+    try{
+      await rtdbRestPut(`registrationFormSlots/${uid}/${s}`,formId,5000);
+      return s;
+    }catch(e){
+      // 可能另一個分頁/手機剛好搶到同一槽，改試下一格。
+      continue;
+    }
+  }
+
+  throw new Error('每個主辦帳號最多只能建立 3 份活動名單。');
+}
+
+async function releaseRegistrationFormSlot(uid,formId){
+  const slots=await getRegistrationFormSlots(uid);
+  const updates={};
+  for(const [slot,id] of Object.entries(slots)){
+    if(id===formId)updates[`registrationFormSlots/${uid}/${slot}`]=null;
+  }
+  if(Object.keys(updates).length){
+    await rtdbRestMultiUpdate(updates,5000).catch(()=>{});
+  }
+}
+
+
 let registrationCreateBusy=false;
 async function createRegistrationForm(){
   if(registrationCreateBusy)return;
+
   if(!isGoogleUser()){
     alert('請先使用 Google 登入，才能建立活動名單。');
     return;
@@ -4200,19 +4272,6 @@ async function createRegistrationForm(){
 
   const title=String($('regCreateTitle')?.value||'').trim();
   const maxPlayers=Math.floor(Number($('regCreateMaxPlayers')?.value||0));
-
-  // 建立前重新查 Firebase，避免多分頁/多手機同時建立超過 3 份。
-  try{
-    const owned=(await rtdbRestGet(`userRegistrationForms/${fbAuth.currentUser.uid}`,6000))||{};
-    const ownedCount=Object.values(owned||{}).filter(v=>typeof v==='string'&&v).length;
-    if(ownedCount>=REGISTRATION_FORM_LIMIT){
-      alert('每個主辦帳號最多只能建立 3 份活動名單。\n\n若要建立新的，請先刪除一份不再使用的活動名單。');
-      return;
-    }
-  }catch(e){
-    alert('目前無法確認活動名單數量，請稍後再試。');
-    return;
-  }
 
   if(!title){
     alert('請輸入活動 / 賽事名稱。');
@@ -4230,9 +4289,12 @@ async function createRegistrationForm(){
   if(btn){btn.disabled=true;btn.textContent='建立中…';}
 
   let createdId='';
+  let reservedSlot=null;
+
   try{
     const uid=fbAuth.currentUser.uid;
     const now=Date.now();
+
     let suffix='';
     if(window.crypto?.getRandomValues){
       const a=new Uint32Array(2);
@@ -4243,6 +4305,9 @@ async function createRegistrationForm(){
     }
     createdId=`RF${now.toString(36).toUpperCase()}${suffix}`.slice(0,24);
 
+    // 先保留 0/1/2 其中一個名單槽位。
+    reservedSlot=await reserveRegistrationFormSlot(uid,createdId);
+
     const form={
       id:createdId,
       ownerUid:uid,
@@ -4252,36 +4317,39 @@ async function createRegistrationForm(){
       open:false
     };
 
-    const owned=(await rtdbRestGet(`userRegistrationForms/${uid}`,6000))||{};
-    let slot='';
-    for(const s of ['0','1','2']){
-      if(!owned[s]){slot=s;break;}
-    }
-    if(!slot)throw new Error('每個主辦帳號最多只能建立 3 份活動名單。');
-
+    // userRegistrationForms 保持原本已驗證穩定的 formId:true 結構。
     await rtdbRestMultiUpdate({
       [`registrationForms/${createdId}`]:form,
-      [`userRegistrationForms/${uid}/${slot}`]:createdId
+      [`userRegistrationForms/${uid}/${createdId}`]:true
     },9000);
+
   }catch(e){
-    alert('建立活動名單失敗：'+(e?.message||e));
+    if(reservedSlot!==null && createdId){
+      await releaseRegistrationFormSlot(fbAuth.currentUser.uid,createdId);
+    }
+
+    const msg=e?.message||String(e);
+    if(msg.includes('最多只能建立 3 份')){
+      alert('每個主辦帳號最多只能建立 3 份活動名單。\n\n若要建立新的，請先刪除一份不再使用的活動名單。');
+    }else{
+      alert('建立活動名單失敗：'+msg);
+    }
+
     registrationCreateBusy=false;
     if(btn){btn.disabled=false;btn.textContent='建立活動名單';}
     return;
   }
 
-  const ok=await openRegistrationAdmin(createdId).then(()=>true).catch(e=>{
+  try{
+    await openRegistrationAdmin(createdId);
+  }catch(e){
     console.warn('活動名單已建立，但管理頁開啟失敗',e);
-    return false;
-  });
-
-  if(!ok){
     alert('活動名單已建立成功。請回到「報名名單管理」後按「管理」。');
     await openRegistrationHub();
+  }finally{
+    registrationCreateBusy=false;
+    if(btn){btn.disabled=false;btn.textContent='建立活動名單';}
   }
-
-  registrationCreateBusy=false;
-  if(btn){btn.disabled=false;btn.textContent='建立活動名單';}
 }
 async function loadMyRegistrationForms(){
   const box=$('myRegForms'), badge=$('myRegFormCount');
@@ -4295,7 +4363,7 @@ async function loadMyRegistrationForms(){
       try{const f=await rtdbRestGet(`registrationForms/${id}`,5000);if(f?.id){registrationFormCache[id]=f;rows.push(f)}}catch{}
     }
     rows.sort((a,b)=>(b.created||0)-(a.created||0));
-    badge.textContent=rows.length+' 份';
+    badge.textContent=`${rows.length} / ${REGISTRATION_FORM_LIMIT} 份`;
     box.innerHTML=rows.length?rows.map(f=>`<div class="regItem"><div><div class="regItemName">${esc(f.title)}</div><div class="regMeta">正選 ${Number(f.maxPlayers)||0} 人｜備選不限｜🔒 主辦管理</div>${f.deadline?`<div class="regDeadlineLine">⏰ 報名截止 ${esc(formatRegDate(f.deadline))}</div>`:''}</div><div class="regActions"><button class="secondary" type="button" onclick="openRegistrationAdmin('${esc(f.id)}')">管理</button><button class="danger" type="button" onclick="deleteRegistrationForm('${esc(f.id)}')">刪除</button></div></div>`).join(''):'<div class="savedEmpty">目前還沒有活動名單。</div>';
   }catch(e){box.innerHTML=`<div class="notice">讀取失敗：${esc(e?.message||e)}</div>`}
 }
@@ -4308,7 +4376,7 @@ async function deleteRegistrationForm(id){
     if(form.ownerUid!==fbAuth.currentUser.uid)return alert('你不是這份活動名單的建立者。');
 
     const title=form.title||'這份活動名單';
-    if(!confirm(`確定要刪除「${title}」嗎？\n\n這會同時刪除這份活動名單底下的所有選手資料，且無法復原。`))return;
+    if(!confirm(`確定要刪除「${title}」嗎？\n\n這會永久刪除這份活動名單、所有選手資料、公開查詢名單、名稱索引與 3 份名單槽位紀錄，且無法復原。`))return;
 
     // 先刪報名資料；此時 registrationForms 仍存在，Rules 才能確認 ownerUid。
     await rtdbRestDelete(`registrations/${id}`,7000).catch(e=>{
@@ -4320,14 +4388,11 @@ async function deleteRegistrationForm(id){
       if(!String(e?.message||e).includes('404'))console.warn('刪除名稱索引失敗',e);
     });
     await rtdbRestDelete(`publicRegistrationLists/${id}`,7000).catch(()=>{});
-    const ownedSlots=(await rtdbRestGet(`userRegistrationForms/${fbAuth.currentUser.uid}`,6000).catch(()=>null))||{};
-    const ownerUpdates={};
-    for(const [slot,formId] of Object.entries(ownedSlots)){
-      if(formId===id)ownerUpdates[`userRegistrationForms/${fbAuth.currentUser.uid}/${slot}`]=null;
-    }
-    if(Object.keys(ownerUpdates).length)await rtdbRestMultiUpdate(ownerUpdates,6000).catch(()=>{});
+    await releaseRegistrationFormSlot(fbAuth.currentUser.uid,id);
+    await rtdbRestDelete(`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`,5000).catch(()=>{});
     await rtdbRestDelete(`registrationForms/${id}`,7000);
-delete registrationFormCache[id];
+
+    delete registrationFormCache[id];
     if(activeRegistrationFormId===id){
       activeRegistrationFormId='';
       activeRegistrationForm=null;
@@ -5811,7 +5876,7 @@ async function createTournament(){
     const msg=e?.message||String(e);
 
     if(String(msg).includes('PERMISSION_DENIED')||String(msg).includes('Permission denied')||String(msg).includes('401')||String(msg).includes('403')){
-      alert('建立雲端賽事失敗：Firebase Rules 與 V2 網頁版本不一致，請發布這一版附帶的 V2 Rules。');
+      alert('建立雲端賽事失敗：Firebase Rules 與目前 V5 網頁版本不一致，請發布這一版附帶的完整 V5 Rules。');
     }else{
       alert('建立雲端賽事失敗：'+msg+code);
     }
