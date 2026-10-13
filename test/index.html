@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST V5 AUDITED-STABLE 2026-10-13 -->
+<!-- BUILD: TEST V5 REG-LIMIT-3 FIXED-SLOTS 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -1992,46 +1992,15 @@ html,body{max-width:100%;overflow-x:hidden}
 </style>
 
 
-<style id="publicRegistrationListV5">
-.publicRegListRows{display:grid;gap:10px;margin-top:12px}
-.publicRegRow{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto auto;
-  gap:10px;
-  align-items:center;
-  padding:13px 14px;
-  border:1px solid var(--line);
-  border-radius:14px;
-  background:var(--panel);
-}
-.publicRegName{font-weight:900;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.publicRegType,.publicRegStatus{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:74px;
-  padding:6px 9px;
-  border-radius:999px;
-  border:1px solid var(--line);
-  background:var(--panel2);
-  font-size:12px;
-  font-weight:850;
-  white-space:nowrap;
-}
-.publicRegStatus.on{
-  border-color:#2e9b63;
-  background:rgba(46,155,99,.14);
-  color:#45b97d;
-}
-@media(max-width:560px){
-  .publicRegRow{grid-template-columns:minmax(0,1fr) auto}
-  .publicRegStatus{grid-column:2}
-}
-</style>
 
 
 
-<style id="publicRegistrationListLiteV5">
+
+
+
+
+
+<style id="publicRegistrationListCompactRowV5">
 #registrationPublicList{
   max-width:980px;
   margin:0 auto;
@@ -2039,7 +2008,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 .publicListShell{
   border:1px solid var(--line);
-  border-radius:22px;
+  border-radius:20px;
   background:var(--panel);
   overflow:hidden;
 }
@@ -2047,83 +2016,77 @@ html,body{max-width:100%;overflow-x:hidden}
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:14px;
-  padding:18px;
+  gap:12px;
+  padding:14px 16px 12px;
   border-bottom:1px solid var(--line);
 }
-.publicListTop h2{margin:2px 0 4px}
-.publicListEyebrow{
-  font-size:12px;
-  font-weight:850;
-  color:var(--muted);
-}
+.publicListTop h2{margin:2px 0 3px;font-size:28px}
+.publicListEyebrow{font-size:12px;font-weight:850;color:var(--muted)}
 .publicRegHeader,
 .publicRegRow{
   display:grid;
-  grid-template-columns:minmax(0,1fr) 92px 96px;
-  gap:10px;
+  grid-template-columns:minmax(0,1fr) 82px 82px;
   align-items:center;
+  column-gap:8px;
 }
 .publicRegHeader{
-  padding:10px 16px;
-  border-bottom:1px solid var(--line);
+  padding:8px 14px;
   background:var(--panel2);
+  border-bottom:1px solid var(--line);
   color:var(--muted);
   font-size:12px;
   font-weight:850;
 }
 .publicRegHeader span:nth-child(2),
-.publicRegHeader span:nth-child(3){
-  text-align:center;
-}
-.publicRegListRows{
-  display:block;
-  margin:0;
-}
+.publicRegHeader span:nth-child(3){text-align:center}
+.publicRegListRows{display:block;margin:0}
 .publicRegRow{
-  padding:12px 16px;
+  padding:9px 14px;
+  min-height:44px;
   border-bottom:1px solid var(--line);
   background:transparent;
 }
 .publicRegRow:last-child{border-bottom:0}
 .publicRegName{
-  font-weight:800;
   min-width:0;
+  font-size:15px;
+  font-weight:800;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
 .publicRegType,
 .publicRegStatus{
+  margin:0;
+  padding:0;
+  min-width:0;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
   text-align:center;
   font-size:13px;
+  line-height:1.2;
   font-weight:800;
   white-space:nowrap;
   color:var(--text);
 }
-.publicRegStatus.on{
-  color:#45b97d;
-}
+.publicRegStatus.on{color:#45b97d}
 @media(max-width:560px){
-  #registrationPublicList{
-    padding-left:10px;
-    padding-right:10px;
-  }
-  .publicListTop{padding:14px}
+  #registrationPublicList{padding-left:10px;padding-right:10px}
+  .publicListTop{padding:12px 13px 10px}
+  .publicListTop h2{font-size:24px}
   .publicRegHeader,
   .publicRegRow{
-    grid-template-columns:minmax(0,1fr) 74px 82px;
-    gap:7px;
+    grid-template-columns:minmax(0,1fr) 68px 74px;
+    column-gap:6px;
   }
-  .publicRegHeader{padding:9px 12px}
-  .publicRegRow{padding:11px 12px}
-  .publicRegType,
-  .publicRegStatus{
-    font-size:12px;
-  }
+  .publicRegHeader{padding:7px 11px;font-size:11px}
+  .publicRegRow{padding:8px 11px;min-height:40px}
+  .publicRegName{font-size:14px}
+  .publicRegType,.publicRegStatus{font-size:12px}
 }
 </style>
-
 
 </head>
 <body>
@@ -2198,7 +2161,7 @@ html,body{max-width:100%;overflow-x:hidden}
   <div><h2 style="margin:0 0 6px">📋 報名名單管理</h2><div class="muted">網站不接受參賽者自行送出報名。名單只由主辦 Google 帳號管理，可手動新增，或從 Google 表單 CSV 匯入。</div></div>
  </div>
  <div class="card">
-  <div class="row"><h3 style="margin:0">我的活動名單</h3><span id="myRegFormCount" class="badge">0 份</span></div>
+  <div class="row"><h3 style="margin:0">我的活動名單</h3><span id="myRegFormCount" class="badge">0 / 3 份</span></div>
   <div id="myRegForms" class="regList"><div class="muted">登入 Google 後會顯示你的活動名單。</div></div>
  </div>
  <div class="registrationLaunch" role="button" tabindex="0" onclick="openRegistrationCreate()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRegistrationCreate()}">
@@ -2373,6 +2336,7 @@ const CLOUD_LOCAL_POLICY_VERSION=1; // 雲端賽事：Firebase only；本機只�
 let draftMode=null, draftStorage=null, ev=null;
 let cloudEventsCache={}, cloudEventIds=[], cloudEventSlots={}; // 僅 RAM，重新載入即清空。
 let fbApp=null,fbAuth=null,fbDb=null,fbUser=null,cloudReady=false,cloudUnsub=null,isAdmin=false,isReferee=false,adminCodeTimer=null,adminCodeCountdownTimer=null,refereeCodeTimer=null,refereeCodeCountdownTimer=null;
+const REGISTRATION_FORM_LIMIT=3;
 let activeRegistrationFormId='',activeRegistrationForm=null,activeRegistrations={},activeRegistrationRows={},registrationSelected=new Set(),registrationSearchPhone='',importRegistrationRows={},importRegistrationSelected=new Set(),registrationFormCache={};
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function events(){
@@ -4091,6 +4055,8 @@ async function openRegistrationHub(){
   window.scrollTo({top:0,behavior:'instant'});
 }
 async function openRegistrationCreate(){
+  const knownCount=Object.keys(registrationFormCache||{}).length;
+  if(knownCount>=REGISTRATION_FORM_LIMIT){alert('每個主辦帳號最多只能建立 3 份活動名單。');return;}
   if(!(await initCloud()))return alert('Firebase 尚未連線成功。');
   if(!isGoogleUser()){
     const ok=await requireGoogleLogin();
@@ -4235,6 +4201,19 @@ async function createRegistrationForm(){
   const title=String($('regCreateTitle')?.value||'').trim();
   const maxPlayers=Math.floor(Number($('regCreateMaxPlayers')?.value||0));
 
+  // 建立前重新查 Firebase，避免多分頁/多手機同時建立超過 3 份。
+  try{
+    const owned=(await rtdbRestGet(`userRegistrationForms/${fbAuth.currentUser.uid}`,6000))||{};
+    const ownedCount=Object.values(owned||{}).filter(v=>typeof v==='string'&&v).length;
+    if(ownedCount>=REGISTRATION_FORM_LIMIT){
+      alert('每個主辦帳號最多只能建立 3 份活動名單。\n\n若要建立新的，請先刪除一份不再使用的活動名單。');
+      return;
+    }
+  }catch(e){
+    alert('目前無法確認活動名單數量，請稍後再試。');
+    return;
+  }
+
   if(!title){
     alert('請輸入活動 / 賽事名稱。');
     $('regCreateTitle')?.focus();
@@ -4273,9 +4252,16 @@ async function createRegistrationForm(){
       open:false
     };
 
+    const owned=(await rtdbRestGet(`userRegistrationForms/${uid}`,6000))||{};
+    let slot='';
+    for(const s of ['0','1','2']){
+      if(!owned[s]){slot=s;break;}
+    }
+    if(!slot)throw new Error('每個主辦帳號最多只能建立 3 份活動名單。');
+
     await rtdbRestMultiUpdate({
       [`registrationForms/${createdId}`]:form,
-      [`userRegistrationForms/${uid}/${createdId}`]:true
+      [`userRegistrationForms/${uid}/${slot}`]:createdId
     },9000);
   }catch(e){
     alert('建立活動名單失敗：'+(e?.message||e));
@@ -4334,10 +4320,14 @@ async function deleteRegistrationForm(id){
       if(!String(e?.message||e).includes('404'))console.warn('刪除名稱索引失敗',e);
     });
     await rtdbRestDelete(`publicRegistrationLists/${id}`,7000).catch(()=>{});
+    const ownedSlots=(await rtdbRestGet(`userRegistrationForms/${fbAuth.currentUser.uid}`,6000).catch(()=>null))||{};
+    const ownerUpdates={};
+    for(const [slot,formId] of Object.entries(ownedSlots)){
+      if(formId===id)ownerUpdates[`userRegistrationForms/${fbAuth.currentUser.uid}/${slot}`]=null;
+    }
+    if(Object.keys(ownerUpdates).length)await rtdbRestMultiUpdate(ownerUpdates,6000).catch(()=>{});
     await rtdbRestDelete(`registrationForms/${id}`,7000);
-    await rtdbRestDelete(`userRegistrationForms/${fbAuth.currentUser.uid}/${id}`,7000);
-
-    delete registrationFormCache[id];
+delete registrationFormCache[id];
     if(activeRegistrationFormId===id){
       activeRegistrationFormId='';
       activeRegistrationForm=null;
@@ -4807,11 +4797,11 @@ function renderPublicRegistrationRows(rowMap){
   $('publicRegListCount').textContent=`名單人數 ${rows.length}`;
   $('publicRegListRows').innerHTML=rows.length?rows.map(([,r])=>`
     <div class="publicRegRow">
-      <div class="publicRegName">${esc(r.playerName)}</div>
-      <div class="publicRegType">${esc(r.entryLabel||'')}</div>
-      <div class="publicRegStatus${r.checkedIn===true?' on':''}">${r.checkedIn===true?'已報到':'未報到'}</div>
+      <span class="publicRegName">${esc(r.playerName)}</span>
+      <span class="publicRegType">${esc(r.entryLabel||'')}</span>
+      <span class="publicRegStatus${r.checkedIn===true?' on':''}">${r.checkedIn===true?'已報到':'未報到'}</span>
     </div>
-  `).join(''):'<div class="savedEmpty" style="padding:20px">目前名單尚未建立。</div>';
+  `).join(''):'<div class="savedEmpty" style="padding:18px">目前名單尚未建立。</div>';
 }
 
 async function showPublicRegistrationList(formId){
