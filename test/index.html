@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12"><!-- V5 TOURNAMENT ONLY：公開賽程投影 / 200+ viewer / iOS Safari 優化 -->
 <title>[TEST V5] Beyblade X Tournament</title>
-<!-- BUILD: 2026-10-13 V5 TOURNAMENT-ONLY ROSTER-NAME-FIX -->
+<!-- BUILD: 2026-10-13 V5 TOURNAMENT-ONLY FOREGROUND-CLOUD-RESYNC -->
 
 <script>
 (function(){
@@ -41,7 +41,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .adminHeroTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.adminHero h2{margin:3px 0 0;font-size:25px;line-height:1.15}.adminActions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}.adminActions button{min-width:0;padding:10px 8px}.adminActions .shareBtn{background:var(--accent)}
 .metaChips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.metaChip{padding:7px 10px;border-radius:999px;background:#0e141d;border:1px solid var(--line);color:#cfd6e4;font-size:12px}.adminTabs{display:flex;gap:8px;overflow:auto;padding:2px 0 12px}.adminTabs button{white-space:nowrap;min-width:auto;padding:9px 13px}
 .bracketShell{position:relative;margin-top:4px;border:1px solid #242d3c;border-radius:18px;background:radial-gradient(circle at 50% 0,#151d2a 0,#0b0d12 42%);overflow:hidden}.bracketTools{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;background:#0d1119e8;border-bottom:1px solid #242d3c;backdrop-filter:blur(10px)}.zoomGroup{display:flex;align-items:center;gap:6px}.zoomGroup button,.viewToggle{background:#171e2b;border:1px solid #354157;padding:8px 10px;border-radius:10px}.zoomLabel{min-width:52px;text-align:center;color:#cdd6e5;font-size:12px}.bracketHint{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bracketScroll{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 14px 26px;min-height:420px}.bracketStage{position:relative;min-width:1px;min-height:1px}.bracketCanvas{position:relative;display:flex;align-items:flex-start;gap:48px;width:max-content;transform-origin:top left;padding:8px 20px 28px 6px}.bracketLinks{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:0}.bracketLinks path{fill:none;stroke:#53627c;stroke-width:2;vector-effect:non-scaling-stroke}.bracketLinks path.live{stroke:#b7842d}
+.bracketScroll{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 14px 26px;min-height:420px}.bracketStage{position:relative;min-width:1px;min-height:1px}.bracketCanvas{position:relative;display:flex;align-items:flex-start;gap:48px;width:max-content;transform-origin:top left;padding:8px 20px 28px 6px}.bracketLinks{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:3}.bracketLinks path{fill:none;stroke:#718096;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;opacity:.95}.bracketLinks path.live{stroke:#d6a84a;stroke-width:3;opacity:1}.roundCol,.rrCol{z-index:4}
 .roundCol{position:relative;width:204px;flex:0 0 204px;z-index:1}.roundHead{min-height:54px;padding:4px 4px 10px;background:linear-gradient(180deg,#0b0d12 68%,transparent);position:relative;top:auto;z-index:2;margin-bottom:8px;pointer-events:none}.roundHead h3{margin:0;font-size:17px;line-height:1.1}.roundHead .roundSub{color:var(--muted);font-size:11px;margin-top:5px}.roundCol:first-of-type .roundHead h3{color:#ff8b74}.roundCol:nth-of-type(2) .roundHead h3,.roundCol:nth-of-type(3) .roundHead h3{color:#7cb8ff}
 .roundMatches{display:flex;flex-direction:column;gap:var(--gap,16px);padding-top:var(--top,0px)}
 .bracketMatch{position:relative;width:100%;height:112px;overflow:hidden;background:linear-gradient(180deg,#171d29,#111620);border:1px solid #344158;border-radius:13px;padding:8px 9px;text-align:left;color:var(--text);box-shadow:0 8px 22px #0004;cursor:pointer}.bracketMatch.done{border-color:#8c6826;box-shadow:0 0 0 1px #8c682644 inset,0 8px 22px #0004}.bracketMatch:hover{border-color:#62718b}.bracketMatch.judging{border-color:#ffd45a;animation:judgePulse 1.15s ease-in-out infinite;box-shadow:0 0 0 1px #ffd45a55 inset,0 0 22px #ffd45a55,0 8px 22px #0005}@keyframes judgePulse{0%,100%{box-shadow:0 0 0 1px #ffd45a44 inset,0 0 8px #ffd45a22,0 8px 22px #0005}50%{box-shadow:0 0 0 2px #ffd45aaa inset,0 0 26px #ffd45a99,0 8px 22px #0005}}.bracketMatch .matchNo{height:18px;line-height:18px;margin:0 62px 4px 0}.bSide{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:6px;align-items:center;height:34px;padding:4px 6px;border-radius:8px;overflow:hidden}.bSide+.bSide{border-top:1px solid #273144}.bSide.winner{background:#3a2418}.bSide.pending{opacity:.48}.bSide.pending .playerLabel{font-style:italic}.bName{min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;font-size:13px;line-height:1.15}.playerLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bScore{display:flex;align-items:center;justify-content:center;width:36px;height:24px;border:1px solid #344158;border-radius:7px;background:#0d131c;color:#e8edf5;font-size:12px;line-height:1}.bSide.winner .bScore{border-color:#a8672e;color:#ffb371}.winnerDot{flex:0 0 auto;font-size:10px;color:#ff9b54}.tapEdit{position:absolute;right:8px;top:7px;color:#7c879a;font-size:10px}.refTag{position:absolute;left:9px;right:9px;bottom:4px;display:block;max-width:calc(100% - 18px);padding:2px 6px;border:1px solid #334158;border-radius:999px;background:#0d131c;color:#9fb0c8;font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.refTag.on{border-color:#6c5630;color:#f0c27a;background:#211a11}.refTag.live{border-color:#ffd45a;color:#ffe9a6;background:#342b12;font-weight:800}.bracketMatch.judging .bSide:last-of-type{margin-bottom:17px}
@@ -4228,7 +4228,7 @@ async function createTournament(){
     },6000);
 
     const code=String(Math.floor(100000+Math.random()*900000));
-    const expiresAt=Date.now()+30000;
+    const expiresAt=Date.now()+60000;
 
     if(createBtn)createBtn.textContent='建立管理權限…';
     await cloudUpdate({
@@ -5595,33 +5595,83 @@ function setBracketScale(v){
   st.style.height=Math.ceil(c.scrollHeight*bracketScale)+'px';
   const lab=document.querySelector('.zoomLabel');if(lab)lab.textContent=Math.round(bracketScale*100)+'%';
 }
-function zoomBracket(d){setBracketScale(bracketScale+d)}
+function zoomBracket(d){setBracketScale(bracketScale+d);requestAnimationFrame(drawBracketLinks)}
 function fitBracket(){
   const sc=document.querySelector('.bracketScroll'),c=document.querySelector('.bracketCanvas');if(!sc||!c)return;
   const scale=Math.min(.92,(sc.clientWidth-16)/c.scrollWidth);
-  setBracketScale(Math.max(.32,scale));sc.scrollTo({left:0,top:0,behavior:'smooth'});
+  setBracketScale(Math.max(.32,scale));sc.scrollTo({left:0,top:0,behavior:'smooth'});requestAnimationFrame(drawBracketLinks);
 }
 function drawBracketLinks(){
-  const canvas=document.querySelector('.bracketCanvas'),svg=document.querySelector('.bracketLinks');if(!canvas||!svg)return;
+  const canvas=document.querySelector('.bracketCanvas');
+  const svg=document.querySelector('.bracketLinks');
+  if(!canvas||!svg||!ev?.rounds)return;
+
   const cr=canvas.getBoundingClientRect();
-  svg.setAttribute('width',canvas.scrollWidth);svg.setAttribute('height',canvas.scrollHeight);svg.setAttribute('viewBox',`0 0 ${canvas.scrollWidth} ${canvas.scrollHeight}`);
-  let paths=[];
+  const inv=1/(bracketScale||1);
+  const width=canvas.scrollWidth;
+  const height=canvas.scrollHeight;
+
+  svg.setAttribute('width',width);
+  svg.setAttribute('height',height);
+  svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+  svg.style.width=width+'px';
+  svg.style.height=height+'px';
+
+  const point=(el,side='center')=>{
+    const r=el.getBoundingClientRect();
+    const x=side==='right'?r.right:(side==='left'?r.left:(r.left+r.width/2));
+    return {
+      x:(x-cr.left)*inv,
+      y:(r.top+r.height/2-cr.top)*inv
+    };
+  };
+
+  const paths=[];
+
+  // 每兩場上一輪對戰，匯入下一輪同一場。
   for(let ri=0;ri<ev.rounds.length-1;ri++){
     const src=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${ri}"]`)];
     const dst=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${ri+1}"]`)];
-    dst.forEach((d,j)=>{
-      const dr=d.getBoundingClientRect(), tx=(dr.left-cr.left)/bracketScale, ty=(dr.top-cr.top+dr.height/2)/bracketScale;
-      [src[j*2],src[j*2+1]].filter(Boolean).forEach(a=>{
-        const ar=a.getBoundingClientRect(), sx=(ar.right-cr.left)/bracketScale, sy=(ar.top-cr.top+ar.height/2)/bracketScale, mx=(sx+tx)/2;
-        const live=a.classList.contains('done')?' live':'';
-        paths.push(`<path class="${live.trim()}" d="M ${sx} ${sy} H ${mx} V ${ty} H ${tx}"/>`);
+
+    dst.forEach((target,j)=>{
+      const t=point(target,'left');
+      const pair=[src[j*2],src[j*2+1]].filter(Boolean);
+      if(!pair.length)return;
+
+      const sourcePoints=pair.map(el=>({el,...point(el,'right')}));
+      const maxSourceX=Math.max(...sourcePoints.map(p=>p.x));
+      const elbowX=maxSourceX+Math.max(16,(t.x-maxSourceX)*0.52);
+
+      sourcePoints.forEach(p=>{
+        const live=p.el.classList.contains('done')?'live':'';
+        paths.push(
+          `<path class="${live}" d="M ${p.x.toFixed(1)} ${p.y.toFixed(1)} H ${elbowX.toFixed(1)} V ${t.y.toFixed(1)} H ${t.x.toFixed(1)}"/>`
+        );
       });
     });
   }
+
+  // 淘汰至三人後接最後三人循環。
   if(ev.finalRR){
-    const last=ev.rounds.length-1, src=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${last}"]`)], target=canvas.querySelector('.rrPanel');
-    if(target){const tr=target.getBoundingClientRect(),tx=(tr.left-cr.left)/bracketScale,ty=(tr.top-cr.top+60)/bracketScale;src.forEach((a,k)=>{const ar=a.getBoundingClientRect(),sx=(ar.right-cr.left)/bracketScale,sy=(ar.top-cr.top+ar.height/2)/bracketScale,mx=(sx+tx)/2;paths.push(`<path d="M ${sx} ${sy} H ${mx} V ${ty+k*12} H ${tx}"/>`)})}
+    const last=ev.rounds.length-1;
+    const src=[...canvas.querySelectorAll(`.bracketMatch[data-ri="${last}"]`)];
+    const target=canvas.querySelector('.rrPanel');
+    if(target&&src.length){
+      const t=point(target,'left');
+      const sourcePoints=src.map(el=>({el,...point(el,'right')}));
+      const maxSourceX=Math.max(...sourcePoints.map(p=>p.x));
+      const elbowX=maxSourceX+Math.max(16,(t.x-maxSourceX)*0.52);
+
+      sourcePoints.forEach((p,k)=>{
+        const live=p.el.classList.contains('done')?'live':'';
+        const ty=t.y+(k-(sourcePoints.length-1)/2)*12;
+        paths.push(
+          `<path class="${live}" d="M ${p.x.toFixed(1)} ${p.y.toFixed(1)} H ${elbowX.toFixed(1)} V ${ty.toFixed(1)} H ${t.x.toFixed(1)}"/>`
+        );
+      });
+    }
   }
+
   svg.innerHTML=paths.join('');
 }
 function normalizeEvent(){
@@ -6599,7 +6649,7 @@ async function rotateAdminCode(force=false){
     }
 
     const code=String(Math.floor(100000+Math.random()*900000));
-    const expiresAt=now+30000;
+    const expiresAt=now+60000;
     await rtdbRestPut(`secrets/${ev.id}`,{adminCode:code,expiresAt},10000);
     return true;
   }catch(e){
@@ -6633,7 +6683,7 @@ async function startAdminCodeRotation(){
 
   await refreshCodeUI(false);
 
-  adminCodeTimer=setInterval(()=>refreshCodeUI(true),30000);
+  adminCodeTimer=setInterval(()=>refreshCodeUI(true),60000);
   adminCodeCountdownTimer=setInterval(updateAdminCodeCountdown,1000);
 }
 async function getCurrentAdminSecret(){
@@ -6678,7 +6728,7 @@ async function rotateRefereeCode(force=false){
     if(!force && cur.code && Number(cur.expiresAt||0)>now+2500)return true;
 
     const code=String(Math.floor(100000+Math.random()*900000));
-    await rtdbRestPut(`refereeSecrets/${ev.id}`,{code,expiresAt:now+30000},10000);
+    await rtdbRestPut(`refereeSecrets/${ev.id}`,{code,expiresAt:now+60000},10000);
     return true;
   }catch(e){
     console.error('rotateRefereeCode failed',e);
@@ -6756,7 +6806,7 @@ async function startRefereeCodeRotation(){
 
   await refresh(false);
 
-  refereeCodeTimer=setInterval(()=>refresh(true),30000);
+  refereeCodeTimer=setInterval(()=>refresh(true),60000);
   refereeCodeCountdownTimer=setInterval(updateRefereeCodeCountdown,1000);
 }
 
@@ -6795,7 +6845,7 @@ async function renderOrganizer(){
 
   if(!hasOrganizerAccess()){
     stopAdminCodeRotation();
-    tab.innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入目前顯示的 6 位驗證碼。驗證碼每 30 秒失效。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
+    tab.innerHTML=`<div class=card><h3>🛡 加入主辦管理</h3><div class=cloudNote>這支手機目前是觀看模式。若要一起修改同一份賽程，請掃描主辦 QR 後輸入目前顯示的 6 位驗證碼。驗證碼每 60 秒失效。</div><label>6 位管理驗證碼</label><input id=joinAdminCode inputmode=numeric maxlength=6 placeholder="例如 583921"><button style="width:100%;margin-top:10px" onclick=claimAdmin()>驗證並成為管理員</button></div>`;
     return;
   }
 
@@ -6809,7 +6859,7 @@ async function renderOrganizer(){
         <div class=muted>動態管理驗證碼</div>
         <div id=organizerCodeBox class=organizerCode>讀取中…</div>
         <div id=adminCodeCountdown class=cloudNote data-expires-at="0" style="text-align:center;margin-top:6px">正在取得驗證碼</div>
-        <div class=cloudNote>驗證碼每 30 秒自動更換，舊碼到期後即無法加入管理。第二支手機：掃右側 QR → 輸入目前顯示的驗證碼。</div>
+        <div class=cloudNote>驗證碼每 60 秒自動更換，舊碼到期後即無法加入管理。第二支手機：掃右側 QR → 輸入目前顯示的驗證碼。</div>
       </div>
       <div>
         <div class=muted>管理 QR</div>
@@ -7434,16 +7484,165 @@ if(document.readyState==='loading'){
 }
 
 
-window.addEventListener('pageshow',()=>{
+
+let foregroundCloudResyncBusy=false;
+let foregroundCloudResyncLastAt=0;
+
+async function resyncCurrentCloudEventOnForeground(reason='foreground'){
+  // 只有「目前正在看的雲端主辦/裁判賽事」需要這層保險。
+  // 本機測試賽事不碰 Firebase；公開觀眾已由 viewer.html 的 SSE-resync 處理。
+  if(!ev || ev.testOnly || ev.publicViewOnly)return false;
+  if(!$('admin') || $('admin').classList.contains('hidden'))return false;
+
+  const id=ev.id;
+  if(!id)return false;
+
+  // pageshow + visibilitychange 在 iOS 可能前後一起觸發。
+  // 避免同一秒重複向 Firebase 抓兩次完整賽事。
+  const now=Date.now();
+  if(foregroundCloudResyncBusy)return false;
+  if(now-foregroundCloudResyncLastAt<1500)return false;
+
+  foregroundCloudResyncBusy=true;
+  foregroundCloudResyncLastAt=now;
+
+  const keepTab=currentAdminTab||'bracket';
+
+  try{
+    // 若 Safari / PWA 從背景恢復時 Auth 還沒回來，最多等 5 秒。
+    if(!fbAuth?.currentUser){
+      await waitForAuthRestore(5000);
+      fbUser=fbAuth?.currentUser||fbUser;
+      renderHeaderAuth();
+    }
+
+    if(!fbAuth?.currentUser){
+      console.warn('foreground cloud resync skipped: auth not restored',reason);
+      return false;
+    }
+
+    // 若背景期間仍停在比分編輯畫面，先關閉舊編輯器，
+    // 避免拿背景前的舊比分再次覆蓋 Firebase 最新結果。
+    if($('matchModal') && !$('matchModal').classList.contains('hidden')){
+      try{closeMatchEditor()}catch(e){
+        $('matchModal')?.classList.add('hidden');
+      }
+    }
+
+    // 先停止舊 listener；完整 GET 成功後再重新綁定。
+    if(cloudUnsub){
+      try{cloudUnsub()}catch(e){}
+      cloudUnsub=null;
+    }
+
+    let latest=null;
+    try{
+      latest=await rtdbRestGet(`events/${id}`,8000);
+    }catch(firstErr){
+      console.warn('foreground resync first read failed, refresh token and retry',firstErr);
+
+      // iOS 背景回前景時 token 可能剛好過期，強制刷新後再讀一次。
+      try{
+        await getRestIdToken(true);
+        latest=await rtdbRestGet(`events/${id}`,8000);
+      }catch(secondErr){
+        console.warn('foreground resync retry failed',secondErr);
+
+        // 讀取失敗時不能用舊 RAM 資料繼續寫。
+        // 保留畫面但不重新綁 listener，讓使用者重新整理/等待 Auth 恢復。
+        alert('雲端賽事重新同步失敗。為避免舊資料覆蓋最新比分，已暫停這個頁面的即時寫入狀態。\n\n請確認網路與右上角登入狀態後重新整理。');
+        return false;
+      }
+    }
+
+    if(!latest){
+      ev=null;
+      clearActiveView();
+      delete cloudEventsCache[id];
+      cloudEventIds=cloudEventIds.filter(x=>x!==id);
+      ['create','admin'].forEach(x=>$(x)?.classList.add('hidden'));
+      $('home')?.classList.remove('hidden');
+      history.replaceState(null,'',location.pathname);
+      renderSavedEvents();
+      alert('這場雲端賽事已不存在或已被刪除。');
+      return false;
+    }
+
+    // Firebase 是唯一真實來源：完整覆蓋舊 RAM 狀態。
+    ev=latest;
+    ev.refereeClaims={};
+    cloudEventsCache[id]=latest;
+
+    if(latest.ownerUid===fbAuth.currentUser.uid){
+      isAdmin=true;
+      isReferee=false;
+    }else{
+      await Promise.all([
+        refreshAdminState(id),
+        refreshRefereeState(id)
+      ]);
+    }
+
+    // 重新取得當下裁判 claim，避免背景期間場次被其他裁判接走。
+    try{
+      const claims=await rtdbRestGet(`refereeClaims/${id}`,5000);
+      ev.refereeClaims=claims||{};
+    }catch(e){
+      console.warn('foreground referee claims refresh skipped',e);
+      ev.refereeClaims=ev.refereeClaims||{};
+    }
+
+    renderAdmin();
+    showTab(keepTab);
+
+    // 用最新完整資料重新綁 listener。
+    listenCloudEvent(id);
+
+    // 重新畫樹狀線，避免 Safari 從背景回來後 geometry 是舊的。
+    requestAnimationFrame(()=>{
+      try{
+        setBracketScale(bracketScale);
+        requestAnimationFrame(drawBracketLinks);
+      }catch(e){}
+    });
+
+    console.info('foreground cloud resync complete',reason,id);
+    return true;
+  }finally{
+    foregroundCloudResyncBusy=false;
+  }
+}
+
+window.addEventListener('pageshow',e=>{
   if($('home') && !$('home').classList.contains('hidden') && isGoogleUser()){
     refreshCloudListOnHome();
     listenMyCloudEventIndex();
+    return;
+  }
+
+  // iOS BFCache / 回到前景：主辦與裁判賽事強制以 Firebase 最新完整資料校正。
+  if(e.persisted || (ev && !ev.testOnly && !ev.publicViewOnly)){
+    resyncCurrentCloudEventOnForeground(e.persisted?'pageshow-bfcache':'pageshow');
   }
 });
 
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible' && $('home') && !$('home').classList.contains('hidden') && isGoogleUser()){
+  if(document.visibilityState!=='visible')return;
+
+  if($('home') && !$('home').classList.contains('hidden') && isGoogleUser()){
     refreshCloudListOnHome();
+    return;
+  }
+
+  // Safari / PWA 背景期間賽程可能已被其他裁判更新。
+  // 回前景後不相信舊 RAM，完整抓 Firebase 最新資料再重綁 listener。
+  resyncCurrentCloudEventOnForeground('visibility');
+});
+
+window.addEventListener('online',()=>{
+  // 網路從離線恢復時也做同一層校正。
+  if(ev && !ev.testOnly && !ev.publicViewOnly){
+    resyncCurrentCloudEventOnForeground('online');
   }
 });
 
