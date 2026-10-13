@@ -1961,7 +1961,7 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 </style>
 
-<!-- BUILD: TEST V5 PUBLIC-LIST-TABLE 2026-10-13 -->
+<!-- BUILD: TEST V5 AUDITED-STABLE 2026-10-13 -->
 
 <style id="testEnvironmentBadgeStyle">
 .testEnvBadge{
@@ -2290,7 +2290,7 @@ html,body{max-width:100%;overflow-x:hidden}
 
  <div class="regStickyTools">
   <div class="regStatRow" style="margin-bottom:10px"><span id="regTotalStat" class="regStat">名單人數 0</span><span id="regSelectedStat" class="regStat">已報到 0</span></div>
-  <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已報到名單</button><button type="button" onclick="importSelectedRegistrationNames()">📥 匯入已報到建立賽事</button></div>
+  <div class="toolbar"><button class="secondary" type="button" onclick="copySelectedRegistrationNames()">📋 複製已報到名單</button><button type="button" onclick="importSelectedToTournament()">📥 匯入已報到建立賽事</button></div>
  </div>
 </section>
 <div id="registrationImportModal" class="importModal hidden" onclick="if(event.target===this)closeImportRegistration()"><div class="importCard">
@@ -3709,7 +3709,7 @@ function listenCloudEvent(id){
 
     try{
       // 只有新增下一輪 / 重建賽程 / 大型設定變更時才整份抓一次。
-      const latest=await publicCloudGet(`events/${id}`,10000);
+      const latest=await rtdbRestGet(`events/${id}`,10000);
 
       if(!latest){
         purgeLocalEvent(id);
@@ -3980,7 +3980,7 @@ async function loadCloudEvent(id){
 
 // ===== 線上報名系統 V1 =====
 function hideMainSections(){
-  ['home','create','admin','registrationHub','registrationCreate','registrationPublic','registrationAdmin'].forEach(id=>$(id)?.classList.add('hidden'));
+  ['home','create','admin','registrationHub','registrationCreate','registrationPublic','registrationAdmin','registrationPublicList'].forEach(id=>$(id)?.classList.add('hidden'));
 }
 function regPublicUrl(formId){
   return '';
@@ -4696,12 +4696,22 @@ function publicRegistrationListProjection(form,rows){
 }
 
 
+const PUBLIC_LIST_RETURN_KEY='bx_public_list_return_v1';
+
 function publicRegistrationBack(){
-  if(document.referrer && document.referrer.startsWith(location.origin)){
-    history.back();
-  }else{
-    location.href=location.pathname;
+  if(publicRegListUnsub){
+    try{publicRegListUnsub()}catch{}
+    publicRegListUnsub=null;
   }
+
+  let target='';
+  try{
+    target=sessionStorage.getItem(PUBLIC_LIST_RETURN_KEY)||'';
+    sessionStorage.removeItem(PUBLIC_LIST_RETURN_KEY);
+  }catch(e){}
+
+  // 強制完整重載，不依賴 Safari bfcache。
+  location.replace(target || location.pathname);
 }
 
 function publicRegistrationListUrl(formId){
@@ -4768,13 +4778,18 @@ async function copyPublicRegistrationListLink(){
 async function openPublicRegistrationList(formId){
   if(!formId)return;
 
-  // 先把目前主辦名單完整同步到公開投影，再進查看頁。
-  // 避免剛進頁面時 meta 已存在但 rows 還沒寫完，顯示 0 人。
   if(activeRegistrationFormId===formId && activeRegistrationForm){
     await syncPublicRegistrationListProjection();
   }
 
-  location.href=publicRegistrationListUrl(formId);
+  try{
+    sessionStorage.setItem(
+      PUBLIC_LIST_RETURN_KEY,
+      `${location.pathname}?regadmin=${encodeURIComponent(formId)}`
+    );
+  }catch(e){}
+
+  location.assign(publicRegistrationListUrl(formId));
 }
 
 let publicRegListUnsub=null;
@@ -4832,7 +4847,10 @@ async function showPublicRegistrationList(formId){
     const ref=fbDb.ref(`publicRegistrationLists/${formId}/rows`);
 
     const apply=s=>{
-      rows[s.key]=s.val();
+      const next=s.val();
+      const prev=rows[s.key];
+      rows[s.key]=next;
+      if(prev && JSON.stringify(prev)===JSON.stringify(next))return;
       renderPublicRegistrationRows(rows);
     };
     const remove=s=>{
@@ -5127,7 +5145,7 @@ function importSelectedToTournament(){
 async function openPublicRegistration(formId){
   history.replaceState(null,'',location.pathname);
   alert('此網站已停止公開線上報名。請使用主辦提供的 Google 表單報名。');
-  showHome();
+  goHome();
 }
 
 async function submitRegistration(){
@@ -8959,10 +8977,11 @@ async function backgroundRefreshCurrentEvent(id){
       try{
         data=await rtdbRestGet(`events/${id}`,5000);
       }catch(e){
-        data=await publicCloudGet(`events/${id}`,6000);
+        console.warn('background private refresh skipped; auth/token may still be restoring',e);
+        return;
       }
     }else{
-      data=await publicCloudGet(`events/${id}`,6000);
+      return;
     }
 
     if(!data){
