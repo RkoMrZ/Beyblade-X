@@ -1,10 +1,4 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b0d12" id="themeColor">
-<title>比賽線上報名平台</title>
-<script>(function(){try{document.documentElement.setAttribute('data-theme',localStorage.getItem('bx_live_theme')==='light'?'light':'dark')}catch(e){document.documentElement.setAttribute('data-theme','dark')}})();</script>
-<style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta id="themeColor" name="theme-color" content="#0b0d12"><title>戰鬥陀螺・線上報名｜介面測試版</title><script>(function(){try{document.documentElement.dataset.theme=localStorage.getItem('bx_live_theme')==='light'?'light':'dark'}catch{document.documentElement.dataset.theme='dark'}})();</script><style>
 :root{color-scheme:dark;--bg:#0b0d12;--surface:#151922;--surface2:#1c2230;--line:#303849;--ink:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--red:#ffb1a5;--yellow:#f4c84b;--input:#0f131b;--link:#ff9b83;--toast-bg:#263042;--toast-ink:#f7f8fa;--header:#0b0d12ef;--label:#cbd5e1;--danger-bg:#3a1717;--danger-ink:#ffb1a5;--success-bg:#153b2b;--success-ink:#a9efc8;--wait-bg:#413717;--wait-ink:#f5df86;--no-bg:#3a1717;--no-ink:#ffb1a5}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;background:var(--bg);color:var(--ink)}header{position:sticky;top:0;z-index:3;background:var(--header);border-bottom:1px solid var(--line);backdrop-filter:blur(15px)}.top{max-width:1060px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px}.brand{font-weight:800;font-size:18px;cursor:pointer}.brand small{font-size:11px;color:var(--muted);display:block;font-weight:400}.shell{max-width:1060px;margin:auto;padding:22px 16px 55px}.hero{padding:19px 2px 9px}h1{font-size:clamp(23px,5vw,33px);margin:0 0 8px}h2{font-size:19px;margin:0 0 14px}h3{margin:0;font-size:16px}.sub,.muted{color:var(--muted)}.sub{line-height:1.7;margin:3px 0 16px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:13px}.card{background:var(--surface);border:1px solid var(--line);padding:19px;border-radius:17px;margin-bottom:14px}.card.hover:hover{border-color:var(--accent)}button,.btn{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:43px;padding:10px 15px;color:#fff;background:var(--accent);border:0;border-radius:11px;font-size:14px;font-weight:700;text-decoration:none}button:disabled{opacity:.4;cursor:not-allowed}button.secondary,.btn.secondary{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}button.danger{background:var(--danger-bg);color:var(--danger-ink);border:1px solid #71302a}button.success{background:var(--success-bg);color:var(--success-ink);border:1px solid #2e7a52}.small{min-height:35px;padding:7px 11px;font-size:13px}.pill{font-size:12px;font-weight:750;border-radius:99px;padding:5px 10px;background:var(--surface2);color:var(--muted);border:1px solid var(--line)}.pill.ok{background:var(--success-bg);color:var(--success-ink)}.pill.no{background:var(--no-bg);color:var(--no-ink)}.pill.wait{background:var(--wait-bg);color:var(--wait-ink)}label{display:block;margin:13px 0 5px;font-size:14px;color:var(--label)}input,textarea,select{width:100%;min-height:43px;border:1px solid var(--line);background:var(--input);color:var(--ink);padding:11px 13px;border-radius:10px;font-size:16px;outline:none}input:focus,textarea:focus,select:focus{border-color:var(--accent)}textarea{min-height:80px;resize:vertical}.help{font-size:12px;color:var(--muted);margin-top:7px;line-height:1.5}.line{height:1px;background:var(--line);margin:16px 0}.stat{min-width:90px;flex:1;background:var(--surface2);border-radius:12px;padding:14px;text-align:center}.stat strong{display:block;font-size:25px}.stat small{color:var(--muted)}.list{display:flex;flex-direction:column;gap:9px}.entry{padding:13px;background:var(--surface2);border-radius:12px;display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}.entry strong{word-break:break-all}.entry .actions{display:flex;gap:6px;flex-wrap:wrap}.empty{color:var(--muted);padding:23px;text-align:center;border:1px dashed var(--line);border-radius:12px}.hidden{display:none!important}.toast{position:fixed;z-index:20;bottom:23px;left:50%;transform:translateX(-50%);max-width:92%;padding:13px 18px;border-radius:12px;background:var(--toast-bg);color:var(--toast-ink);box-shadow:0 8px 30px #0009;font-weight:650;text-align:center}.error{background:var(--danger-bg);color:var(--danger-ink)}a{color:var(--link);word-break:break-all}code{color:var(--link);overflow-wrap:anywhere}.w500{max-width:570px;margin:auto}.mt{margin-top:12px}.tiny{font-size:12px}.divider{margin:0 7px;color:var(--muted)}.loading{padding:65px 10px;text-align:center;color:var(--muted)}@media(max-width:530px){.shell{padding:17px 12px 60px}.card{padding:16px}.entry{align-items:flex-start}.entry .actions{width:100%}.entry .actions button{flex:1}.top{padding:11px 12px}.brand{font-size:15px}}
 
 /* 與正式賽程表相同的淺／深色主題色票 */
@@ -33,7 +27,7 @@ input[type="date"]::-webkit-datetime-edit,input[type="time"]::-webkit-datetime-e
 @media(max-width:700px){.fieldGrid{grid-template-columns:minmax(0,1fr)}.fieldGrid>div{min-width:0}.fieldGrid input{width:100%;min-width:0;max-width:100%}}
 .navHome{white-space:nowrap;padding:8px 11px;min-height:38px;font-size:13px}
 .topRight{display:flex;gap:7px;align-items:center;flex-wrap:nowrap}
-.topRight>*{flex:none}
+.topRight>*{flex:none}.topRight .navHome{order:99}
 @media(max-width:520px){.top{gap:6px}.topRight{gap:5px}.topRight button{padding:8px 9px}.brand{font-size:14px}.brand small{font-size:10px}.navHome{min-width:0}}
 .pageBack{display:inline-flex;align-items:center;gap:5px;padding:9px 11px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--ink);text-decoration:none;font-size:13px;font-weight:700;margin:0 0 13px}
 .formFeedback{min-height:0;margin-top:12px;font-size:13px;line-height:1.6;border-radius:11px}
@@ -42,136 +36,225 @@ input[type="date"]::-webkit-datetime-edit,input[type="time"]::-webkit-datetime-e
 .formFeedback.good{background:var(--success-bg);color:var(--success-ink);border-color:#2e7a52}
 .draftHelp{color:var(--muted);font-size:12px;margin:9px 0;line-height:1.5}
 input.invalid{border-color:#ff6b59!important;box-shadow:0 0 0 1px #ff6b5955}
-</style>
-</head>
-<body>
-<header><div class="top"><div class="brand" id="homeBtn" role="button" tabindex="0">戰鬥陀螺 · 線上報名<small>獨立報名與審核平台</small></div><div class="topRight"><button id="navHomeBtn" class="secondary navHome" type="button">⌂ 首頁</button><button id="themeBtn" class="themeBtn" type="button" aria-label="切換深淺色模式" title="切換深淺色模式">☀️</button><button id="adminBtn" class="secondary small">主辦登入</button><button id="logoutBtn" class="secondary small hidden">登出</button></div></div></header>
-<main id="app" class="shell"><div class="loading">正在啟動平台…</div></main><div id="toast" class="toast hidden"></div>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-<script>
-/* ljtreg-39954 報名系統 Firebase 設定 */
-const firebaseConfig = {
-  apiKey: "AIzaSyDc0wD_Rfo4Ldf86stPbMHN9Q8Ng0PJsvo",
-  authDomain: "ljtreg-39954.firebaseapp.com",
-  databaseURL: "https://ljtreg-39954-default-rtdb.asia-southeast1.firebasedatabase.app/",
-  projectId: "ljtreg-39954",
-  storageBucket: "ljtreg-39954.firebasestorage.app",
-  messagingSenderId: "898101322849",
-  appId: "1:898101322849:web:a0c568372940da7901f620",
-  measurementId: "G-HYC9LPX8HJ"
+
+.previewBanner{background:#fff0e9;color:#8d371d;text-align:center;padding:10px 12px;font-size:13px;font-weight:750;line-height:1.5;border-bottom:1px solid #f3c0b4}:root[data-theme="dark"] .previewBanner{background:#39231e;color:#ffd8c9;border-bottom-color:#7f4434}.netGood{background:#10251b;color:#9be7bd;padding:5px 12px;font-size:12px;text-align:center}.netBad{background:#402020;color:#ffb1a5;padding:5px 12px;font-size:12px;text-align:center}#app input[type="checkbox"]{vertical-align:middle}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.entry{gap:8px}.entry .actions{max-width:100%}@media(max-width:550px){.topRight button{padding:8px 9px}.brand small{display:none}}
+</style></head><body><header><div class="top"><div id="brand" class="brand">戰鬥陀螺 · 線上報名<small>雲端報名與審核平台</small></div><div class="topRight"><button type="button" id="themeBtn" class="themeBtn">☀️</button><button type="button" id="loginBtn" class="secondary small">主辦登入</button><button type="button" id="logoutBtn" class="secondary small hidden">登出</button><button type="button" id="homeBtn" class="secondary navHome">⌂ 首頁</button></div></div></header><div class="previewBanner" role="status">介面測試版｜本頁只使用瀏覽器內的模擬資料，沒有連接 Firebase，請勿用於正式報名或分享給選手。</div><div id="netInfo" class="netBad">介面測試模式</div><main id="app" class="shell"><div class="loading">正在啟動雲端報名平台…</div></main><div id="toast" class="toast hidden"></div><script>'use strict';
+// 絕不透過瀏覽器 SDK 寫入 RTDB：此檔沒有 db.ref(...).set/update/transaction。
+const CONFIG={
+ apiKey:'AIzaSyDc0wD_Rfo4Ldf86stPbMHN9Q8Ng0PJsvo',
+ authDomain:'ljtreg-39954.firebaseapp.com',
+ databaseURL:'https://ljtreg-39954-default-rtdb.asia-southeast1.firebasedatabase.app',
+ projectId:'ljtreg-39954',storageBucket:'ljtreg-39954.firebasestorage.app',
+ messagingSenderId:'898101322849',appId:'1:898101322849:web:a0c568372940da7901f620'
 };
-function syncThemeButton(){const light=document.documentElement.getAttribute('data-theme')==='light';const b=document.getElementById('themeBtn');if(b){b.textContent=light?'🌙':'☀️';b.title=light?'切換深色模式':'切換淺色模式';b.setAttribute('aria-label',b.title)}const meta=document.getElementById('themeColor');if(meta)meta.content=light?'#f5f7fa':'#0b0d12'}
-function toggleTheme(){const next=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('bx_live_theme',next)}catch(e){}syncThemeButton()}
-document.getElementById('themeBtn').addEventListener('click',toggleTheme);syncThemeButton();
-const $=id=>document.getElementById(id), app=$('app'), escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const show=(html)=>app.innerHTML=html;
-const routeBack=(title,params)=>`<a class="pageBack" href="#" data-nav-back="${escapeHTML(JSON.stringify(params))}">← ${escapeHTML(title)}</a>`;
-function toast(message,error=false){const el=$('toast');el.textContent=message;el.className='toast'+(error?' error':'');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.add('hidden'),3800)}
-const statusLabel={pending:'待審核',approved:'審核通過',rejected:'未通過'};
-const statusClass={pending:'wait',approved:'ok',rejected:'no'};
-const pill=s=>`<span class="pill ${statusClass[s]||''}">${statusLabel[s]||'未知'}</span>`;
-let db,auth,me=null,isAdmin=false,unsubscribe=[],routeKey='',currentEvent=null;
-const cleanListeners=()=>{unsubscribe.forEach(f=>f());unsubscribe=[]};
-const listen=(ref,cb)=>{ref.on('value',cb,e=>{toast('讀取資料失敗：'+e.message,true);const el=$('myEvents')||$('eventList')||$('managerBody');if(el&&el.textContent.includes('載入'))el.innerHTML='<div class="empty">資料讀取失敗：'+escapeHTML(e.message)+'。請確認 Firebase Rules 與網路連線。</div>'});unsubscribe.push(()=>ref.off('value',cb))};
-const page=(title,desc,html)=>show(`<section class="hero"><h1>${title}</h1><p class="sub">${desc}</p></section>${html}`);
-const eventURL=id=>location.origin+location.pathname+'?event='+encodeURIComponent(id);
-const ticketURL=(eid,ticket)=>eventURL(eid)+'&ticket='+encodeURIComponent(ticket);
-function nav(params={}){const url=new URL(location.href);url.search='';Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));if(url.href===location.href){render();return}history.pushState(null,'',url);render()}
-const draftKey=(kind,id='')=>'reg_v2_'+kind+'_'+(me?.uid||'visitor')+(id?'_'+id:'');
-function draftGet(kind,id=''){try{return JSON.parse(localStorage.getItem(draftKey(kind,id))||'null')}catch{return null}}
-function draftSet(kind,id='',value){try{localStorage.setItem(draftKey(kind,id),JSON.stringify(value))}catch(e){}}
-function draftClear(kind,id=''){try{localStorage.removeItem(draftKey(kind,id))}catch(e){}}
-function collectDraft(){const o={};for(const id of ['titleInput','eventDateInput','checkinInput','startInput','venueInput','feeInput','capacityInput'])o[id]=$(id)?.value||'';return o}
-function applyDraft(o){if(!o)return;for(const [id,value] of Object.entries(o)){if($(id))$(id).value=value}}
-function formFeedback(text,kind='bad'){const el=$('formFeedback');if(el){el.textContent=text;el.className='formFeedback '+kind}if(kind==='bad')toast(text,true)}
-function watchDraft(formId,kind,id=''){const form=$(formId);if(!form)return;form.addEventListener('input',ev=>{if(ev.target?.classList)ev.target.classList.remove('invalid');draftSet(kind,id,collectDraft());const el=$('formFeedback');if(el){el.textContent='';el.className='formFeedback'}});form.addEventListener('change',()=>draftSet(kind,id,collectDraft()));}
-function setSubmitting(formId,busy,text){const f=$(formId);if(!f)return;const b=f.querySelector('button[type=submit]');if(!b)return;if(!b.dataset.defaultLabel)b.dataset.defaultLabel=b.textContent;b.disabled=busy;b.textContent=busy?text:b.dataset.defaultLabel}
-
-async function copy(t){try{await navigator.clipboard.writeText(t);toast('已複製')}catch{prompt('請手動複製：',t)}}
-function safeError(e){const s=String(e?.message||e||'操作失敗');toast(s,true)}
-async function ensureAnon(){if(!auth.currentUser)await auth.signInAnonymously();return auth.currentUser}
-function authButtons(){const adminUser=me&&!me.isAnonymous&&me.providerData.some(p=>p.providerId==='google.com'); $('adminBtn').classList.toggle('hidden',!!adminUser);$('logoutBtn').classList.toggle('hidden',!adminUser)}
-function idGen(){const a=new Uint8Array(24);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')}
-function fmt(t){return t?new Date(t).toLocaleString('zh-TW',{hour12:false}):'未設定'}
-function eventDetails(e){return `<div class="eventDetails"><div>📅 比賽日期：${escapeHTML(e.eventDate||'未設定')}</div><div>🕘 報到：${escapeHTML(e.checkinTime||'未設定')}　開賽：${escapeHTML(e.startTime||'未設定')}</div><div>📍 地點：${escapeHTML(e.venue||'未設定')}</div><div>💰 報名費：${e.fee!=null?escapeHTML(String(e.fee))+' 元':'未設定'}</div><div>👥 正選名額：${e.capacity!=null?escapeHTML(String(e.capacity))+' 人':'未設定'}（備選無限制）</div></div>`}
-function eventFields(e={}){return `<label>比賽名稱 *</label><input id="titleInput" maxlength="70" required placeholder="例如：金魚盃 2026" value="${escapeHTML(e.title||'')}"><label>比賽日期 *</label><input id="eventDateInput" type="date" required value="${escapeHTML(e.eventDate||'')}"><div class="fieldGrid"><div><label>報到時間 *</label><input id="checkinInput" type="time" required value="${escapeHTML(e.checkinTime||'')}"></div><div><label>開賽時間 *</label><input id="startInput" type="time" required value="${escapeHTML(e.startTime||'')}"></div></div><label>比賽地點 *</label><input id="venueInput" maxlength="150" required placeholder="請輸入比賽地點" value="${escapeHTML(e.venue||'')}"><div class="fieldGrid"><div><label>報名費（元） *</label><input id="feeInput" type="number" required min="0" max="1000000" step="1" placeholder="免費請填 0" value="${e.fee??''}"></div><div><label>正選人數 *</label><input id="capacityInput" type="number" required min="1" max="10000" step="1" placeholder="例如：24" value="${e.capacity??''}"></div></div><p class="help">正選名額由主辦人工審核決定；備選人數無限制，系統不會因正選額滿而停止接受報名。</p>`}
-function readEventFields(){
- const ids=[['titleInput','比賽名稱'],['eventDateInput','比賽日期'],['checkinInput','報到時間'],['startInput','開賽時間'],['venueInput','比賽地點'],['feeInput','報名費'],['capacityInput','正選人數']];
- for(const [id,label] of ids){const el=$(id);if(!el||!String(el.value).trim()){formFeedback('請填寫「'+label+'」，才能建立比賽。');el?.classList.add('invalid');el?.focus();return null}el.classList.remove('invalid')}
- const obj={title:$('titleInput').value.trim(),eventDate:$('eventDateInput').value,checkinTime:$('checkinInput').value,startTime:$('startInput').value,venue:$('venueInput').value.trim(),fee:Number($('feeInput').value),capacity:Number($('capacityInput').value)};
- if(obj.title.length>70){formFeedback('比賽名稱請勿超過 70 字');return null}
- if(!/^\d{4}-\d{2}-\d{2}$/.test(obj.eventDate)){formFeedback('請使用日期選擇器選擇正確日期');return null}
- if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(obj.checkinTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(obj.startTime)){formFeedback('請選擇有效的報到與開賽時間');return null}
- if(obj.checkinTime>obj.startTime){formFeedback('報到時間不能晚於開賽時間');return null}
- if(obj.venue.length>150){formFeedback('比賽地點請勿超過 150 字');return null}
- if(!Number.isInteger(obj.fee)||obj.fee<0||obj.fee>1000000){formFeedback('報名費請輸入 0 至 1,000,000 的整數，免費請填 0');return null}
- if(!Number.isInteger(obj.capacity)||obj.capacity<1||obj.capacity>10000){formFeedback('正選人數請輸入 1 至 10,000 的整數');return null}
- return obj
+// 預覽模式完全不初始化 Firebase：不會向正式 RTDB 發送讀寫請求。
+const PREVIEW_MODE=true;
+const db=null,auth={currentUser:{uid:'preview-owner',isAnonymous:false,providerData:[{providerId:'google.com'}]}},functions=null;
+const $=id=>document.getElementById(id),E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const action=name=>async data=>({data:await previewCall(name,data)});
+let account={uid:'preview-owner',isAnonymous:false,providerData:[{providerId:'google.com'}]},ready=true,connected=true,connectedKnown=true,version=0,stopListeners=[],netListener=null,adminEvents=[];
+const STATUS={pending:'待審核',approved:'通過',rejected:'不通過'};
+function isGoogle(){return !!(account&&!account.isAnonymous&&account.providerData.some(p=>p.providerId==='google.com'))}
+function showToast(s,bad=false){const t=$('toast');t.textContent=s;t.className='toast'+(bad?' error':'');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>t.classList.add('hidden'),5000)}
+function message(err){return err?.message?.replace(/^internal:\s*/i,'')||String(err)||'未知錯誤'}
+function escapeError(err){showToast(message(err),true)}
+function setBusy(btn,text){if(!btn)return()=>{};const old=btn.textContent;btn.disabled=true;btn.textContent=text;return()=>{if(btn.isConnected){btn.disabled=false;btn.textContent=old}}}
+function theme(){const light=document.documentElement.dataset.theme==='light';$('themeBtn').textContent=light?'🌙':'☀️';$('themeColor').content=light?'#f5f7fa':'#0b0d12'}
+function switchTheme(){const v=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=v;try{localStorage.setItem('bx_live_theme',v)}catch{}theme()}
+function q(){return new URLSearchParams(location.search)}
+function goto(params={}){const url=new URL(location.href);url.search='';Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));history.pushState({},'',url);render()}
+function publicURL(eid){return location.origin+location.pathname+'?event='+encodeURIComponent(eid)}
+function ticketURL(eid,rid){return publicURL(eid)+'&ticket='+encodeURIComponent(rid)}
+function html(title,desc,body){$('app').innerHTML=`<section class="hero"><h1>${E(title)}</h1><p class="sub">${E(desc)}</p></section>${body}`;}
+function loading(label='正在取得最新雲端資料…'){$('app').innerHTML='<div class="loading">'+E(label)+'</div>'}
+function statusPill(s){return `<span class="pill ${s==='approved'?'ok':s==='rejected'?'no':'wait'}">${STATUS[s]||'未知'}</span>`}
+function date(t){return t?new Date(t).toLocaleString('zh-TW',{hour12:false}):'—'}
+function eventSummary(e){return `<div class="eventDetails"><div>📅 比賽日期：${E(e.eventDate)}</div><div>🕘 報到：${E(e.checkinTime)}　開賽：${E(e.startTime)}</div><div>📍 比賽地點：${E(e.venue)}</div><div>💰 報名費：${E(e.fee)} 元</div><div>👥 正選 ${E(e.capacity)} 人／備選無限制</div></div>`}
+function clearSubscriptions(){stopListeners.forEach(x=>{try{x()}catch{}});stopListeners=[];version++;}
+function connectionUI(){if(PREVIEW_MODE){$('netInfo').className='netGood';$('netInfo').textContent='模擬資料｜沒有 Firebase 連線・資料僅保存在這個分頁的測試暫存';return}const e=$('netInfo');e.className=connected?'netGood':'netBad';e.textContent=!connectedKnown?'正在確認 Firebase 連線…':connected?'雲端已連線':'已離線：禁止送出或審核，等待雲端恢復';}
+function guard(){if(!connected){showToast('尚未連上 Firebase，已禁止修改雲端資料。請等待重新連線。',true);return false}return true}
+// 首次取得資料需通過 REST 雲端讀取；監聽只能在伺服器確認後展示。
+async function restFresh(path){
+ if(PREVIEW_MODE)return structuredClone(previewValue(path));
+ const token=auth.currentUser?await auth.currentUser.getIdToken():null;
+ const uri=CONFIG.databaseURL+'/'+path+'.json'+(token?'?auth='+encodeURIComponent(token):'');
+ const res=await fetch(uri,{cache:'no-store',headers:{'Cache-Control':'no-cache','Accept':'application/json'}});
+ if(!res.ok)throw Error(res.status===401||res.status===403?'Firebase 拒絕讀取資料，請確認 Rules 或登入身分。':'雲端讀取失敗（HTTP '+res.status+'）');
+ return await res.json();
 }
-function eventCard(id,e,admin){return `<div class="card hover"><div class="row between"><h3>${escapeHTML(e.title)}</h3><span class="pill ${e.open?'ok':'no'}">${e.open?'報名開放':'暫停報名'}</span></div>${eventDetails(e)}<button data-open="${id}" class="${admin?'secondary':''}">${admin?'管理這場比賽':'前往報名'}</button></div>`}
-function render(){cleanListeners();const q=new URLSearchParams(location.search),event=q.get('event'),ticket=q.get('ticket'),admin=q.has('admin');routeKey=location.search;
- if(!db){page('尚未設定 Firebase','請先編輯 index.html 的 firebaseConfig，再依安裝說明開啟 Firebase 服務。',`<div class="card">目前是功能預覽版；設定後才可以真正儲存與同步報名資料。</div>`);return}
- if(admin){if(!isAdmin){renderAdminLogin();return}const selected=q.get('manage');if(q.has('new')){renderCreatePage();return}if(q.has('edit')&&selected){renderEditPage(selected);return}selected?renderManager(selected):renderAdminHome();return}
- if(event&&ticket){renderTicket(event,ticket);return}event?renderRegistration(event):renderPublicHome()}
-function renderPublicHome(){page('找到想參加的比賽','選擇比賽，免登入即可提交報名資料。',`<div id="eventList" class="grid"><div class="loading">載入活動中…</div></div>`);setTimeout(()=>{const el=$('eventList');if(el&&el.textContent.includes('載入活動中'))el.innerHTML='<div class="empty">等待資料庫回應過久，請稍後重新整理或確認網路連線。</div>'},12000);listen(db.ref('events'),s=>{const events=s.val()||{};let arr=Object.entries(events).filter(([id,e])=>e.open);$('eventList').innerHTML=arr.length?arr.sort((a,b)=>b[1].createdAt-a[1].createdAt).map(([id,e])=>eventCard(id,e,false)).join(''):'<div class="empty">目前沒有開放報名的比賽</div>'})}
-function renderRegistration(eid){page('線上比賽報名','不需 Google 登入，提交後取得專屬審核結果查詢連結。',`<div id="registrationBody" class="w500"><div class="loading">載入比賽資訊…</div></div>`);
- listen(db.ref('events/'+eid),s=>{let e=s.val();currentEvent=e;const b=$('registrationBody');if(!b)return;if(!e){b.innerHTML='<div class="empty">此比賽不存在或已刪除</div>';return}const open=e.open; if(document.activeElement&&['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;
- b.innerHTML=`<div class="card"><div class="row between"><h2>${escapeHTML(e.title)}</h2><span class="pill ${open?'ok':'no'}">${open?'報名中':'已截止'}</span></div>${eventDetails(e)}<div class="line"></div>${open?`<form id="entryForm"><label>手機後三碼 *</label><input id="phone3" inputmode="numeric" autocomplete="off" placeholder="例如：093" maxlength="3" pattern="[0-9]{3}" required><div class="help">請輸入完整三位數字，開頭的 0 也要保留。</div><label>LINE 名稱 *</label><input id="lineName" maxlength="40" placeholder="你的 LINE 顯示名稱" required><label class="mt"><input id="consent" type="checkbox" style="width:auto;min-height:0" required> 我同意主辦使用本次報名資料進行審核</label><p class="help">專屬查詢連結請妥善保存；任何取得連結的人都能看到審核結果。</p><button id="sendBtn" type="submit" style="width:100%;margin-top:13px">送出報名</button></form>`:'<div class="empty">目前不接受新報名</div>'}</div>`;
- const form=$('entryForm');if(form)form.onsubmit=async ev=>{ev.preventDefault();const phone=$('phone3').value.trim(),name=$('lineName').value.trim();if(!/^\d{3}$/.test(phone)||!name||name.length>40){toast('請確認手機後三碼與 LINE 名稱',true);return}const btn=$('sendBtn');btn.disabled=true;btn.textContent='送出中…';try{const user=await ensureAnon(),rid=idGen(),now=Date.now();const values={};values[`registrations/${eid}/${rid}`]={phone3:phone,lineName:name,status:'pending',submitterUid:user.uid,createdAt:now};values[`publicStatus/${eid}/${rid}`]={status:'pending',createdAt:now};await db.ref(`registrations/${eid}/${rid}`).set(values[`registrations/${eid}/${rid}`]);await db.ref(`publicStatus/${eid}/${rid}`).set(values[`publicStatus/${eid}/${rid}`]);nav({event:eid,ticket:rid})}catch(err){safeError(err);btn.disabled=false;btn.textContent='送出報名'}}
- })}
-function renderTicket(eid,rid){page('報名審核結果','此連結可跨手機查看，建議收藏或分享給自己的 LINE。',`<div class="card w500" id="ticketBody"><div class="loading">正在查詢審核狀態…</div></div>`);listen(db.ref(`publicStatus/${eid}/${rid}`),s=>{const v=s.val(),b=$('ticketBody');if(!b)return;b.innerHTML=v?`<h2>目前狀態</h2><p style="font-size:22px">${pill(v.status)}</p><p class="sub">${v.status==='pending'?'主辦尚未完成審核，結果變更後會自動更新。':v.status==='approved'?'你的報名已審核通過。':'你的報名未通過審核；如有疑問請聯絡主辦。'}</p><button class="secondary" id="copyTicket">複製我的查詢連結</button><div class="help">此頁僅公開審核狀態，不公開手機後三碼或 LINE 名稱。</div>`:'<div class="empty">無法找到這筆報名。比賽或資料可能已被主辦刪除。</div>';if(v)$('copyTicket').onclick=()=>copy(ticketURL(eid,rid))})}
-function renderAdminLogin(){page('主辦管理後台','主辦使用 Google 登入，自動擁有自己建立的活動管理權限。',`<div class="card w500"><h2>主辦登入</h2><p class="sub">任何 Google 帳號都可建立自己的報名活動；不同主辦的名單互不開放。</p><button id="loginGoogle">使用 Google 登入</button></div>`);$('loginGoogle').onclick=async()=>{try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());nav({admin:1})}catch(e){safeError(e)}}}
-function renderAdminHome(){page('比賽管理','建立不同名稱的活動，獨立管理報名與審核。刪除活動將永久刪除該活動所有報名資料。',`<div class="row between" style="margin-bottom:15px"><button id="createBtn">＋ 建立新比賽</button></div><div id="myEvents" class="grid"><div class="loading">載入比賽中…</div></div>`);$('createBtn').onclick=()=>nav({admin:1,new:1});setTimeout(()=>{const el=$('myEvents');if(el&&el.textContent.includes('載入比賽中'))el.innerHTML='<div class="empty">等待 Firebase 回應時間過長。請確認網路連線、Realtime Database Rules 是否已發布，再重新整理。</div>'},12000);listen(db.ref('events'),s=>{const vals=s.val()||{},items=Object.entries(vals).filter(([,e])=>e.ownerUid===me.uid).sort((a,b)=>b[1].createdAt-a[1].createdAt);$('myEvents').innerHTML=items.length?items.map(([id,e])=>eventCard(id,e,true)).join(''):'<div class="empty">尚未建立活動，點選「建立新比賽」開始。</div>'})}
-function renderCreatePage(){
- page('建立新比賽','填寫基本比賽資訊，其他宣傳內容可放在 LINE 記事本。',`${routeBack('返回比賽管理',{admin:1})}<div class="card w500"><form id="createForm" novalidate>${eventFields()}<p class="draftHelp">填寫內容會自動儲存在這台裝置，重新整理不會消失。建立成功後才清除草稿。</p><div id="formFeedback" class="formFeedback" role="status" aria-live="polite"></div><div class="row mt"><button type="submit">建立並開放報名</button><button type="button" class="secondary" id="cancelBtn">返回管理</button><button type="button" class="secondary small" id="clearDraftBtn">清除草稿</button></div></form></div>`);
- applyDraft(draftGet('create'));
- watchDraft('createForm','create');
- $('cancelBtn').onclick=()=>nav({admin:1});
- $('clearDraftBtn').onclick=()=>{if(!confirm('清除這台裝置的建立比賽草稿？'))return;draftClear('create');$('createForm').reset();formFeedback('草稿已清除','good')};
- $('createForm').onsubmit=async ev=>{
-  ev.preventDefault();const values=readEventFields();if(!values)return;
-  if(!me||me.isAnonymous){formFeedback('尚未完成 Google 登入，請重新登入主辦帳號');return}
-  if(!navigator.onLine){formFeedback('目前沒有網路連線，資料已保留在草稿，恢復連線後再提交。');return}
-  setSubmitting('createForm',true,'正在建立…');formFeedback('正在連線 Firebase 並儲存比賽，請稍候。','good');
-  try{
-   const eid=idGen().slice(0,24),now=Date.now();
-   await db.ref('events/'+eid).set({...values,open:true,ownerUid:me.uid,createdAt:now,updatedAt:now});
-   draftClear('create');nav({admin:1,manage:eid});toast('比賽已建立並開放報名');
-  }catch(e){console.error('建立活動失敗',e);formFeedback('建立失敗：'+(String(e?.code||'').toLowerCase().includes('permission')?'Firebase 權限被拒絕，請確認報名資料庫已發布新版 Rules。':String(e?.message||e||'未知錯誤')))}
-  finally{setSubmitting('createForm',false,'建立並開放報名')}
- }
+function stream(path,renderCallback){
+ if(PREVIEW_MODE){const sub={path,renderCallback};previewSubscriptions.add(sub);stopListeners.push(()=>previewSubscriptions.delete(sub));renderCallback(structuredClone(previewValue(path)));return}
+ const mine=version;let confirmed=false;
+ const ref=db.ref(path);const cb=s=>{if(mine!==version||!connected||!confirmed)return;renderCallback(s.val())};
+ const fail=e=>{if(mine===version)html('雲端讀取失敗',message(e),'<button id="retry" class="secondary">重新連線</button>'),$('retry').onclick=render};
+ ref.on('value',cb,fail);stopListeners.push(()=>ref.off('value',cb));
+ restFresh(path).then(v=>{if(mine!==version||!connected)return;confirmed=true;renderCallback(v)}).catch(fail);
 }
-
-let adminListCache={};
-function renderManager(eid){page('報名審核管理',`返回可管理的活動列表。`, `${routeBack('返回比賽管理',{admin:1})}<div id="managerBody"><div class="loading">載入管理資料…</div></div>`);
- let e=null,registrations={};const draw=()=>{const b=$('managerBody');if(!b||!e)return;const rows=Object.entries(registrations).sort((a,b)=>b[1].createdAt-a[1].createdAt);const counts={pending:0,approved:0,rejected:0};rows.forEach(([,r])=>counts[r.status]=(counts[r.status]||0)+1);b.innerHTML=`<div class="card"><div class="row between"><h2>${escapeHTML(e.title)}</h2><span class="pill ${e.open?'ok':'no'}">${e.open?'開放中':'已關閉'}</span></div>${eventDetails(e)}<div class="row"><button id="shareBtn" class="secondary small">複製報名網址</button><button id="toggleBtn" class="secondary small">${e.open?'關閉報名':'重新開放報名'}</button><button id="editBtn" class="secondary small">編輯活動</button><button id="deleteBtn" class="danger small">刪除整場比賽</button></div><p class="help">報名網址：<a target="_blank" rel="noopener" href="${eventURL(eid)}">${escapeHTML(eventURL(eid))}</a></p></div><div class="card"><div class="row"><div class="stat"><strong>${rows.length}</strong><small>全部報名</small></div><div class="stat"><strong>${counts.pending}</strong><small>待審核</small></div><div class="stat"><strong>${counts.approved}</strong><small>已通過</small></div><div class="stat"><strong>${counts.rejected}</strong><small>未通過</small></div></div><div class="row mt"><button class="success" id="copyList">複製合格名單</button><button class="secondary" id="csvBtn">下載合格 CSV</button></div><p class="help">複製名單只有 LINE 名稱，每位選手一行；CSV 包含比賽名稱、手機後三碼、LINE 名稱。</p></div><div class="card"><div class="row between"><h2>報名紀錄</h2><span class="muted tiny">即時更新</span></div><div class="row"><select id="filterSelect" style="max-width:170px"><option value="all">全部狀態</option><option value="pending">待審核</option><option value="approved">已通過</option><option value="rejected">未通過</option></select><input id="searchInput" placeholder="搜尋 LINE 名稱或後三碼" style="flex:1;min-width:180px"></div><div class="list mt" id="entryList"></div></div>`;
- $('shareBtn').onclick=()=>copy(eventURL(eid));$('toggleBtn').onclick=()=>db.ref('events/'+eid).update({open:!e.open,updatedAt:Date.now()}).catch(safeError);$('editBtn').onclick=()=>editEvent(eid,e);
- $('deleteBtn').onclick=async()=>{if(!confirm(`確定永久刪除「${e.title}」以及所有報名紀錄、公開查詢狀態？此操作無法復原。`))return;if(!confirm('再次確認：刪除後所有選手查詢連結都會失效。'))return;try{await db.ref().update({[`events/${eid}`]:null,[`registrations/${eid}`]:null,[`publicStatus/${eid}`]:null});toast('活動和所有報名資料已刪除');nav({admin:1})}catch(err){safeError(err)}};
- const approved=rows.filter(([,r])=>r.status==='approved');$('copyList').onclick=()=>approved.length?copy(approved.map(([,r])=>r.lineName).join('\n')):toast('目前沒有已通過的選手',true);
- $('csvBtn').onclick=()=>{const matrix=[['比賽名稱','手機後三碼','Line名稱'],...approved.map(([,r])=>[e.title,r.phone3,r.lineName])];const csv='\ufeff'+matrix.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const href=URL.createObjectURL(blob),a=document.createElement('a');a.href=href;a.download=(e.title.replace(/[\\/:*?"<>|]/g,'_')||'approved')+'_合格名單.csv';a.click();setTimeout(()=>URL.revokeObjectURL(href),500)};
- const drawEntries=()=>{let filter=$('filterSelect').value,search=$('searchInput').value.toLowerCase().trim();const filtered=rows.filter(([,r])=>(filter==='all'||r.status===filter)&&(!search||(r.phone3||'').includes(search)||(r.lineName||'').toLowerCase().includes(search)));$('entryList').innerHTML=filtered.length?filtered.map(([rid,r])=>`<div class="entry"><div><strong>${escapeHTML(r.lineName)}</strong> ${pill(r.status)}<div class="tiny muted">手機後三碼：${escapeHTML(r.phone3)}　·　${fmt(r.createdAt)}</div></div><div class="actions"><button class="success small" data-action="approved" data-id="${rid}">通過</button><button class="secondary small" data-action="pending" data-id="${rid}">待審核</button><button class="danger small" data-action="rejected" data-id="${rid}">不通過</button><button class="secondary small" data-action="edit" data-id="${rid}">編輯</button><button class="secondary small" data-action="delete" data-id="${rid}">刪除</button></div></div>`).join(''):'<div class="empty">沒有符合條件的報名者</div>'};$('filterSelect').onchange=drawEntries;$('searchInput').oninput=drawEntries;drawEntries();
- $('entryList').onclick=async ev=>{const btn=ev.target.closest('button[data-action]');if(!btn)return;const action=btn.dataset.action,rid=btn.dataset.id,r=registrations[rid];if(!r)return;try{if(['pending','approved','rejected'].includes(action)){const changes={};changes[`registrations/${eid}/${rid}/status`]=action;changes[`publicStatus/${eid}/${rid}/status`]=action;await db.ref().update(changes)}else if(action==='edit'){const name=prompt('LINE 名稱',r.lineName);if(name===null)return;const phone=prompt('手機後三碼',r.phone3);if(phone===null)return;if(!name.trim()||name.trim().length>40||!/^\d{3}$/.test(phone)){toast('請輸入有效的 LINE 名稱與三位數字',true);return}await db.ref(`registrations/${eid}/${rid}`).update({lineName:name.trim(),phone3:phone})}else if(action==='delete'){if(!confirm('永久刪除這筆報名？查詢連結將失效。'))return;await db.ref().update({[`registrations/${eid}/${rid}`]:null,[`publicStatus/${eid}/${rid}`]:null})}}catch(err){safeError(err)}};
+async function call(name,data,button,progress='處理中…'){
+ if(!guard())return null;
+ const release=setBusy(button,progress);
+ try{const r=await action(name)(data);return r.data}catch(e){escapeError(e);return null}finally{release()}
+}
+function updateAuthButtons(){const publicPage=q().has('event');if(PREVIEW_MODE){$('loginBtn').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('homeBtn').classList.toggle('hidden',publicPage);return}$('loginBtn').classList.toggle('hidden',publicPage||isGoogle());$('logoutBtn').classList.toggle('hidden',publicPage||!isGoogle());$('homeBtn').classList.toggle('hidden',publicPage);}
+async function anonymousUser(){if(PREVIEW_MODE)return {uid:'preview-visitor'};if(auth.currentUser)return auth.currentUser;await auth.signInAnonymously();return auth.currentUser}
+function readFields(){
+ const v={title:$('titleInput')?.value.trim(),eventDate:$('eventDateInput')?.value,checkinTime:$('checkinInput')?.value,startTime:$('startInput')?.value,venue:$('venueInput')?.value.trim(),fee:Number($('feeInput')?.value),capacity:Number($('capacityInput')?.value)};
+ if(!v.title||!v.eventDate||!v.checkinTime||!v.startTime||!v.venue||!$('feeInput')?.value||!$('capacityInput')?.value||!Number.isInteger(v.fee)||v.fee<0||!Number.isInteger(v.capacity)||v.capacity<1){showToast('所有比賽欄位均為必填，請確認資料。',true);return null}
+ if(v.checkinTime>v.startTime){showToast('報到時間不可晚於開賽時間',true);return null}return v;
+}
+function fields(e={}){return `<label>比賽名稱 *</label><input id="titleInput" maxlength="70" required value="${E(e.title||'')}" placeholder="例如：金魚盃 2026"><label>比賽日期 *</label><input type="date" id="eventDateInput" required value="${E(e.eventDate||'')}"><div class="fieldGrid"><div><label>報到時間 *</label><input type="time" id="checkinInput" value="${E(e.checkinTime||'')}" required></div><div><label>開賽時間 *</label><input type="time" id="startInput" value="${E(e.startTime||'')}" required></div></div><label>比賽地點 *</label><input id="venueInput" maxlength="150" required placeholder="比賽地點" value="${E(e.venue||'')}"><div class="fieldGrid"><div><label>報名費（元）*</label><input id="feeInput" type="number" min="0" max="1000000" required placeholder="免費填 0" value="${e.fee??''}"></div><div><label>正選人數 *</label><input id="capacityInput" type="number" min="1" max="10000" required placeholder="例如：32" value="${e.capacity??''}"></div></div><p class="help">依雲端受理先後分配報名順位；待審核及通過佔名額、不通過暫時取消順位；恢復後自動遞補。備選無限制。</p>`}
+function draftKey(mode,id=''){return 'reg_cloud_draft_'+mode+'_'+(account?.uid||'none')+'_'+id}
+// 只保留使用者尚未提交的文字草稿；不保存任何雲端活動、報名或審核快照，絕不自動回寫。
+function keepDraft(form,mode,id=''){
+ const key=draftKey(mode,id),inputs=[...form.querySelectorAll('input')];
+ try{const saved=JSON.parse(sessionStorage.getItem(key)||'null');if(saved)inputs.forEach(i=>{if(saved[i.id]!==undefined)i.value=saved[i.id]})}catch{}
+ const save=()=>{try{sessionStorage.setItem(key,JSON.stringify(Object.fromEntries(inputs.map(i=>[i.id,i.value]))))}catch{}};
+ form.addEventListener('input',save);form.addEventListener('change',save);
+ return ()=>{try{sessionStorage.removeItem(key)}catch{}};
+}
+function rank(no,ledger,capacity){if(!Number.isSafeInteger(no)||no<1||!ledger||Number(ledger[String(no)])!==1)return null;let n=0;for(const [k,v] of Object.entries(ledger))if(Number(k)<=no&&Number(v)===1)n++;return {rank:n,type:n<=capacity?'primary':'alternate',no:n<=capacity?n:n-capacity}}
+function rankText(no,ledger,capacity,status){if(status==='rejected')return '未通過・已取消正備選資格';const pos=rank(Number(no),ledger,Number(capacity));return !pos?'順位同步中':`${pos.type==='primary'?'正選':'備選'}第 ${pos.no} 號`}
+function render(){
+ clearSubscriptions();updateAuthButtons();if(!ready){loading('正在驗證使用者身分…');return}
+ if(!connected){loading('Firebase 雲端連線尚未確認，請稍候…');return}
+ const u=q(),eid=u.get('event'),rid=u.get('ticket'),mid=u.get('manage');
+ if(eid){if(!/^[0-9a-f]{24}$/.test(eid)){html('連結錯誤','活動代碼無效','');return}rid?showTicket(eid,rid):showSignup(eid);return}
+ if(!isGoogle()){showLogin();return}
+ if(u.has('new')){showCreate();return}
+ if(mid){if(u.has('edit'))showEdit(mid);else showManager(mid);return}
+ showDashboard();
+}
+function showLogin(){html('主辦管理後台','這裡專供主辦建立及審核比賽。選手使用主辦分享的個別報名連結。',`<div class="card w500"><h2>主辦 Google 登入</h2><p class="sub">不同主辦的資料互相隔離；不需要手動設定管理員 UID。</p><button id="google">使用 Google 登入</button></div>`);$('google').onclick=async()=>{try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());goto()}catch(e){escapeError(e)}}}
+function showDashboard(){html('我的比賽',PREVIEW_MODE?'介面測試：預先建立 35 位示範選手，可試著將第 10 人改為不通過再恢復。資料只在這個分頁的測試暫存。':'比賽列表由雲端索引讀取；比賽名稱與資料每次都向雲端確認。',`<div class="row mt"><button id="add">＋ 建立新比賽</button></div><div id="list" class="grid mt"><div class="loading">正在取得最新雲端活動…</div></div>`);$('add').onclick=()=>goto({admin:1,new:1});let listSerial=0;
+ stream('ownerEvents/'+account.uid,raw=>{
+  const serial=++listSerial,mine=version,ids=Object.keys(raw||{}),box=$('list');if(!box)return;
+  if(!ids.length){box.innerHTML='<div class="empty">尚無比賽，請建立新比賽。</div>';return}
+  box.innerHTML='<div class="loading">正在核對每場比賽的最新資料…</div>';
+  Promise.all(ids.map(async id=>({id,event:await restFresh('eventStates/'+id+'/public').catch(()=>null)}))).then(items=>{
+   if(mine!==version||serial!==listSerial||!connected||!$('list'))return;
+   items=items.filter(x=>x.event).sort((a,b)=>(b.event.createdAt||0)-(a.event.createdAt||0));
+   $('list').innerHTML=items.length?items.map(({id,event:e})=>`<div class="card hover"><h3>${E(e.title||'比賽')}</h3><p class="muted tiny">${E(e.eventDate||'')} · ${PREVIEW_MODE?'模擬測試活動':'即時雲端活動'}</p><button class="small secondary" data-manage="${E(id)}">進入管理</button></div>`).join(''):'<div class="empty">找不到活動的最新資料，請重新整理後再試。</div>';
+   $('list').onclick=ev=>{const b=ev.target.closest('[data-manage]');if(b)goto({admin:1,manage:b.dataset.manage})};
+  });
+ });}
+function showCreate(){html('建立新比賽',PREVIEW_MODE?'預覽建立只會寫入本分頁模擬資料，不會建立真實雲端活動。':'建立成功才會寫入雲端。未送出的文字草稿不會自動覆蓋雲端資料。',`<div class="w500"><button class="secondary small" id="back">← 返回管理首頁</button><div class="card mt"><form id="form">${fields()}<div id="feedback" class="formFeedback" role="status"></div><button type="submit" class="mt">建立並開放報名</button></form></div></div>`);$('back').onclick=()=>goto({admin:1});const form=$('form'),clear=keepDraft(form,'new');form.onsubmit=async ev=>{ev.preventDefault();const vals=readFields();if(!vals)return;const done=await call('regCreateEvent',vals,form.querySelector('button[type=submit]'),'雲端建立中…');if(done?.eid){clear();goto({admin:1,manage:done.eid});showToast(PREVIEW_MODE?'已建立模擬比賽（未寫入雲端）':'雲端已建立比賽')}}}
+function showEdit(eid){html('編輯比賽','編輯前會先重新取得 Firebase 最新版本；舊本機資料不會自動提交。',`<button class="secondary small" id="back">← 返回審核管理</button><div id="edit" class="card w500 mt"><div class="loading">雲端核對中…</div></div>`);$('back').onclick=()=>goto({admin:1,manage:eid});stream('eventStates/'+eid,s=>{if(!s){$('edit').innerHTML='<div class="empty">活動不存在</div>';return}if($('editForm'))return;
+ $('edit').innerHTML=`<form id="editForm">${fields(s.public)}<p class="help">已有選手報名後，正選名額鎖定，避免人數設定變更造成爭議。</p><button type="submit" class="mt">儲存比賽資訊</button></form>`;
+ if(s.nextNo>0){$('capacityInput').readOnly=true;$('capacityInput').title='已有報名，禁止修改正選名額'}
+ const form=$('editForm');form.onsubmit=async ev=>{ev.preventDefault();const vals=readFields();if(!vals)return;const done=await call('regUpdateEvent',{eid,...vals,expectedVersion:s.public.metaVersion},form.querySelector('button[type=submit]'),'正在核對及儲存…');if(done?.ok){goto({admin:1,manage:eid});showToast('修改已確認寫入雲端')}};
+});}
+function showManager(eid){html('報名審核管理','所有操作都在 Firebase 伺服器交易後才算成功，不會以手機快取覆蓋雲端。',`<button class="secondary small" id="back">← 返回我的比賽</button><div id="manager" class="mt"><div class="loading">正在讀取雲端管理資料…</div></div>`);$('back').onclick=()=>goto({admin:1});let inputFilter='all',inputQuery='';stream('eventStates/'+eid,s=>{
+ if(!s){$('manager').innerHTML='<div class="empty">這場活動已被刪除</div>';return}
+ const e=s.public||{},regs=Object.entries(s.registrations||{}).sort((a,b)=>a[1].signupNo-b[1].signupNo),actives=regs.filter(([,r])=>r.status!=='rejected'),rankings=Object.fromEntries(actives.map((entry,i)=>[entry[0],{kind:i<e.capacity?'正選':'備選',no:i<e.capacity?i+1:i+1-e.capacity}]));
+ const rows=regs.sort((a,b)=>(a[1].status==='rejected')-(b[1].status==='rejected')||a[1].signupNo-b[1].signupNo),qualified=rows.filter(([rid,r])=>r.status==='approved'&&rankings[rid]?.kind==='正選');
+ const total={pending:rows.filter(([,r])=>r.status==='pending').length,approved:rows.filter(([,r])=>r.status==='approved').length,rejected:rows.filter(([,r])=>r.status==='rejected').length};
+ $('manager').innerHTML=`<div class="card"><div class="row between"><h2>${E(e.title)}</h2><span class="pill ${e.open?'ok':'no'}">${e.open?'報名開放':'報名關閉'}</span></div>${eventSummary(e)}<div class="row"><button class="small secondary" id="share">複製報名網址</button><button class="small secondary" id="open">${e.open?'關閉報名':'開放報名'}</button><button class="small secondary" id="edit">編輯</button><button class="small danger" id="deleteEvent">刪除活動</button></div></div>
+ <div class="card"><div class="row"><div class="stat"><strong>${rows.length}</strong><small>總報名</small></div><div class="stat"><strong>${actives.length}</strong><small>有效順位</small></div><div class="stat"><strong>${total.pending}</strong><small>待審核</small></div><div class="stat"><strong>${total.approved}</strong><small>通過</small></div><div class="stat"><strong>${total.rejected}</strong><small>不通過</small></div></div><div class="row mt"><button id="copy" class="small success">複製通過正選</button><button id="csv" class="small secondary">下載 CSV</button></div></div>
+ <div class="card"><h2>報名紀錄</h2><div class="row"><select id="filter"><option value="all">全部</option><option value="pending">待審核</option><option value="approved">通過</option><option value="rejected">不通過</option></select><input id="search" placeholder="搜尋 LINE 名稱或手機後三碼" style="min-width:170px;flex:1"></div><div id="entries" class="list mt"></div></div>`;
+ $('share').onclick=()=>{if(PREVIEW_MODE){showToast('這是模擬比賽，不可分享給真實選手。請等正式雲端版上線。',true);return}copy(publicURL(eid))};$('open').onclick=()=>call('regSetOpen',{eid,open:!e.open,expectedVersion:e.metaVersion},$('open'),'提交雲端…');$('edit').onclick=()=>goto({admin:1,manage:eid,edit:1});
+ $('deleteEvent').onclick=async()=>{if(!confirm('確定要永久刪除「'+e.title+'」？所有報名與查詢資料會一起刪除，無法復原。'))return;if(!confirm('最後確認：全部資料永久刪除。'))return;const r=await call('regDeleteEvent',{eid},$('deleteEvent'),'雲端刪除中…');if(r?.ok){goto({admin:1});showToast(PREVIEW_MODE?'已刪除模擬活動':'活動及全部報名已刪除')}};
+ $('copy').onclick=()=>copy(qualified.map(([,r])=>r.lineName).join('\n')||'尚無通過正選');$('csv').onclick=()=>{
+ const lines=[['比賽名稱','手機後三碼','Line名稱'],...qualified.map(([,r])=>[e.title,r.phone3,r.lineName])];const csv='\ufeff'+lines.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=(e.title.replace(/[\\/:*?"<>|]/g,'_')||'比賽')+'_正選.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);
  };
- listen(db.ref('events/'+eid),s=>{e=s.val();if(!e||e.ownerUid!==me.uid){nav({admin:1});return}draw()});listen(db.ref('registrations/'+eid),s=>{registrations=s.val()||{};draw()})}
-function editEvent(id,e){if(!me||e.ownerUid!==me.uid){toast('無管理權限',true);return}nav({admin:1,manage:id,edit:1})}
-async function renderEditPage(id){
- page('編輯比賽','修改後會同步更新公開報名資訊。',`${routeBack('返回審核管理',{admin:1,manage:id})}<div id="editHolder" class="card w500"><div class="loading">正在讀取比賽資訊…</div></div>`);
- try{
-  const snap=await db.ref('events/'+id).once('value');
-  if(new URLSearchParams(location.search).get('edit')!=='1'||new URLSearchParams(location.search).get('manage')!==id)return;
-  const e=snap.val();if(!e||!me||e.ownerUid!==me.uid){$('editHolder').innerHTML='<div class="empty">找不到活動或無權限</div>';return}
-  $('editHolder').innerHTML=`<form id="editForm" novalidate>${eventFields(e)}<p class="draftHelp">編輯內容會自動儲存在本機，重新整理可繼續。</p><div id="formFeedback" class="formFeedback" role="status" aria-live="polite"></div><div class="row mt"><button type="submit">儲存修改</button><button class="secondary" type="button" id="backBtn">返回管理</button></div></form>`;
-  applyDraft(draftGet('edit',id));watchDraft('editForm','edit',id);
-  $('backBtn').onclick=()=>nav({admin:1,manage:id});
-  $('editForm').onsubmit=async ev=>{ev.preventDefault();const values=readEventFields();if(!values)return;setSubmitting('editForm',true,'儲存中…');formFeedback('正在儲存修改…','good');try{await db.ref('events/'+id).update({...values,updatedAt:Date.now()});draftClear('edit',id);nav({admin:1,manage:id});toast('比賽資訊已更新')}catch(err){formFeedback('更新失敗：'+(err?.message||String(err)))}finally{setSubmitting('editForm',false,'儲存修改')}}
- }catch(err){const h=$('editHolder');if(h)h.innerHTML='<div class="empty">無法讀取比賽：'+escapeHTML(err?.message||String(err))+'</div>'}
+ const draw=()=>{const filtered=rows.filter(([,r])=>(inputFilter==='all'||r.status===inputFilter)&&(!inputQuery||r.phone3.includes(inputQuery)||r.lineName.toLowerCase().includes(inputQuery)));
+ $('entries').innerHTML=filtered.map(([rid,r])=>`<div class="entry"><div><b>${E(r.lineName)}</b> <span class="pill">${r.status==='rejected'?'編號取消':rankings[rid]?.kind+'第 '+rankings[rid]?.no+' 號'}</span> ${statusPill(r.status)}<div class="tiny muted">原始順位 #${r.signupNo} · ${date(r.createdAt)}</div><div class="tiny muted">手機後三碼：${E(r.phone3)}</div></div><div class="actions"><button class="small success" data-r="${rid}" data-s="approved">通過</button><button class="small secondary" data-r="${rid}" data-s="pending">待審核</button><button class="small danger" data-r="${rid}" data-s="rejected">不通過</button><button class="small secondary" data-r="${rid}" data-s="edit">編輯</button><button class="small secondary" data-r="${rid}" data-s="delete">刪除</button></div></div>`).join('')||'<div class="empty">沒有符合條件的報名者</div>';
+ };
+ $('filter').value=inputFilter;$('search').value=inputQuery;$('filter').onchange=ev=>{inputFilter=ev.target.value;draw()};$('search').oninput=ev=>{inputQuery=ev.target.value.toLowerCase().trim();draw()};draw();
+ $('entries').onclick=async ev=>{const b=ev.target.closest('button[data-r]');if(!b)return;const rid=b.dataset.r,st=b.dataset.s,r=s.registrations[rid];if(!r)return;
+ if(['pending','approved','rejected'].includes(st)){if(st===r.status)return;if(st==='rejected'&&!confirm('標記不通過將暫時取消名額。之後仍可恢復原始順位，確定？'))return;await call('regReview',{eid,rid,status:st,expectedVersion:r.recordVersion},b,'雲端審核中…')}
+ else if(st==='edit'){const name=prompt('LINE 名稱',r.lineName);if(name===null)return;const phone=prompt('手機後三碼',r.phone3);if(phone===null)return;await call('regEditEntry',{eid,rid,lineName:name,phone3:phone,expectedVersion:r.recordVersion},b,'儲存中…')}
+ else if(st==='delete'){if(!confirm('永久刪除此選手的資料？其原順位將永久取消。'))return;await call('regDeleteEntry',{eid,rid,expectedVersion:r.recordVersion},b,'刪除中…')}
+ };
+ });}
+function showSignup(eid){html('選手線上報名',PREVIEW_MODE?'模擬選手報名：不會送入 Firebase，請勿輸入真實個資。':'只需填寫手機後三碼和 LINE 名稱，不必自行註冊帳號。',`<div id="signup" class="w500"><div class="loading">正在雲端確認活動資訊…</div></div>`);stream('eventStates/'+eid+'/public',e=>{
+ const box=$('signup');if(!box)return;if(!e){box.innerHTML='<div class="empty">活動不存在或已刪除。</div>';return}
+ box.innerHTML=`<div class="card"><div class="row between"><h2>${E(e.title)}</h2><span class="pill ${e.open?'ok':'no'}">${e.open?'開放報名':'暫停報名'}</span></div>${eventSummary(e)}${e.open?`<form id="signupForm"><label>手機後三碼 *</label><input id="phone" inputmode="numeric" maxlength="3" pattern="[0-9]{3}" required placeholder="例如：093"><label>LINE 名稱 *</label><input id="name" maxlength="40" required placeholder="LINE 顯示名稱"><label class="mt"><input id="consent" type="checkbox" required style="width:auto;min-height:0;display:inline-block"> 同意主辦使用報名資料進行審核</label><p class="help">報名成功會依雲端受理順序產生正／備選號碼。審核不通過時，後面的人會依序遞補；恢復審核也會重新計算。</p><button type="submit" id="send" style="width:100%">確認送出報名</button></form>`:'<div class="empty">目前不接受新報名，但已報名者可透過原查詢連結查看狀態。</div>'}<button id="recover" class="secondary mt small">查詢我在此瀏覽器的既有報名</button></div>`;
+ $('recover').onclick=async()=>{const b=$('recover');if(!guard())return;const release=setBusy(b,'雲端確認中…');try{await anonymousUser();const result=await action('regRecover')({eid});if(result.data?.rid)goto({event:eid,ticket:result.data.rid});else showToast('沒有找到這個帳號的報名；請使用原查詢連結。',true)}catch(e){escapeError(e)}finally{release()}};
+ const form=$('signupForm');if(!form)return;const clearSignupDraft=keepDraft(form,'signup',eid);form.onsubmit=async ev=>{ev.preventDefault();if(!guard())return;const phone3=$('phone').value.trim(),lineName=$('name').value.trim();if(!/^\d{3}$/.test(phone3)||!lineName||lineName.length>40){showToast('手機後三碼或 LINE 名稱不正確',true);return}
+ const send=$('send'),release=setBusy(send,'正在由雲端受理及取號…');
+ try{await anonymousUser();const rid=Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');const result=await action('regSubmit')({eid,rid,phone3,lineName});if(result.data?.rid){clearSignupDraft();goto({event:eid,ticket:result.data.rid});showToast(PREVIEW_MODE?'已完成模擬報名（未送入雲端）':'報名成功・雲端已確認')}}catch(e){escapeError(e);showToast('若已送出但未收到回應，請先使用「查詢我在此瀏覽器的既有報名」，不要重複送出。',true)}finally{release()}
+ };
+ });}
+function showTicket(eid,rid){if(!/^[0-9a-f]{48}$/.test(rid)){html('查詢連結無效','請使用報名成功後取得的完整網址。','');return}
+ html('我的報名結果',PREVIEW_MODE?'模擬查詢結果：此頁只讀取同分頁的測試資料。':'以 Firebase 最新雲端資料即時顯示正備選名額與審核結果。',`<div class="card w500"><div class="muted" id="eventLabel">正在確認比賽…</div><div id="ticket" class="loading">正在取得雲端審核狀態…</div></div>`);
+ let event=null,ledger=null,ticket=null,got={};const draw=()=>{if(!got.event||!got.ledger||!got.ticket)return;
+ $('eventLabel').textContent=event?.title||'活動已刪除';const box=$('ticket');if(!event||!ticket){box.innerHTML='<div class="empty">查無報名資料，活動可能已刪除。</div>';return}
+ const label=rankText(ticket.signupNo,ledger,event.capacity,ticket.status);box.innerHTML=`<div class="tiny muted">原始報名順序：第 ${ticket.signupNo} 位</div><h2 style="font-size:clamp(25px,6vw,35px);margin:12px 0">${E(label)}</h2>${statusPill(ticket.status)}<p class="sub mt">報名時間：${E(date(ticket.createdAt))}</p><p class="help">原始順位保持不變；審核不通過會暫時移出，恢復時依原報名順序重新計算。顯示的正備選編號可能即時變動。</p><button class="secondary" id="copyLink">複製我的查詢連結</button>`;$('copyLink').onclick=()=>copy(ticketURL(eid,rid))};
+ stream('eventStates/'+eid+'/public',v=>{event=v;got.event=true;draw()});stream('eventStates/'+eid+'/rankLedger',v=>{ledger=v||{};got.ledger=true;draw()});stream('eventStates/'+eid+'/tickets/'+rid,v=>{ticket=v;got.ticket=true;draw()});
+}
+async function copy(str){if(!str){showToast('目前沒有符合條件的正選',true);return}try{await navigator.clipboard.writeText(str);showToast('已複製')}catch{prompt('請手動複製：',str)}}
+
+// ===== 介面測試專用模型 =====
+// 唯一目的：檢查手機排版及操作流程。測試狀態只放在 sessionStorage，永遠不呼叫 Firebase。
+const PREVIEW_STORE='reg_ui_demo_20261014',previewSubscriptions=new Set();
+function previewSeed(){
+ const eid='e'.repeat(24),now=Date.now(),publicInfo={title:'示範測試盃（可測試遞補）',eventDate:'2026-11-01',checkinTime:'09:00',startTime:'10:00',venue:'示範體育館',fee:0,capacity:32,open:true,createdAt:now,updatedAt:now,metaVersion:1};
+ const e={ownerUid:'preview-owner',public:publicInfo,nextNo:35,revision:1,registrations:{},tickets:{},rankLedger:{},byUser:{}};
+ for(let i=1;i<=35;i++){const rid=i.toString(16).padStart(48,'0'),r={rid,phone3:String(100+i),lineName:'示範選手 '+String(i).padStart(2,'0'),submitterUid:'preview-user-'+i,status:'pending',signupNo:i,createdAt:now+i*1000,recordVersion:1};e.registrations[rid]=r;e.tickets[rid]={status:r.status,signupNo:i,createdAt:r.createdAt,recordVersion:1};e.rankLedger[String(i)]=1;e.byUser[r.submitterUid]=rid}
+ return {ownerEvents:{'preview-owner':{[eid]:now}},eventStates:{[eid]:e}};
+}
+let previewDB;
+try{previewDB=JSON.parse(sessionStorage.getItem(PREVIEW_STORE)||'null')}catch{}
+if(!previewDB?.ownerEvents||!previewDB?.eventStates)previewDB=previewSeed();
+function previewSave(){try{sessionStorage.setItem(PREVIEW_STORE,JSON.stringify(previewDB))}catch{}}
+previewSave();
+function previewValue(path){return path.split('/').filter(Boolean).reduce((x,k)=>x?.[k],previewDB)??null}
+function previewNotify(){previewSave();for(const {path,renderCallback} of [...previewSubscriptions]){try{renderCallback(structuredClone(previewValue(path)))}catch(err){console.error(err)}}}
+function previewBad(msg){throw Error(msg)}
+async function previewCall(name,d={}){
+ const eid=d.eid,e=previewDB.eventStates[eid],now=Date.now();let result;
+ if(name==='regCreateEvent'){
+  const val={title:d.title,eventDate:d.eventDate,checkinTime:d.checkinTime,startTime:d.startTime,venue:d.venue,fee:d.fee,capacity:d.capacity};
+  const id=Array.from(crypto.getRandomValues(new Uint8Array(12)),x=>x.toString(16).padStart(2,'0')).join('');
+  previewDB.eventStates[id]={ownerUid:'preview-owner',public:{...val,open:true,createdAt:now,updatedAt:now,metaVersion:1},nextNo:0,revision:0,registrations:{},tickets:{},rankLedger:{},byUser:{}};
+  previewDB.ownerEvents['preview-owner'][id]=now;result={eid:id};
+ }else if(!e){previewBad('模擬比賽不存在。重新整理示範資料再試。')}
+ else if(name==='regUpdateEvent'){
+  if(d.expectedVersion!==e.public.metaVersion)previewBad('比賽設定已被其他操作更新，請重新載入');
+  if(e.nextNo>0&&d.capacity!==e.public.capacity)previewBad('有報名資料後不能更改正選人數');
+  Object.assign(e.public,{title:d.title,eventDate:d.eventDate,checkinTime:d.checkinTime,startTime:d.startTime,venue:d.venue,fee:d.fee,capacity:d.capacity,updatedAt:now,metaVersion:e.public.metaVersion+1});e.revision++;result={ok:true};
+ }else if(name==='regSetOpen'){
+  if(d.expectedVersion!==e.public.metaVersion)previewBad('報名開關已更新，請重新整理');
+  e.public.open=!!d.open;e.public.metaVersion++;e.public.updatedAt=now;e.revision++;result={ok:true};
+ }else if(name==='regSubmit'){
+  if(!e.public.open)previewBad('報名已關閉');
+  if(e.registrations[d.rid]){result={rid:d.rid,signupNo:e.registrations[d.rid].signupNo}}
+  else{
+   if(e.byUser['preview-visitor'])previewBad('此示範瀏覽器已報名過同一場，請使用既有連結');
+   const n=++e.nextNo,r={rid:d.rid,phone3:d.phone3,lineName:d.lineName,submitterUid:'preview-visitor',status:'pending',signupNo:n,createdAt:now,recordVersion:1};
+   e.registrations[d.rid]=r;e.tickets[d.rid]={status:r.status,signupNo:n,createdAt:now,recordVersion:1};e.rankLedger[String(n)]=1;e.byUser['preview-visitor']=d.rid;e.revision++;result={rid:d.rid,signupNo:n};
+  }
+ }else if(name==='regRecover'){
+  const rid=e.byUser['preview-visitor'];result={rid:rid||null};
+ }else if(['regReview','regEditEntry','regDeleteEntry'].includes(name)){
+  const r=e.registrations[d.rid];if(!r)previewBad('選手不存在');
+  if(d.expectedVersion!==r.recordVersion)previewBad('這筆報名已變更，請重新取得資料');
+  if(name==='regReview'){r.status=d.status;r.recordVersion++;e.tickets[d.rid].status=d.status;e.tickets[d.rid].recordVersion++;e.rankLedger[String(r.signupNo)]=d.status==='rejected'?0:1;}
+  if(name==='regEditEntry'){r.lineName=d.lineName;r.phone3=d.phone3;r.recordVersion++}
+  if(name==='regDeleteEntry'){delete e.registrations[d.rid];delete e.tickets[d.rid];e.rankLedger[String(r.signupNo)]=0;delete e.byUser[r.submitterUid];}
+  e.revision++;result={ok:true};
+ }else if(name==='regDeleteEvent'){
+  delete previewDB.eventStates[eid];delete previewDB.ownerEvents['preview-owner'][eid];result={ok:true};
+ }else previewBad('預覽模式未支援的模擬操作：'+name);
+ // 延遲通知，避免重繪時移除尚未完成的按鈕事件。
+ queueMicrotask(previewNotify);
+ return result;
 }
 
-$('homeBtn').onclick=()=>nav();$('homeBtn').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nav()}};$('navHomeBtn').onclick=()=>nav();$('adminBtn').onclick=()=>nav({admin:1});$('logoutBtn').onclick=async()=>{try{await auth.signOut();isAdmin=false;nav()}catch(e){safeError(e)}};
-app.onclick=ev=>{const back=ev.target.closest('[data-nav-back]');if(back){ev.preventDefault();try{nav(JSON.parse(back.dataset.navBack))}catch(e){nav()}return}const b=ev.target.closest('[data-open]');if(b)nav(isAdmin&&new URLSearchParams(location.search).has('admin')?{admin:1,manage:b.dataset.open}:{event:b.dataset.open})};
-window.onpopstate=render;
-(async()=>{if(firebaseConfig.apiKey.includes('PASTE_')){render();return}try{firebase.initializeApp(firebaseConfig);db=firebase.database();auth=firebase.auth();auth.onAuthStateChanged(async u=>{me=u;authButtons();isAdmin=!!(u&&!u.isAnonymous&&u.providerData.some(p=>p.providerId==='google.com'));render()})}catch(e){page('Firebase 啟動失敗',escapeHTML(e.message),'<div class="card">請檢查 firebaseConfig 與 Firebase 專案設定。</div>')}})();
-</script>
-</body></html>
+$('themeBtn').onclick=switchTheme;theme();
+$('homeBtn').onclick=()=>goto({admin:1});$('brand').onclick=()=>goto({admin:1});
+$('loginBtn').onclick=()=>goto({admin:1});$('logoutBtn').onclick=async()=>{await auth.signOut();goto({admin:1})};
+window.addEventListener('popstate',render);
+// 觀察連線；斷線後不允許任何直接資料庫寫入。恢復時丟棄舊監聽，重新驗證雲端資料。
+if(!PREVIEW_MODE){
+ db.ref('.info/connected').on('value',snap=>{
+  const now=!!snap.val(),was=connected;connected=now;connectedKnown=true;connectionUI();
+  if(!now){clearSubscriptions();if(ready)render()}else if(!was&&ready)render();
+ });
+ auth.onAuthStateChanged(u=>{account=u;ready=true;render()});
+}
+if(PREVIEW_MODE){connectionUI();render()}
+window.addEventListener('online',()=>{if(ready&&connected)render()});
+window.addEventListener('pageshow',ev=>{if(ready&&connected&&ev.persisted)render()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ready&&connected)render()});
+</script></body></html>
