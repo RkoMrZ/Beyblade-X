@@ -37,7 +37,7 @@ input[type="date"]::-webkit-datetime-edit,input[type="time"]::-webkit-datetime-e
 .draftHelp{color:var(--muted);font-size:12px;margin:9px 0;line-height:1.5}
 input.invalid{border-color:#ff6b59!important;box-shadow:0 0 0 1px #ff6b5955}
 
-.previewBanner{background:#fff0e9;color:#8d371d;text-align:center;padding:10px 12px;font-size:13px;font-weight:750;line-height:1.5;border-bottom:1px solid #f3c0b4}:root[data-theme="dark"] .previewBanner{background:#39231e;color:#ffd8c9;border-bottom-color:#7f4434}.netGood{background:#10251b;color:#9be7bd;padding:5px 12px;font-size:12px;text-align:center}.netBad{background:#402020;color:#ffb1a5;padding:5px 12px;font-size:12px;text-align:center}#app input[type="checkbox"]{vertical-align:middle}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.entry{gap:8px}.entry .actions{max-width:100%}@media(max-width:550px){.topRight button{padding:8px 9px}.brand small{display:none}}
+.previewBanner{background:#fff0e9;color:#8d371d;text-align:center;padding:10px 12px;font-size:13px;font-weight:750;line-height:1.5;border-bottom:1px solid #f3c0b4}:root[data-theme="dark"] .previewBanner{background:#39231e;color:#ffd8c9;border-bottom-color:#7f4434}.netGood{background:#10251b;color:#9be7bd;padding:5px 12px;font-size:12px;text-align:center}.netBad{background:#402020;color:#ffb1a5;padding:5px 12px;font-size:12px;text-align:center}.netWarn{background:#3b321e;color:#ffe5a0;padding:5px 12px;font-size:12px;text-align:center}#app input[type="checkbox"]{vertical-align:middle}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.entry{gap:8px}.entry .actions{max-width:100%}@media(max-width:550px){.topRight button{padding:8px 9px}.brand small{display:none}}
 
 /* =============================================================
    報名系統：分流電腦 / 平板 / 手機的自適應版面（2026-10-14）
@@ -311,7 +311,8 @@ firebase.initializeApp(CONFIG);
 const db=firebase.database(),auth=firebase.auth(),functions=firebase.app().functions('asia-southeast1');
 const $=id=>document.getElementById(id),E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const action=name=>functions.httpsCallable(name);
-let account=null,ready=false,connected=false,connectedKnown=false,version=0,stopListeners=[],netListener=null,adminEvents=[];
+let account=null,ready=false,connected=false,connectedStable=false,connectedKnown=false,httpsOnline=false,version=0,stopListeners=[],netListener=null,adminEvents=[];
+let activeStreamRefresh=null,cloudCheckPromise=null,cloudReadAt=0;
 const STATUS={pending:'待審核',approved:'通過',rejected:'不通過'};
 function isGoogle(){return !!(account&&!account.isAnonymous&&account.providerData.some(p=>p.providerId==='google.com'))}
 function showToast(s,bad=false){const t=$('toast');t.textContent=s;t.className='toast'+(bad?' error':'');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>t.classList.add('hidden'),5000)}
@@ -330,35 +331,94 @@ function loading(label='正在取得最新雲端資料…'){$('app').innerHTML='
 function statusPill(s){return `<span class="pill ${s==='approved'?'ok':s==='rejected'?'no':'wait'}">${STATUS[s]||'未知'}</span>`}
 function date(t){return t?new Date(t).toLocaleString('zh-TW',{hour12:false}):'—'}
 function eventSummary(e){return `<div class="eventDetails"><div>📅 比賽日期：${E(e.eventDate)}</div><div>🕘 報到：${E(e.checkinTime)}　開賽：${E(e.startTime)}</div><div>📍 比賽地點：${E(e.venue)}</div><div>💰 報名費：${E(e.fee)} 元</div><div>👥 正選 ${E(e.capacity)} 人／備選無限制</div></div>`}
-function clearSubscriptions(){stopListeners.forEach(x=>{try{x()}catch{}});stopListeners=[];version++;}
+function clearSubscriptions(){stopListeners.forEach(x=>{try{x()}catch{}});stopListeners=[];activeStreamRefresh=null;version++;}
 let everConnected=false, connectionStartedAt=Date.now();
 function connectionUI(){
  const e=$('netInfo');if(!e)return;
- e.className=connected?'netGood':'netBad';
- e.textContent=connected?'雲端即時連線已建立':!connectedKnown||(!everConnected&&Date.now()-connectionStartedAt<12000)?'正在建立 Firebase 即時連線…':everConnected?'連線已中斷：雲端修改暫停，等待恢復':'Firebase 即時連線未建立：雲端修改已安全鎖定';
+ e.className=connectedStable?'netGood':httpsOnline?'netWarn':'netBad';
+ e.textContent=connectedStable?'雲端即時同步已建立':httpsOnline?'即時通道不穩・已改用 HTTPS 讀取最新雲端資料':!connectedKnown||(!everConnected&&Date.now()-connectionStartedAt<12000)?'正在建立雲端連線…':'雲端讀取尚未確認，等待恢復';
 }
-// .info/connected 的首次 false 只是「尚未連線」，不能直接等同正式故障。
-setTimeout(()=>{if(!connected)connectionUI()},12500);
-function guard(){if(!connected){showToast('尚未連上 Firebase，已禁止修改雲端資料。請等待重新連線。',true);return false}return true}
-// 首次取得資料需通過 REST 雲端讀取；監聽只能在伺服器確認後展示。
+// 僅伺服器確實回應的 HTTPS 請求可顯示／操作雲端資料。
+// .info/connected 抖動不再阻擋 Cloud Functions HTTPS 寫入；後端仍負責權限與版本比對。
+setTimeout(()=>{if(!connectedStable&&!httpsOnline)connectionUI()},12500);
+function guard(){if(!navigator.onLine||(!connectedStable&&!httpsOnline)){showToast('無法確認伺服器連線，已停止送出，請先重新取得最新雲端資料。',true);return false}return true}
 async function restFresh(path){
  const token=auth.currentUser?await auth.currentUser.getIdToken():null;
  const uri=CONFIG.databaseURL+'/'+path+'.json'+(token?'?auth='+encodeURIComponent(token):'');
- const res=await fetch(uri,{cache:'no-store',headers:{'Cache-Control':'no-cache','Accept':'application/json'}});
- if(!res.ok)throw Error(res.status===401||res.status===403?'Firebase 拒絕讀取資料，請確認 Rules 或登入身分。':'雲端讀取失敗（HTTP '+res.status+'）');
- return await res.json();
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),12000);
+ try{
+  const res=await fetch(uri,{cache:'no-store',signal:controller.signal,headers:{'Cache-Control':'no-cache','Accept':'application/json'}});
+  if(!res.ok)throw Error(res.status===401||res.status===403?'Firebase 拒絕讀取資料，請確認 Rules 或登入身分。':'雲端讀取失敗（HTTP '+res.status+'）');
+  return await res.json();
+ }finally{clearTimeout(timeout)}
+}
+async function verifyCloudHTTPS(){
+ if(!isGoogle())return false;
+ if(cloudCheckPromise)return cloudCheckPromise;
+ const uid=account.uid;
+ cloudCheckPromise=(async()=>{
+  try{
+   await restFresh('ownerEvents/'+uid);
+   if(!isGoogle()||account.uid!==uid)return false;
+   httpsOnline=true;cloudReadAt=Date.now();connectionUI();
+   if($('connDiag')&&ready)render();
+   return true;
+  }catch(err){
+   if(account?.uid===uid){httpsOnline=false;connectionUI();const note=$('connDiag');if(note)note.textContent='HTTPS 雲端驗證未通過：'+message(err)+'。請檢查連線，暫時不允許寫入。'}
+   return false;
+  }finally{cloudCheckPromise=null}
+ })();return cloudCheckPromise;
 }
 function stream(path,renderCallback){
- const mine=version;let confirmed=false;
- const ref=db.ref(path);const cb=s=>{if(mine!==version||!connected||!confirmed)return;renderCallback(s.val())};
- const fail=e=>{if(mine===version)html('雲端讀取失敗',message(e),'<button id="retry" class="secondary">重新連線</button>'),$('retry').onclick=render};
- ref.on('value',cb,fail);stopListeners.push(()=>ref.off('value',cb));
- restFresh(path).then(v=>{if(mine!==version||!connected)return;confirmed=true;renderCallback(v)}).catch(fail);
+ const mine=version;let confirmed=false,request=null,receiptSeq=0,lastRendered='';
+ const ref=db.ref(path);
+ const show=value=>{
+  if(mine!==version)return;
+  const stamp=JSON.stringify(value);
+  if(stamp===lastRendered)return;
+  lastRendered=stamp;renderCallback(value);
+ };
+ const cb=s=>{
+  if(mine!==version||!connectedStable||!confirmed)return;
+  receiptSeq++;show(s.val());
+ };
+ const fail=e=>{
+  if(mine!==version)return;
+  if(!confirmed){html('雲端讀取失敗',message(e),'<button id="retry" class="secondary">重試讀取</button>');$('retry').onclick=render}
+  else {showToast('即時監聽暫停，將使用 HTTPS 備援。',true)}
+ };
+ const refresh=async()=>{
+  if(mine!==version||request)return;
+  const seq=receiptSeq;
+  request=restFresh(path);
+  try{
+   const value=await request;
+   if(mine!==version)return;
+   httpsOnline=true;cloudReadAt=Date.now();confirmed=true;
+   if(seq===receiptSeq)show(value); // 防止較早 REST 快照覆蓋更新的即時事件
+   connectionUI();
+  }catch(err){
+   if(mine!==version)return;
+   httpsOnline=false;connectionUI();
+   if(!confirmed)fail(err);else showToast('目前無法讀取最新雲端資料，請檢查網路。',true)
+  }finally{request=null}
+ };
+ ref.on('value',cb,e=>{if(mine===version)console.warn('即時監聽無法使用，保留 HTTPS 備援',e)});
+ const timer=setInterval(()=>{if(document.visibilityState==='visible'&&!connectedStable)refresh()},30000);
+ stopListeners.push(()=>{clearInterval(timer);ref.off('value',cb)});
+ activeStreamRefresh=refresh;
+ refresh(); // 首次一定以伺服器 HTTPS 快照為準，不採用 SDK 可能的舊快取
 }
 async function call(name,data,button,progress='處理中…'){
  if(!guard())return null;
  const release=setBusy(button,progress);
- try{const r=await action(name)(data);return r.data}catch(e){escapeError(e);return null}finally{release()}
+ try{
+  // 更新前必須先完成一次最新 HTTPS 連線檢查，不會讓瀏覽器 SDK 離線排隊寫入。
+  if(!await verifyCloudHTTPS())throw Error('HTTPS 雲端連線驗證失敗，未送出任何修改。');
+  const r=await action(name)(data);
+  if(activeStreamRefresh)setTimeout(()=>activeStreamRefresh?.(),300);
+  return r.data;
+ }catch(e){escapeError(e);return null}finally{release()}
 }
 function updateAuthButtons(){const publicPage=q().has('event');$('loginBtn').classList.toggle('hidden',publicPage||isGoogle());$('logoutBtn').classList.toggle('hidden',publicPage||!isGoogle());$('homeBtn').classList.toggle('hidden',publicPage);}
 function readFields(){
@@ -393,7 +453,7 @@ function render(){
  if(eid){location.replace(new URL('signup.html?event='+encodeURIComponent(eid),location.href).href);return}
  // Google 登入是 Firebase Auth，不應被 RTDB 連線旗標擋住。
  if(!isGoogle()){showLogin();return}
- if(!connected){showConnectionWait();return}
+ if(!connectedStable&&!httpsOnline){showConnectionWait();return}
  if(u.has('new')){showCreate();return}
  if(mid){if(u.has('edit'))showEdit(mid);else showManager(mid);return}
  showDashboard();
@@ -407,7 +467,7 @@ function showConnectionWait(){
    const path=CONFIG.databaseURL+'/eventStates/000000000000000000000000/public.json';
    const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),12000);
    let res;try{res=await fetch(path,{cache:'no-store',signal:ctl.signal})}finally{clearTimeout(timer)}
-   if(res.ok)note.textContent='資料庫 HTTPS 讀取成功（HTTP '+res.status+'）。即時通道尚未建立，請按「重新建立即時連線」。';
+   if(res.ok){note.textContent='資料庫 HTTPS 公開讀取成功（HTTP '+res.status+'），正在確認主辦的雲端讀取權限…';const okay=await verifyCloudHTTPS();if(!okay)note.textContent='公開讀取成功，但主辦權限驗證未通過。請檢查上方錯誤提示。'}
    else note.textContent='資料庫 HTTP '+res.status+'：'+(res.status===401||res.status===403?'可能是 Rules 讀取權限問題。':'請檢查資料庫網址或伺服器狀態。');
   }catch(e){note.textContent='資料庫 HTTPS 連線失敗：'+(e?.name==='AbortError'?'12 秒逾時，請稍後再試。':String(e?.message||e));}
   finally{release()}
@@ -415,8 +475,8 @@ function showConnectionWait(){
  $('retryDb').onclick=()=>{
   // 不強制 goOffline()/goOnline()，以免在 iOS Safari 造成連線狀態反覆震盪。
   const note=$('connDiag');
-  note.textContent='已要求恢復連線，Firebase 將自動重新嘗試；不會重新整理網頁。';
-  try{db.goOnline()}catch(e){note.textContent='連線檢查失敗：'+message(e)}
+  note.textContent='正在重新確認 HTTPS 雲端讀取；即時通道交由 Firebase 自動重連。';
+  verifyCloudHTTPS();
  };
 }
 function showLogin(){html('主辦管理後台','這裡專供主辦建立及審核比賽。選手使用主辦分享的個別報名連結。',`<div class="card w500"><h2>主辦 Google 登入</h2><p class="sub">不同主辦的資料互相隔離；不需要手動設定管理員 UID。</p><button id="google">使用 Google 登入</button></div>`);$('google').onclick=async()=>{try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());goto()}catch(e){escapeError(e)}}}
@@ -426,7 +486,7 @@ function showDashboard(){html('我的比賽','比賽列表由雲端索引讀取�
   if(!ids.length){box.innerHTML='<div class="empty">尚無比賽，請建立新比賽。</div>';return}
   box.innerHTML='<div class="loading">正在核對每場比賽的最新資料…</div>';
   Promise.all(ids.map(async id=>({id,event:await restFresh('eventStates/'+id+'/public').catch(()=>null)}))).then(items=>{
-   if(mine!==version||serial!==listSerial||!connected||!$('list'))return;
+   if(mine!==version||serial!==listSerial||(!connectedStable&&!httpsOnline)||!$('list'))return;
    items=items.filter(x=>x.event).sort((a,b)=>(b.event.createdAt||0)-(a.event.createdAt||0));
    $('list').innerHTML=items.length?items.map(({id,event:e})=>`<article class="card hover dashboardEvent"><div class="dashboardEventTop"><span class="pill">雲端活動</span><span class="tiny muted">${E(e.eventDate||'')}</span></div><h3>${E(e.title||'比賽')}</h3><p class="muted tiny dashboardEventMeta">${e.venue?'📍 '+E(e.venue):'尚未設定地點'}　·　正選 ${E(e.capacity||'—')} 人</p><button class="secondary" data-manage="${E(id)}">進入報名管理 →</button></article>`).join(''):'<div class="empty">找不到活動的最新資料，請重新整理後再試。</div>';
    $('list').onclick=ev=>{const b=ev.target.closest('[data-manage]');if(b)goto({admin:1,manage:b.dataset.manage})};
@@ -496,29 +556,33 @@ let connectionStableTimer=null;
 {
  db.ref('.info/connected').on('value',snap=>{
   const now=!!snap.val();
-  if(connectedKnown&&now===connected)return; // 重複的相同狀態不觸發畫面重建
+  if(connectedKnown&&now===connected)return;
   connected=now;connectedKnown=true;if(now)everConnected=true;
-  connectionUI();
   clearTimeout(connectionStableTimer);
-  if(now){
-   // 確定穩定連線後，才將「等待連線」頁面切回管理頁。
-   // 若是已經打開的管理畫面，SDK 監聽會自行補上最新雲端資料。
-   connectionStableTimer=setTimeout(()=>{
-    if(!connected||!ready)return;
-    if($('connDiag')||$('app')?.querySelector('.loading'))render();
-   },1800);
-  }
-  // false 時不呼叫 render()；保留原畫面及使用者正在編輯的表單。
+  if(!now){connectedStable=false;connectionUI();return}
+  connectionStableTimer=setTimeout(()=>{
+   if(!connected)return;
+   connectedStable=true;connectionUI();
+   // 不重新整理已經開啟的表單或管理畫面。
+   if(($('connDiag')||$('app')?.querySelector('.loading'))&&ready)render();
+   else if(activeStreamRefresh)activeStreamRefresh();
+  },1800);
  });
  auth.onAuthStateChanged(u=>{
   const oldUid=account?.uid||null,newUid=u?.uid||null,first=!ready;
   account=u;ready=true;
+  if(oldUid!==newUid){httpsOnline=false;cloudReadAt=0;connectionUI()}
   if(first||oldUid!==newUid)render();
+  if(isGoogle())verifyCloudHTTPS();
  });
 }
-// 從背景回前景、網路恢復時，Firebase SDK 本身會處理重新連線；
-// 不再主動 render()，避免 iOS 切回 Safari 時整頁反覆重畫。
-window.addEventListener('online',()=>{connectionUI()});
-window.addEventListener('pageshow',()=>{connectionUI()});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')connectionUI()});
+window.addEventListener('online',()=>{connectionUI();if(isGoogle()&&!connectedStable)verifyCloudHTTPS()});
+window.addEventListener('pageshow',()=>{connectionUI();if(isGoogle()&&!connectedStable&&Date.now()-cloudReadAt>20000)verifyCloudHTTPS()});
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState!=='visible')return;
+ connectionUI();
+ if(!isGoogle())return;
+ if(Date.now()-cloudReadAt>20000)verifyCloudHTTPS();
+ if(activeStreamRefresh&&!connectedStable)activeStreamRefresh();
+});
 </script></body></html>
