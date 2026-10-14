@@ -1,93 +1,25 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b0d12"><title>公開報名查詢</title><script>try{document.documentElement.dataset.theme=localStorage.getItem('bx_live_theme')==='light'?'light':'dark'}catch{}</script><style>
-:root{color-scheme:dark;--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--good:#9be7bd;--warn:#f4c84b;--bad:#ffb1a5}
-:root[data-theme=light]{color-scheme:light;--bg:#f5f7fa;--panel:#fff;--panel2:#f1f4f8;--line:#d7dde7;--text:#18212f;--muted:#687386;--accent:#ff5a3c;--good:#15965a;--warn:#986f09;--bad:#b6442d}
-*{box-sizing:border-box}html,body{margin:0;min-width:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Noto Sans TC',sans-serif}body{min-height:100dvh}
-header{background:var(--bg);border-bottom:1px solid var(--line);padding:15px 13px}header .top{max-width:880px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}header b{font-size:17px}header small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
-main{width:min(100%,880px);margin:0 auto;padding:22px 13px 75px}.banner{font-size:12px;line-height:1.5;text-align:center;background:#39231e;color:#ffdbce;padding:8px 12px}h1{font-size:clamp(22px,5.5vw,30px);line-height:1.3;margin:6px 0 10px;overflow-wrap:anywhere}.sub{color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:17px;margin-top:13px}.card h2{font-size:18px;margin:0 0 12px}label{display:block;color:var(--muted);font-size:13px;margin:15px 0 6px}input{display:block;width:100%;min-width:0;min-height:45px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);color:var(--text);font-size:16px}button{font:inherit;font-weight:800;border:0;border-radius:10px;padding:12px 16px;min-height:44px;background:var(--accent);color:white;cursor:pointer}button:disabled{opacity:.55;cursor:wait}button.secondary{background:var(--panel2);border:1px solid var(--line);color:var(--text)}a{color:var(--accent);text-decoration:none;font-weight:750}.minor{font-size:12px;color:var(--muted);line-height:1.6}.status{padding:11px;border:1px solid var(--line);background:var(--panel2);border-radius:11px;color:var(--muted);font-size:13px;margin-bottom:14px}.status.error{border-color:#8e4740;color:var(--bad)}.status.ok{border-color:#2c7450;color:var(--good)}
-.pill{white-space:nowrap;display:inline-block;padding:5px 9px;font-size:12px;font-weight:800;border:1px solid var(--line);border-radius:99px;background:var(--panel2)}.pill.pending{color:var(--warn)}.pill.approved{color:var(--good)}.pill.rejected{color:var(--bad)}
-.modal{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:#000b;padding:14px}.sheet{max-width:460px;width:100%;max-height:90dvh;overflow:auto;border:1px solid var(--line);background:var(--panel);border-radius:18px;padding:20px;box-shadow:0 20px 60px #0009}.sheet h2{font-size:21px;margin:0 0 8px}.rank{font-weight:900;font-size:28px;color:var(--good);margin:15px 0}.details{border-radius:12px;background:var(--panel2);padding:12px 15px;line-height:2;font-size:13px}.sheet button{width:100%;margin-top:16px}.hide{display:none!important}
-@media(max-width:420px){main{padding:17px 11px 62px}.card{padding:14px}.sheet{padding:17px}}
-
-/* 四欄公開名單，僅顯示單場精簡資料；窄螢幕只在表格內橫向滑動。 */
-.boardWrap{border:1px solid var(--line);border-radius:13px;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--panel)}
-table{width:100%;min-width:338px;border-collapse:collapse;table-layout:fixed}
-th,td{text-align:left;border-bottom:1px solid var(--line);padding:12px 9px;overflow-wrap:anywhere}
-th{background:var(--panel2);font-size:12px;color:var(--muted)}td{font-size:13px;font-weight:650}
-tr:last-child td{border-bottom:0}tr:nth-child(even) td{background:color-mix(in srgb,var(--panel2),transparent 48%)}
-th:nth-child(1){width:25%}th:nth-child(2){width:31%}th:nth-child(3){width:18%}th:nth-child(4){width:26%}
-.rankBadge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:4px 5px;font-size:12px;font-weight:850;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
-.rankBadge.primary{color:var(--good)}.rankBadge.alternate{color:var(--warn)}.rankBadge.none{font-weight:500;color:var(--muted)}
-.count{display:inline-block;font-size:12px;color:var(--muted);margin-bottom:12px}
-.toolbar{display:flex;justify-content:space-between;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:12px}.toolbar input{width:240px;min-height:38px;font-size:14px}
-@media(max-width:440px){th,td{padding:10px 5px;font-size:12px}th{font-size:11px}.rankBadge{font-size:11px;padding:4px 3px}.pill{font-size:11px;padding:4px 5px}.toolbar input{width:100%}}
-</style></head><body><header><div class="top"><div><b>戰鬥陀螺・線上報名</b><small>公開審核查詢</small></div><span class="pill">查詢</span></div></header>
-<main><h1 id="title">正在取得比賽名稱…</h1><p class="sub">本場報名順位與審核狀態即時更新；正選仍須通過審核，才能確認參賽資格。</p><div class="status" id="status">正在讀取公開名單…</div><div id="content" class="hide"><div class="toolbar"><span class="count" id="counter"></span><input id="search" type="search" placeholder="搜尋比賽名稱或手機後三碼" aria-label="搜尋公開名單"></div><div class="boardWrap"><table aria-label="公開報名審核表"><thead><tr><th scope="col">正／備選</th><th scope="col">比賽名稱</th><th scope="col">手機後三碼</th><th scope="col">審核狀態</th></tr></thead><tbody id="rows"></tbody></table></div><p class="minor">此頁不顯示 LINE 名稱、報名時間或主辦管理資料。</p></div></main>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>公開審核查詢</title><meta name="theme-color" content="#0b0d12"><script>try{document.documentElement.dataset.theme=localStorage.getItem('bx_live_theme')==='light'?'light':'dark'}catch{}</script><style>:root{color-scheme:dark;--bg:#0b0d12;--panel:#151922;--panel2:#1c2230;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d;--warn:#f4c84b;--red:#ffb1a5;--input:#0f131b}
+:root[data-theme=light]{color-scheme:light;--bg:#f5f7fa;--panel:#fff;--panel2:#f1f4f8;--line:#d7dde7;--text:#18212f;--muted:#687386;--accent:#ff5a3c;--green:#15965a;--warn:#a87400;--red:#b6442d;--input:#fff}
+*{box-sizing:border-box}html,body{min-width:0;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif}body{min-height:100dvh}button,input{font:inherit}button{min-height:39px;padding:8px 12px;background:var(--accent);border:1px solid transparent;color:#fff;border-radius:10px;font-weight:750;cursor:pointer}button:disabled{opacity:.5;cursor:wait}button.alt{background:var(--panel2);color:var(--text);border-color:var(--line)}button.good{background:#163a2a;color:#9ce7b9;border-color:#28734e}button.bad{background:#3d1d1d;color:#ffbdad;border-color:#813d33}button.sm{font-size:13px;padding:6px 9px;min-height:32px}input{min-width:0;width:100%;padding:10px 12px;min-height:44px;border-radius:9px;border:1px solid var(--line);background:var(--input);color:var(--text);font-size:16px}input:focus{outline:2px solid var(--accent);outline-offset:1px}label{display:block;color:var(--muted);font-size:13px;margin:11px 0 5px}a{color:var(--accent)}p{line-height:1.55}.muted{color:var(--muted)}.tiny{font-size:12px}.header{border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;background:var(--bg)}.top{width:min(1280px,100%);margin:auto;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:9px}.brand{font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.actions>button{white-space:nowrap}.container{max-width:1280px;margin:auto;padding:24px 14px 64px}h1{font-size:clamp(23px,3vw,32px);margin:0 0 12px}h2{font-size:20px;margin:0 0 12px}.card{background:var(--panel);border:1px solid var(--line);padding:18px;border-radius:16px;margin-bottom:13px;min-width:0}.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.between{justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.stack{display:grid;gap:10px}.dim{font-size:13px;color:var(--muted)}.status{padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:13px;margin:10px 0}.status.ok{color:var(--green)}.status.warn{color:var(--warn)}.status.err{color:var(--red)}.pill{display:inline-block;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:5px 8px;font-size:12px;font-weight:800;white-space:nowrap}.pill.pending{color:var(--warn)}.pill.approved{color:var(--green)}.pill.rejected{color:var(--red)}.formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 13px}.full{grid-column:1/-1}.formBtns{margin-top:20px;display:flex;gap:9px;flex-wrap:wrap}.formBtns>*{flex:1}.tableWrap{max-width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:11px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:11px 10px;text-align:left;border-bottom:1px solid var(--line)}tr:last-child td{border-bottom:0}th{background:var(--panel2);white-space:nowrap;color:var(--muted)}.tabbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:12px 0}.tabbar button{min-width:0;padding:7px 2px;font-size:12px}.tabbar button[aria-selected=true]{background:var(--accent);color:#fff}.tabbar button:not([aria-selected=true]){background:var(--panel2);color:var(--muted);border-color:var(--line)}.contact{font-weight:800}.contact small{display:block;color:var(--muted);font-weight:450;margin-top:4px}.rank{white-space:nowrap;font-weight:800}.sheetWrap{position:fixed;inset:0;z-index:30;background:#000b;display:flex;align-items:center;justify-content:center;padding:15px}.sheet{width:min(470px,100%);background:var(--panel);padding:20px;border:1px solid var(--line);border-radius:17px;max-height:90dvh;overflow:auto}.hide{display:none!important}.msg{padding:11px 14px;border-radius:11px;background:var(--panel2);color:var(--muted);margin:10px 0}.close{width:100%;margin-top:13px}.public{max-width:790px;margin:auto}.public .card{max-width:640px}.big{font-weight:900;font-size:clamp(25px,6vw,34px);color:var(--green)}.summary{padding:12px 14px;background:var(--panel2);border-radius:12px;line-height:2}.badge{color:var(--muted);font-size:12px}
+@media(max-width:650px){.container{padding:18px 11px 55px}.card{padding:15px}.formGrid{grid-template-columns:1fr}.brand{font-size:14px}.top button{font-size:12px;padding:7px 8px}.tableWrap table{min-width:415px}.reviewbtn{min-width:0!important;font-size:11px!important;padding:6px 4px!important}.sheetWrap{align-items:flex-end;padding:0}.sheet{border-radius:18px 18px 0 0;width:100%;padding:18px 17px calc(18px + env(safe-area-inset-bottom))}.tableWrap th,.tableWrap td{padding:9px 6px}.tableWrap th:first-child,.tableWrap td:first-child{position:sticky;left:0;background:var(--panel);z-index:1;min-width:85px;max-width:105px}.tableWrap th:first-child{background:var(--panel2)}.tabbar button{font-size:11px}.tabbar{gap:4px}}
+</style></head><body>
+<header class="header"><div class="top"><div class="brand">戰鬥陀螺・線上報名</div><span class="pill">公開查詢</span></div></header>
+<main class="container public"><h1 id="title">公開審核查詢</h1><p class="muted">依照原始報名先後計算正選／備選；待審核並不等於已通過。此頁僅讀取單場精簡名單，不下載 LINE 名稱。</p><div id="notice" class="status">正在讀取雲端資料…</div><section class="card"><div class="row between"><strong id="count">—</strong><button class="alt sm" id="refresh">立即更新</button></div><label for="search">搜尋比賽名稱或手機後三碼</label><input type="search" id="search" placeholder="搜尋…"><div class="tableWrap" style="margin-top:13px"><table><thead><tr><th>正／備選</th><th>比賽名稱</th><th>手機後三碼</th><th>審核狀態</th></tr></thead><tbody id="rows"><tr><td colspan="4">等待資料…</td></tr></tbody></table></div><p class="dim" id="last">每次先讀取精簡的變更標記；有更新才取得相關選手。</p></section></main>
 <script>
 'use strict';
-// LIGHTWEIGHT PUBLIC STATUS, modeled after tournament viewer.html:
-// only SSE + REST for a single publicView node. NO SDK, NO local storage, NO writes.
-const DB='https://ljtreg-39954-default-rtdb.asia-southeast1.firebasedatabase.app';
-const eid=new URLSearchParams(location.search).get('event')||'';
-const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DB='https://ljtreg-39954-default-rtdb.asia-southeast1.firebasedatabase.app',eid=new URLSearchParams(location.search).get('event')||'', $=s=>document.getElementById(s),safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const names={pending:'待審核',approved:'通過',rejected:'不通過'};
-let data=null,stream=null,revision=0,received=0,hasFirst=false,needsResync=false,resync=null,timer=null,filter='';
-const path=DB+'/eventStates/'+encodeURIComponent(eid)+'/publicView.json';
-function message(x,bad=false){$('status').textContent=x;$('status').className='status'+(bad?' error':' ok')}
-function apply(path,value,patch=false){
- const parts=String(path||'/').split('/').filter(Boolean);
- if(!parts.length){if(!patch||value===null){data=value;return}data??={};for(const [k,v]of Object.entries(value))v===null?delete data[k]:data[k]=v;return}
- if(!data||typeof data!=='object')data={};let obj=data;
- for(let i=0;i<parts.length-1;i++){const key=parts[i];if(!obj[key]||typeof obj[key]!=='object')obj[key]={};obj=obj[key]}
- const k=parts.at(-1);
- if(patch&&value&&typeof value==='object'&&!Array.isArray(value)){obj[k]??={};for(const [x,v]of Object.entries(value))v===null?delete obj[k][x]:obj[k][x]=v}
- else if(value===null)delete obj[k];else obj[k]=value;
-}
-function applyEvent(kind,s){
- const payload=JSON.parse(s.data);if(typeof payload.path!=='string')return;
- received++;apply(payload.path,payload.data,kind==='patch');hasFirst=true;draw();message(data?'即時查詢已連線':'這場比賽已刪除或不存在',!data);
-}
-async function fresh(gen=revision){
- const before=received;
- try{
-  const r=await fetch(path,{cache:'no-store'});
-  if(gen!==revision)return;
-  if(!r.ok)throw Error(r.status===401||r.status===403?'公開查詢權限未開啟':'無法取得雲端查詢資料');
-  const snapshot=await r.json();if(gen!==revision||received!==before)return;
-  data=snapshot;hasFirst=true;draw();message(snapshot?'已取得最新雲端資料':'找不到這場比賽',!snapshot);
- }catch(e){if(gen===revision)message((hasFirst?'連線暫時不穩，正在重連：':'')+e.message,true)}
-}
-function planResync(){clearTimeout(timer);const gen=revision;timer=setTimeout(()=>{resync=fresh(gen).finally(()=>{resync=null})},300+Math.floor(Math.random()*1300))}
-function start(){if(!/^[0-9a-f]{24}$/.test(eid)){message('連結中的比賽代碼無效',true);return}
- revision++;const gen=revision;try{stream?.close()}catch{};clearTimeout(timer);stream=null;
- message(hasFirst?'正在重新連線…':'正在連接單場公開名單…');
- const es=new EventSource(path);stream=es;
- es.onopen=()=>{if(gen!==revision)return;if(hasFirst)planResync();else message('已連線，正在等候資料…')};
- es.addEventListener('put',e=>{if(gen===revision)try{applyEvent('put',e)}catch{planResync()}});
- es.addEventListener('patch',e=>{if(gen===revision)try{applyEvent('patch',e)}catch{planResync()}});
- es.addEventListener('cancel',()=>{if(gen!==revision)return;message('此比賽無法公開查詢',true);es.close()});
- es.addEventListener('auth_revoked',()=>{if(gen!==revision)return;message('查詢權限已失效',true);es.close()});
- es.onerror=()=>{if(gen!==revision)return;message('Firebase 連線中斷，正在重新連線…',true);if(!hasFirst&&!resync)planResync()};
- if(!hasFirst)setTimeout(()=>{if(gen===revision&&!hasFirst&&!resync)resync=fresh(gen).finally(()=>{resync=null})},4500);
-}
-function draw(){if(!data){$('content').classList.add('hide');return}
- const title=data.eventTitle||'公開查詢';$('title').textContent=title;document.title=title+'｜公開審核查詢';$('content').classList.remove('hide');
- const input=Array.isArray(data.rows)?data.rows.filter(Boolean):Object.values(data.rows||{});
- const bySignup=input.sort((a,b)=>Number(a.signupNo)-Number(b.signupNo));
- const capacity=Number(data.capacity),ranks=new Map();let active=0;
- for(const r of bySignup){if(r.status==='rejected')continue;active++;ranks.set(r.signupNo,active<=capacity?{text:'正選#'+active,kind:'primary'}:{text:'備選#'+(active-capacity),kind:'alternate'})}
- const all=bySignup.sort((a,b)=>Number(a.status==='rejected')-Number(b.status==='rejected')||Number(a.signupNo)-Number(b.signupNo));
- const q=$('search').value.trim().toLowerCase();const show=all.filter(r=>!q||String(r.playerName||'').toLowerCase().includes(q)||String(r.phone3||'').includes(q));
- $('counter').textContent=`共 ${all.length} 人${q?'・顯示 '+show.length+' 人':''}`;
- $('rows').innerHTML=show.length?show.map(r=>{const rk=r.status==='rejected'?null:ranks.get(r.signupNo);
-   return `<tr><td><span class="rankBadge ${esc(rk?.kind||'none')}">${esc(r.status==='rejected'?'—':rk?.text||'同步中')}</span></td><td>${esc(r.playerName)}</td><td>${esc(r.phone3)}</td><td><span class="pill ${esc(r.status)}">${esc(names[r.status]||'未知')}</span></td></tr>`;
- }).join(''):'<tr><td colspan="4">找不到符合條件的報名資料</td></tr>';
-}
-$('search').addEventListener('input',draw);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&eid)start()});
-window.addEventListener('pageshow',e=>{if(e.persisted&&eid)start()});
-window.addEventListener('online',()=>{if(eid)start()});
-window.addEventListener('pagehide',()=>{revision++;clearTimeout(timer);try{stream?.close()}catch{}stream=null});
-setInterval(()=>{if(document.visibilityState==='visible'&&hasFirst&&!resync)planResync()},240000+Math.floor(Math.random()*60000));
-if(/^[0-9a-f]{24}$/.test(eid))start();else message('比賽代碼無效',true);
+let meta=null,rows=null,requesting=false,lastUpdate=0,syncToken=null,seen=new Set();
+function notice(t,bad=false){$('notice').className='status '+(bad?'warn':'ok');$('notice').textContent=t}
+async function get(path,query=null){const u=new URL(DB+'/'+path+'.json');if(query)for(const [k,v] of Object.entries(query))u.searchParams.set(k,v);const c=new AbortController(),time=setTimeout(()=>c.abort(),12000);try{const r=await fetch(u,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error('HTTPS '+r.status);return await r.json()}finally{clearTimeout(time)}}
+function render(){if(!meta||rows===null)return;let a=Object.values(rows).filter(x=>x&&x.status!=='deleted').sort((x,y)=>x.signupNo-y.signupNo),n=0,m=new Map();for(const r of a){if(r.status==='rejected')continue;n++;m.set(r.signupNo,n<=meta.capacity?'正選#'+n:'備選#'+(n-meta.capacity))}a.sort((x,y)=>(x.status==='rejected')-(y.status==='rejected')||x.signupNo-y.signupNo);const q=$('search').value.trim().toLowerCase(),matched=a.filter(r=>r.playerName.toLowerCase().includes(q)||r.phone3.includes(q));$('count').textContent='總報名 '+a.length+' 人 · 有效順位 '+n+' 人';$('rows').innerHTML=matched.length?matched.map(r=>`<tr><td class="rank">${safe(m.get(r.signupNo)||'—')}</td><td>${safe(r.playerName)}</td><td>${safe(r.phone3)}</td><td><span class="pill ${safe(r.status)}">${safe(names[r.status]||'未知')}</span></td></tr>`).join(''):'<tr><td colspan="4">目前沒有符合條件的報名</td></tr>';$('last').textContent='最新確認：'+new Date(lastUpdate).toLocaleTimeString('zh-TW',{hour12:false})+'；本頁只讀公開資料，不寫回雲端。'}
+async function initial(){if(!/^[a-f0-9]{24}$/.test(eid)){notice('報名連結無效',true);return}if(requesting)return;requesting=true;try{const [marker,history]=await Promise.all([get('syncV8/'+eid),get('changesV8/'+eid,{'orderBy':'"$key"','limitToLast':'100'})]),[m,r]=await Promise.all([get('eventsV8/'+eid+'/meta'),get('publicRowsV8/'+eid)]);if(!m||m.deleted)throw Error('活動不存在或已刪除');meta=m;rows=r||{};syncToken=marker?.token||null;seen=new Set(Object.keys(history||{}));lastUpdate=Date.now();$('title').textContent=m.title;document.title=m.title+'｜公開查詢';render();notice('已取得正式雲端公開名單')}catch(e){notice('讀取失敗：'+e.message,true)}finally{requesting=false}}
+async function checkUpdate(){if(requesting||!rows)return;requesting=true;try{const stamp=await get('syncV8/'+eid);if(!stamp){rows=null;throw Error('活動已刪除')}
+ if(stamp.token===syncToken){lastUpdate=Date.now();render();notice('名單無變更，已確認');return}
+ const history=await get('changesV8/'+eid,{'orderBy':'"$key"','limitToLast':'100'}),list=Object.entries(history||{}).sort((a,b)=>a[0].localeCompare(b[0])),fresh=list.filter(([id])=>!seen.has(id));
+ if(list.length>=100&&!list.some(([id])=>seen.has(id))){requesting=false;return initial()}
+ for(const [id,item] of fresh){seen.add(id);if(item.type==='meta'){const m=await get('eventsV8/'+eid+'/meta');if(!m||m.deleted)throw Error('活動已刪除');meta=m;continue}if(!/^p\d{8}$/.test(item.key||''))continue;const r=await get('publicRowsV8/'+eid+'/'+item.key);if(r)rows[item.key]=r;else delete rows[item.key]}
+ if(seen.size>250)seen=new Set([...seen].slice(-150));syncToken=stamp.token;lastUpdate=Date.now();render();notice('已套用最新幾筆雲端變更')
+ }catch(e){notice('目前無法確認最新名單：'+e.message+'；不會寫回手機舊資料',true)}finally{requesting=false}}
+$('search').oninput=render;$('refresh').onclick=()=>rows?checkUpdate():initial();setInterval(()=>{if(document.visibilityState==='visible')checkUpdate()},45000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate()});window.addEventListener('pageshow',e=>{if(e.persisted)checkUpdate()});initial();
 </script></body></html>
