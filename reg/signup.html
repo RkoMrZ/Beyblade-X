@@ -4,7 +4,7 @@
 @media(max-width:650px){.container{padding:18px 11px 55px}.card{padding:15px}.formGrid{grid-template-columns:1fr}.brand{font-size:14px}.top button{font-size:12px;padding:7px 8px}.tableWrap table{min-width:415px}.reviewbtn{min-width:0!important;font-size:11px!important;padding:6px 4px!important}.sheetWrap{align-items:flex-end;padding:0}.sheet{border-radius:18px 18px 0 0;width:100%;padding:18px 17px calc(18px + env(safe-area-inset-bottom))}.tableWrap th,.tableWrap td{padding:9px 6px}.tableWrap th:first-child,.tableWrap td:first-child{position:sticky;left:0;background:var(--panel);z-index:1;min-width:85px;max-width:105px}.tableWrap th:first-child{background:var(--panel2)}.tabbar button{font-size:11px}.tabbar{gap:4px}}
 </style></head><body>
 <header class="header"><div class="top"><div class="brand">戰鬥陀螺・線上報名</div><span class="pill">選手報名</span></div></header>
-<main class="container public"><h1 id="title">讀取比賽資訊中…</h1><p class="muted">選手免登入；同場比賽名稱不可重複，手機後三碼與 LINE 名稱可以相同。公開查詢只顯示比賽名稱、手機後三碼及審核結果。</p><div class="status" id="notice">正在讀取最新比賽資料…</div><section class="card hide" id="entryCard"><h2>選手報名</h2><form id="signup"><label for="playerName">比賽名稱 *</label><input id="playerName" maxlength="50" required autocomplete="off" placeholder="選手參賽名稱"><label for="phone3">手機後三碼 *</label><input id="phone3" required pattern="[0-9]{3}" inputmode="numeric" maxlength="3" placeholder="例如：093"><label for="lineName">LINE 名稱 *</label><input id="lineName" maxlength="40" required autocomplete="off" placeholder="LINE 顯示名稱"><button id="submit" style="width:100%;margin-top:20px" type="submit">確認報名</button></form></section><p><a id="statusLink" href="#">查看這場比賽的公開查詢表 →</a></p></main>
+<main class="container public"><h1 id="title">讀取比賽資訊中…</h1><p class="muted">選手免登入；同場比賽名稱不可重複，手機後三碼與 LINE 名稱可以相同。公開查詢只顯示比賽名稱、手機後三碼及審核結果。</p><div class="status" id="notice">正在讀取最新比賽資料…</div><section class="card hide" id="entryCard"><h2>選手報名</h2><form id="signup"><label for="playerName">比賽名稱 *</label><input id="playerName" maxlength="50" required autocomplete="off" placeholder="選手參賽名稱"><label for="phone3">手機後三碼 *</label><input id="phone3" required pattern="[0-9]{3}" inputmode="numeric" maxlength="3" placeholder="例如：093"><label for="lineName">LINE 名稱 *</label><input id="lineName" maxlength="40" required autocomplete="off" placeholder="LINE 顯示名稱"><button id="submit" style="width:100%;margin-top:20px" type="submit">確認報名</button><p id="localHint" class="dim" aria-live="polite"></p></form></section><p><a id="statusLink" href="#">查看這場比賽的公開查詢表 →</a></p></main>
 <div class="sheetWrap hide" id="modal" role="dialog" aria-modal="true"><section class="sheet"><h2>報名成功</h2><p class="dim">雲端已確認收到報名，順位會隨審核及遞補更新。</p><div id="rank" class="big">已成功報名</div><div id="details" class="summary"></div><p class="dim">初始審核：待審核。正選仍須主辦審核通過才能確認參賽。</p><button id="close" class="close">關閉</button></section></div>
 <script>
 'use strict';
@@ -12,6 +12,14 @@ const DB='https://ljtreg-39954-default-rtdb.asia-southeast1.firebasedatabase.app
 const eid=new URLSearchParams(location.search).get('event')||'';
 const $=s=>document.getElementById(s),safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let meta=null,busy=false;
+// A *local-browser* soft cap: different browsers, private sessions or cleared storage can bypass it.
+// Keep request IDs so replays of the same successful submission never consume two slots.
+const LOCAL_LIMIT=2;
+function localSignups(){try{const x=JSON.parse(localStorage.getItem('reg-v8-local-signups-'+eid)||'[]');return Array.isArray(x)?x.filter(v=>/^[0-9a-f]{48}$/.test(v)).slice(0,LOCAL_LIMIT):[]}catch{return []}}
+function saveLocalSignup(id){try{const a=localSignups();if(!a.includes(id)){a.push(id);localStorage.setItem('reg-v8-local-signups-'+eid,JSON.stringify(a))}}catch{}}
+function localSlotsLeft(){return Math.max(0,LOCAL_LIMIT-localSignups().length)}
+function updateLocalHint(){const el=$('localHint');if(el)el.textContent='本瀏覽器每場最多成功報名 '+LOCAL_LIMIT+' 次；目前剩餘 '+localSlotsLeft()+' 次（更換瀏覽器／清除資料可能重設）。'}
+
 function msg(t,bad=false){$('notice').className='status '+(bad?'err':'ok');$('notice').textContent=t}
 async function load(){if(!/^[0-9a-f]{24}$/.test(eid)){msg('報名連結不正確',true);return}try{const res=await fetch(DB+'/eventsV8/'+eid+'/meta.json',{cache:'no-store'});if(!res.ok)throw Error('讀取失敗（HTTP '+res.status+'）');const m=await res.json();if(!m||m.deleted)throw Error('找不到比賽或活動已刪除');meta=m;$('title').textContent=m.title;document.title=m.title+'｜選手報名';$('entryCard').classList.toggle('hide',!m.open);msg(m.open?'報名開放中':'主辦尚未開放報名',!m.open)}catch(e){$('entryCard').classList.add('hide');msg(e.message||'無法確認比賽資料',true)}}
 function rid(){return Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('')}
@@ -21,9 +29,14 @@ async function finalRank(no){try{const r=await fetch(DB+'/publicRowsV8/'+eid+'.j
 $('signup').addEventListener('submit',async ev=>{
  ev.preventDefault();if(busy)return;const data={eid,playerName:$('playerName').value.trim(),phone3:$('phone3').value.trim(),lineName:$('lineName').value.trim()};
  if(!data.playerName||!/^\d{3}$/.test(data.phone3)||!data.lineName){msg('請完整填寫三個欄位',true);return}
+ if(localSlotsLeft()<=0){msg('本瀏覽器這場比賽已成功報名 2 次，無法再送出。若需更改資料請聯絡主辦。',true);return}
  busy=true;$('submit').disabled=true;$('submit').textContent='等待雲端確認…';
- try{const requestId=await idempotency(data),ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),20000);let r;try{r=await fetch(FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:{...data,rid:requestId}}),signal:ctl.signal})}finally{clearTimeout(tm)}const body=await r.json();if(!r.ok||body.error||!body.result?.signupNo)throw Error(body.error?.message||'報名未完成');const found=await finalRank(body.result.signupNo);$('rank').textContent=found||body.result.rankLabel||'報名成功，請查看公開表格';$('details').innerHTML=`<div>📅 日期：${safe(meta.eventDate)}</div><div>🕘 報到：${safe(meta.checkinTime)}</div><div>🚀 開賽：${safe(meta.startTime)}</div><div>📍 地點：${safe(meta.venue)}</div><div>💰 報名費：${safe(meta.fee)} 元</div>`;$('modal').classList.remove('hide');$('signup').reset();try{sessionStorage.removeItem('reg-v8-request-'+eid)}catch{}msg('雲端已確認報名成功');
+ try{const requestId=await idempotency(data),ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),20000);let r;try{r=await fetch(FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:{...data,rid:requestId}}),signal:ctl.signal})}finally{clearTimeout(tm)}const body=await r.json();if(!r.ok||body.error||!body.result?.signupNo)throw Error(body.error?.message||'報名未完成');saveLocalSignup(requestId);updateLocalHint();
+ // Display server-confirmed success immediately. Final rank can change following review.
+ const no=body.result.signupNo;
+ $('rank').textContent='原始順位 #'+no+' · 正備選確認中';
+ finalRank(no).then(found=>{if(found&&$('modal').classList.contains('hide')===false)$('rank').textContent=found}).catch(()=>{});$('details').innerHTML=`<div>📅 日期：${safe(meta.eventDate)}</div><div>🕘 報到：${safe(meta.checkinTime)}</div><div>🚀 開賽：${safe(meta.startTime)}</div><div>📍 地點：${safe(meta.venue)}</div><div>💰 報名費：${safe(meta.fee)} 元</div>`;$('modal').classList.remove('hide');$('signup').reset();try{sessionStorage.removeItem('reg-v8-request-'+eid)}catch{}msg('雲端已確認報名成功');
  }catch(e){msg((e.message||'目前無法確認報名')+'。如網路中斷，請保留原資料後再按一次，系統會使用相同提交憑證。',true)}finally{busy=false;$('submit').disabled=false;$('submit').textContent='確認報名'}
 });
-$('close').onclick=()=>$('modal').classList.add('hide');$('statusLink').href='status.html?event='+encodeURIComponent(eid);window.addEventListener('pageshow',e=>{if(e.persisted)load()});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busy)load()});load();
+$('close').onclick=()=>$('modal').classList.add('hide');updateLocalHint();$('statusLink').href='status.html?event='+encodeURIComponent(eid);window.addEventListener('pageshow',e=>{if(e.persisted)load()});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busy)load()});load();
 </script></body></html>
