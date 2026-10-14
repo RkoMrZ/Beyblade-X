@@ -413,8 +413,10 @@ function showConnectionWait(){
   finally{release()}
  };
  $('retryDb').onclick=()=>{
-  $('connDiag').textContent='正在重新建立 Firebase 即時連線…';
-  try{db.goOffline();db.goOnline();}catch(e){$('connDiag').textContent='重連失敗：'+message(e)}
+  // 不強制 goOffline()/goOnline()，以免在 iOS Safari 造成連線狀態反覆震盪。
+  const note=$('connDiag');
+  note.textContent='已要求恢復連線，Firebase 將自動重新嘗試；不會重新整理網頁。';
+  try{db.goOnline()}catch(e){note.textContent='連線檢查失敗：'+message(e)}
  };
 }
 function showLogin(){html('主辦管理後台','這裡專供主辦建立及審核比賽。選手使用主辦分享的個別報名連結。',`<div class="card w500"><h2>主辦 Google 登入</h2><p class="sub">不同主辦的資料互相隔離；不需要手動設定管理員 UID。</p><button id="google">使用 Google 登入</button></div>`);$('google').onclick=async()=>{try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());goto()}catch(e){escapeError(e)}}}
@@ -487,15 +489,36 @@ $('themeBtn').onclick=switchTheme;theme();
 $('homeBtn').onclick=()=>goto({admin:1});$('brand').onclick=()=>goto({admin:1});
 $('loginBtn').onclick=()=>goto({admin:1});$('logoutBtn').onclick=async()=>{await auth.signOut();goto({admin:1})};
 window.addEventListener('popstate',render);
-// Firebase 連線與身分驗證。僅伺服器確認後才操作。
+// iPhone / Safari：網路狀態會短暫在 true/false 間震盪，
+// 狀態變動只更新提示，不清空整個畫面、不重建監聽、不覆蓋輸入表單。
+// 使用者的寫入權限仍由 call() -> guard() 檢查，離線不能送出審核。
+let connectionStableTimer=null;
 {
  db.ref('.info/connected').on('value',snap=>{
-  const now=!!snap.val(),was=connected;connected=now;connectedKnown=true;if(now)everConnected=true;connectionUI();
-  if(!now){clearSubscriptions();if(ready)render()}else if(!was&&ready)render();
+  const now=!!snap.val();
+  if(connectedKnown&&now===connected)return; // 重複的相同狀態不觸發畫面重建
+  connected=now;connectedKnown=true;if(now)everConnected=true;
+  connectionUI();
+  clearTimeout(connectionStableTimer);
+  if(now){
+   // 確定穩定連線後，才將「等待連線」頁面切回管理頁。
+   // 若是已經打開的管理畫面，SDK 監聽會自行補上最新雲端資料。
+   connectionStableTimer=setTimeout(()=>{
+    if(!connected||!ready)return;
+    if($('connDiag')||$('app')?.querySelector('.loading'))render();
+   },1800);
+  }
+  // false 時不呼叫 render()；保留原畫面及使用者正在編輯的表單。
  });
- auth.onAuthStateChanged(u=>{account=u;ready=true;render()});
+ auth.onAuthStateChanged(u=>{
+  const oldUid=account?.uid||null,newUid=u?.uid||null,first=!ready;
+  account=u;ready=true;
+  if(first||oldUid!==newUid)render();
+ });
 }
-window.addEventListener('online',()=>{if(ready&&connected)render()});
-window.addEventListener('pageshow',ev=>{if(ready&&connected&&ev.persisted)render()});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ready&&connected)render()});
+// 從背景回前景、網路恢復時，Firebase SDK 本身會處理重新連線；
+// 不再主動 render()，避免 iOS 切回 Safari 時整頁反覆重畫。
+window.addEventListener('online',()=>{connectionUI()});
+window.addEventListener('pageshow',()=>{connectionUI()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')connectionUI()});
 </script></body></html>
