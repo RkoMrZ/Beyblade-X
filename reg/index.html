@@ -331,7 +331,14 @@ function statusPill(s){return `<span class="pill ${s==='approved'?'ok':s==='reje
 function date(t){return t?new Date(t).toLocaleString('zh-TW',{hour12:false}):'—'}
 function eventSummary(e){return `<div class="eventDetails"><div>📅 比賽日期：${E(e.eventDate)}</div><div>🕘 報到：${E(e.checkinTime)}　開賽：${E(e.startTime)}</div><div>📍 比賽地點：${E(e.venue)}</div><div>💰 報名費：${E(e.fee)} 元</div><div>👥 正選 ${E(e.capacity)} 人／備選無限制</div></div>`}
 function clearSubscriptions(){stopListeners.forEach(x=>{try{x()}catch{}});stopListeners=[];version++;}
-function connectionUI(){const e=$('netInfo');e.className=connected?'netGood':'netBad';e.textContent=!connectedKnown?'正在確認 Firebase 連線…':connected?'雲端已連線':'已離線：禁止送出或審核，等待雲端恢復';}
+let everConnected=false, connectionStartedAt=Date.now();
+function connectionUI(){
+ const e=$('netInfo');if(!e)return;
+ e.className=connected?'netGood':'netBad';
+ e.textContent=connected?'雲端即時連線已建立':!connectedKnown||(!everConnected&&Date.now()-connectionStartedAt<12000)?'正在建立 Firebase 即時連線…':everConnected?'連線已中斷：雲端修改暫停，等待恢復':'Firebase 即時連線未建立：雲端修改已安全鎖定';
+}
+// .info/connected 的首次 false 只是「尚未連線」，不能直接等同正式故障。
+setTimeout(()=>{if(!connected)connectionUI()},12500);
 function guard(){if(!connected){showToast('尚未連上 Firebase，已禁止修改雲端資料。請等待重新連線。',true);return false}return true}
 // 首次取得資料需通過 REST 雲端讀取；監聽只能在伺服器確認後展示。
 async function restFresh(path){
@@ -382,13 +389,33 @@ function rankText(no,ledger,capacity,status){if(status==='rejected')return '未�
 function render(){
  const publicPage=q().has('event');document.body.classList.toggle('publicMode',publicPage);document.title='戰鬥陀螺・線上報名';
  clearSubscriptions();updateAuthButtons();if(!ready){loading('正在驗證使用者身分…');return}
- if(!connected){loading('Firebase 雲端連線尚未確認，請稍候…');return}
- const u=q(),eid=u.get('event'),rid=u.get('ticket'),mid=u.get('manage');
+ const u=q(),eid=u.get('event'),mid=u.get('manage');
  if(eid){location.replace(new URL('signup.html?event='+encodeURIComponent(eid),location.href).href);return}
+ // Google 登入是 Firebase Auth，不應被 RTDB 連線旗標擋住。
  if(!isGoogle()){showLogin();return}
+ if(!connected){showConnectionWait();return}
  if(u.has('new')){showCreate();return}
  if(mid){if(u.has('edit'))showEdit(mid);else showManager(mid);return}
  showDashboard();
+}
+function showConnectionWait(){
+ html('等待雲端即時連線','已識別主辦帳號，但 Firebase Realtime Database 尚未建立即時連線。為避免手機舊資料回寫，所有修改仍保持鎖定。',`<div class="card w500"><p class="sub" id="connDiag">你可以先測試資料庫的 HTTPS 讀取是否正常，再重新建立即時連線。</p><div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="secondary small" id="testDb">測試資料庫連線</button><button type="button" class="secondary small" id="retryDb">重新建立即時連線</button></div><p class="tiny muted" style="margin-top:12px">這兩個動作都不會寫入、刪除或覆蓋任何比賽資料。</p></div>`);
+ $('testDb').onclick=async()=>{
+  const b=$('testDb'),release=setBusy(b,'測試中…'),note=$('connDiag');
+  try{
+   // 探測不存在的單場公開節點，避免下載個資，也不依賴登入。
+   const path=CONFIG.databaseURL+'/eventStates/000000000000000000000000/public.json';
+   const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),12000);
+   let res;try{res=await fetch(path,{cache:'no-store',signal:ctl.signal})}finally{clearTimeout(timer)}
+   if(res.ok)note.textContent='資料庫 HTTPS 讀取成功（HTTP '+res.status+'）。即時通道尚未建立，請按「重新建立即時連線」。';
+   else note.textContent='資料庫 HTTP '+res.status+'：'+(res.status===401||res.status===403?'可能是 Rules 讀取權限問題。':'請檢查資料庫網址或伺服器狀態。');
+  }catch(e){note.textContent='資料庫 HTTPS 連線失敗：'+(e?.name==='AbortError'?'12 秒逾時，請稍後再試。':String(e?.message||e));}
+  finally{release()}
+ };
+ $('retryDb').onclick=()=>{
+  $('connDiag').textContent='正在重新建立 Firebase 即時連線…';
+  try{db.goOffline();db.goOnline();}catch(e){$('connDiag').textContent='重連失敗：'+message(e)}
+ };
 }
 function showLogin(){html('主辦管理後台','這裡專供主辦建立及審核比賽。選手使用主辦分享的個別報名連結。',`<div class="card w500"><h2>主辦 Google 登入</h2><p class="sub">不同主辦的資料互相隔離；不需要手動設定管理員 UID。</p><button id="google">使用 Google 登入</button></div>`);$('google').onclick=async()=>{try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());goto()}catch(e){escapeError(e)}}}
 function showDashboard(){html('我的比賽','比賽列表由雲端索引讀取；比賽名稱與資料每次都向雲端確認。',`<div class="dashboardToolbar"><div class="dashboardGuide"><span class="pill">主辦後台</span><span class="muted tiny">選擇自己的比賽進入管理，或建立新的報名活動。</span></div><button id="add">＋ 建立新比賽</button></div><div id="list" class="grid dashboardGrid"><div class="loading">正在取得最新雲端活動…</div></div>`);$('add').onclick=()=>goto({admin:1,new:1});let listSerial=0;
@@ -463,7 +490,7 @@ window.addEventListener('popstate',render);
 // Firebase 連線與身分驗證。僅伺服器確認後才操作。
 {
  db.ref('.info/connected').on('value',snap=>{
-  const now=!!snap.val(),was=connected;connected=now;connectedKnown=true;connectionUI();
+  const now=!!snap.val(),was=connected;connected=now;connectedKnown=true;if(now)everConnected=true;connectionUI();
   if(!now){clearSubscriptions();if(ready)render()}else if(!was&&ready)render();
  });
  auth.onAuthStateChanged(u=>{account=u;ready=true;render()});
