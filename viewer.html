@@ -1,11 +1,8 @@
 <!doctype html>
-<html lang="zh-Hant">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12">
-<title>Beyblade X 即時查看</title>
-<!-- RELEASE BUILD: 2026-10-13 PUBLIC VIEWER -->
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12"><title>Beyblade X 即時賽程・V0.1</title>
+<!-- V0.1: read-only lazy-loaded viewer on production URL; uses V01 nodes -->
 <style>
 :root{--bg:#0b0d12;--panel:#151922;--panel2:#101620;--line:#303849;--text:#f7f8fa;--muted:#98a2b3;--accent:#ff5a3c;--green:#2dcf7d}
 *{box-sizing:border-box}
@@ -43,331 +40,710 @@ main{padding:10px}
 .finalPlacings{margin-top:10px;width:100%;max-width:none}.finalPlacings .rrRankRow{grid-template-columns:30px minmax(80px,1fr) minmax(90px,1fr);font-size:13px}.finalPlacings .rrRankRow span:last-child{text-align:right}
 body.fullscreen{overflow:hidden}body.fullscreen header{display:none}body.fullscreen .bracketShell{position:fixed;inset:0;z-index:40;border:0;border-radius:0}body.fullscreen .bracketScroll{height:calc(100dvh - 50px);min-height:0;padding-bottom:60px}
 @media(min-width:641px){main{padding:16px}.roundCol{width:204px;flex-basis:204px}.bracketCanvas{gap:48px}.rrPanel{width:236px;flex-basis:236px}}
-</style>
-</head>
+
+
+/* V0.1 lazy-per-round public viewer; mobile-first across iOS/Android/desktop */
+.loadRoundButton{display:block;width:100%;margin-top:10px;background:#25324a;font-size:12px;padding:6px;color:#cde2ff}
+.matchPlaceholder{border-style:dashed;opacity:.60}.placeholderText{font-size:11px;color:var(--muted);text-align:center;margin:20px 0}
+.rrPanel[data-rr]{font-size:13px;align-self:flex-start}.roundCol button.hidden{display:none!important}
+.demoActions{padding:9px 0;display:flex;flex-wrap:wrap;gap:7px}
+.demoActions button{background:#3b2d17;border-color:#8f682d;font-size:12px}
+.bracketTools{gap:6px}.loadAllBtn{padding:7px 9px;font-size:11px;white-space:nowrap}
+@media(max-width:400px){.loadAllBtn{padding:7px 5px;font-size:10px}}
+</style></head>
 <body>
-<header>
-  <div class="wrap brand">
-    <div class="brandTitle"><b>⚔️ Beyblade X Tournament</b><small id="pageSub">公開即時查看</small></div>
-    <button type="button" onclick="goBack()">返回</button>
-  </div>
-</header>
-
+<header><div class="wrap brand"><div class="brandTitle"><b>⚔️ Beyblade X Tournament</b>
+<small id="pageSub">公開賽程・輕量化同步測試</small></div>
+<button type="button" onclick="goBack()">返回</button></div></header>
 <main class="wrap">
-  <div id="status" class="status">正在連線即時資料…</div>
-
-  <section id="eventView" class="hidden">
-    <div id="hero" class="hero"></div>
-    <div class="bracketShell">
-      <div class="bracketTools">
-        <div class="zoomGroup">
-          <button type="button" onclick="zoom(-.1)">−</button>
-          <span class="zoomLabel">100%</span>
-          <button type="button" onclick="zoom(.1)">＋</button>
-          <button type="button" onclick="fit()">全覽</button>
-        </div>
-        <button class="viewToggle" type="button" onclick="toggleFull()">⛶</button>
-      </div>
-      <div class="bracketScroll"><div class="bracketStage"><div class="bracketCanvas"><svg class="bracketLinks"></svg><div id="bracketCols" style="display:contents"></div></div></div></div>
-    </div>
-    <div id="finalBox"></div>
-  </section>
-</main>
-
-<script>
-const DB='https://ljt-beyblade-x-default-rtdb.asia-southeast1.firebasedatabase.app';
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const params=new URLSearchParams(location.search);
-const eventId=params.get('event')||'';
-let data=null, stream=null, renderTimer=null, scale=1, gotFirst=false, failureCheckBusy=false;
-let streamKind='',streamId='',streamGeneration=0,streamOpenedOnce=false;
-let reconnectResyncTimer=null,resyncPromise=null,lastResyncAt=0;
-let reconnectCount=0,lastStreamOpenAt=0;
-let receivedEventSerial=0;
-
-function goBack(){
-  try{stream?.close()}catch{}
-  stream=null;
-  streamGeneration++;
-  clearTimeout(reconnectResyncTimer);
-
-  // viewer 是純觀看頁，返回一律完整載入管理首頁，
-  // 不依賴 iOS Safari 的 bfcache。
-  location.replace('index.html');
-}
-function setStatus(text,kind=''){
-  const el=$('status'); el.textContent=text; el.className='status'+(kind?' '+kind:'');
-}
-function pathParts(path){return String(path||'/').split('/').filter(Boolean)}
-function setAtPath(root,path,value){
-  const parts=pathParts(path);
-  if(!parts.length)return value;
-  if(root==null||typeof root!=='object')root={};
-  let cur=root;
-  for(let i=0;i<parts.length-1;i++){
-    const k=parts[i];
-    if(cur[k]==null||typeof cur[k]!=='object')cur[k]={};
-    cur=cur[k];
+<div id="status" class="status" aria-live="polite">準備檢查公開賽程版本…</div>
+<div id="demoControls" class="demoActions hidden">
+<button type="button" id="demoAdvance">模擬場次加分</button>
+<button type="button" id="demoSkip">模擬背景漏掉 5 次更新</button>
+</div>
+<section id="eventView" class="hidden"><div id="hero" class="hero"></div>
+<div class="bracketShell"><div class="bracketTools">
+<div class="zoomGroup"><button type="button" onclick="zoom(-.1)">−</button>
+<span class="zoomLabel">100%</span><button type="button" onclick="zoom(.1)">＋</button>
+<button type="button" onclick="fit()">全覽</button></div>
+<button type="button" id="loadAll" class="loadAllBtn">載入全部輪次</button>
+<button class="viewToggle" type="button" onclick="toggleFull()">⛶</button>
+</div><div class="bracketScroll"><div class="bracketStage"><div class="bracketCanvas">
+<svg class="bracketLinks"></svg><div id="bracketCols" style="display:contents"></div>
+</div></div></div></div><div id="finalBox"></div></section></main>
+<script>/* Beyblade X V0.1 public incremental synchronization protocol.
+ * Browser + Node 22 compatible. No Firebase dependency.
+ * Cache is read-only and never eligible for an authoritative score write.
+ */
+(function(root, factory) {
+  "use strict";
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else root.BXSync = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function() {
+  "use strict";
+  const CACHE_SCHEMA = 2;
+  const PACK_KEYS = {a:"a",b:"b",sa:"x",sb:"y",winner:"w",matchVersion:"v",claimed:"c"};
+  const UNPACK_KEYS = Object.fromEntries(Object.entries(PACK_KEYS).map(([a,b])=>[b,a]));
+  function packChange(entry) {
+    if (!entry) return null;
+    if (entry.kind==="match")return ["m",entry.ri,entry.mi,entry.roundRevision,
+      Object.fromEntries(Object.entries(entry.patch||entry.match||{}).map(([k,v])=>[PACK_KEYS[k]||k,v]))];
+    if (entry.kind==="batch")return ["b",entry.items.map(packChange)];
+    if (entry.kind==="rr")return ["r",entry.finalRR];
+    if (entry.kind==="meta")return ["t",entry.meta];
+    if (entry.kind==="structure")return ["s"];
+    if (entry.kind==="closed")return ["c"];
+    if (entry.kind==="round")return ["R",entry.ri];
+    throw new Error("unknown public packet kind");
   }
-  const key=parts[parts.length-1];
-  if(value===null){
-    if(Array.isArray(cur) && /^\d+$/.test(key))cur[Number(key)]=null;
-    else delete cur[key];
-  }else cur[key]=value;
-  return root;
-}
-function patchAtPath(root,path,patch){
-  if(patch==null)return setAtPath(root,path,null);
-  if(typeof patch!=='object'||Array.isArray(patch))return setAtPath(root,path,patch);
-  for(const [k,v] of Object.entries(patch)){
-    const p=(path==='/'?'':path.replace(/\/$/,''))+'/'+k;
-    root=setAtPath(root,p,v);
+  function unpackChange(part) {
+    if (!Array.isArray(part)) throw new Error("invalid compact public delta");
+    const kind=part[0];
+    if (kind==="m")return {kind:"match",ri:part[1],mi:part[2],roundRevision:part[3],
+      patch:Object.fromEntries(Object.entries(part[4]||{}).map(([k,v])=>[UNPACK_KEYS[k]||k,v]))};
+    if (kind==="b")return {kind:"batch",items:(part[1]||[]).map(unpackChange)};
+    if (kind==="r")return {kind:"rr",finalRR:part[1]};
+    if (kind==="t")return {kind:"meta",meta:part[1]};
+    if (kind==="s")return {kind:"structure"};
+    if (kind==="c")return {kind:"closed"};
+    if (kind==="R")return {kind:"round",ri:part[1]};
+    throw new Error("invalid compact public delta kind");
   }
-  return root;
-}
-function applyServerEvent(type,payload){
-  receivedEventSerial++;
-  if(!payload||typeof payload.path!=='string')return;
-  if(type==='put')data=setAtPath(data,payload.path,payload.data);
-  else data=patchAtPath(data,payload.path,payload.data);
-  gotFirst=true;
-  scheduleRender();
-}
-function scheduleRender(){
-  if(renderTimer)return;
-  renderTimer=setTimeout(()=>{renderTimer=null;render()},90);
-}
-function streamUrl(kind,id){
-  return `${DB}/${kind}/${encodeURIComponent(id)}.json`;
-}
+  function expandMarker(raw) {
+    if (!raw || typeof raw!=="object")return raw;
+    if (!Object.prototype.hasOwnProperty.call(raw,"d")) return raw; // Stage2 wire compatible.
+    return {seq:raw.seq,structureVersion:raw.sv,publicOpen:raw.o!==0,
+      last:raw.d ? {seq:raw.seq,...unpackChange(raw.d)} : null};
+  }
 
-function publicReadErrorText(){
-  return '公開連結已關閉或過期。';
-}
-
-async function fetchFreshSnapshot(kind,id,{quiet=false}={}){
-  const generation=streamGeneration;
-  const requestSerial=receivedEventSerial;
-
-  try{
-    const r=await fetch(streamUrl(kind,id),{
-      cache:'no-store',
-      headers:{'Accept':'application/json'}
+  const MAX_CHANGE_PAGE = 96;
+  const MAX_CACHE_AGE_MS = 12 * 60 * 60 * 1000;
+  function seqKey(n) {
+    if (!Number.isSafeInteger(n) || n < 0) throw new Error("invalid sequence");
+    return String(n).padStart(12, "0");
+  }
+  function isValidId(id) { return /^[A-Za-z0-9_-]{6,100}$/.test(id || ""); }
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+  function newCache(id) {
+    return {schema: CACHE_SCHEMA, eventId: id, seq: 0, meta: null,
+      rounds: {}, finalRR: null, updatedAt: 0};
+  }
+  function usableCache(c, id, now) {
+    return Boolean(c && c.schema === CACHE_SCHEMA && c.eventId === id &&
+      Number.isSafeInteger(c.seq) && c.seq >= 0 &&
+      Number.isFinite(c.updatedAt) && c.updatedAt > 0 &&
+      now - c.updatedAt >= 0 && now - c.updatedAt < MAX_CACHE_AGE_MS &&
+      c.meta && c.meta.publicOpen === true && Number(c.meta.publicUntil) > now &&
+      c.rounds && typeof c.rounds === "object");
+  }
+  function normalizeRound(raw) {
+    if (!raw || typeof raw !== "object" || !Number.isSafeInteger(raw.revision) || raw.revision < 0) {
+      throw new Error("invalid round snapshot");
+    }
+    const matches = raw.matches && typeof raw.matches === "object" ? raw.matches : {};
+    return {revision: raw.revision, matches: clone(matches)};
+  }
+  function applyOne(cache, entry) {
+    if (entry.kind === "match") {
+      if (!Number.isInteger(entry.ri) || entry.ri < 0 ||
+          !Number.isInteger(entry.mi) || entry.mi < 0 ||
+          !Number.isInteger(entry.roundRevision) || entry.roundRevision < 1 ||
+          (!entry.patch || typeof entry.patch !== "object") &&
+          (!entry.match || typeof entry.match !== "object")) {
+        throw new Error("invalid match delta");
+      }
+      const r = cache.rounds[entry.ri];
+      if (r) {
+        // A cached round may be missing an earlier update; never apply a later
+        // per-round revision on top of it. It will lazy-refetch when visible.
+        if (entry.roundRevision !== r.revision + 1) delete cache.rounds[entry.ri];
+        else {
+          r.matches[String(entry.mi)] = entry.patch ?
+            {...r.matches[String(entry.mi)], ...clone(entry.patch)} : clone(entry.match);
+          r.revision = entry.roundRevision;
+        }
+      }
+    } else if (entry.kind === "round") {
+      if (!Number.isInteger(entry.ri) || entry.ri < 0) throw new Error("invalid round delta");
+      // May encode many dependent advances; reload just this round on demand.
+      delete cache.rounds[entry.ri];
+    } else if (entry.kind === "rr") {
+      // RR delta is compact. A full RR object is small (3 matches).
+      if (!entry.finalRR || typeof entry.finalRR !== "object") throw new Error("invalid RR delta");
+      cache.finalRR = clone(entry.finalRR);
+    } else if (entry.kind === "meta") {
+      if (!entry.meta || typeof entry.meta !== "object") throw new Error("invalid metadata delta");
+      cache.meta = {...cache.meta, ...clone(entry.meta)};
+    } else if (entry.kind === "structure") {
+      // Structure has changed; old round layout and names are not trustworthy.
+      cache.meta = null;
+      cache.rounds = {};
+      cache.finalRR = null;
+    } else if (entry.kind === "closed") {
+      cache.meta = {...cache.meta, publicOpen: false};
+      cache.rounds = {};
+      cache.finalRR = null;
+    } else {
+      throw new Error("unknown delta kind");
+    }
+  }
+  function applyChange(cache, entry) {
+    if (!entry || !Number.isSafeInteger(entry.seq) || entry.seq !== cache.seq + 1) {
+      throw new Error("non-contiguous change sequence");
+    }
+    const actions = entry.kind === "batch" ? entry.items : [{...entry, seq: undefined}];
+    if (!Array.isArray(actions) || actions.length < 1 || actions.length > 16) {
+      throw new Error("invalid batch");
+    }
+    for (const action of actions) {
+      if (!action || action.kind === "batch" || action.seq !== undefined) throw new Error("invalid batch member");
+      applyOne(cache, action);
+    }
+    cache.seq = entry.seq;
+  }
+  function replay(cache, entries, targetSeq) {
+    if (!Array.isArray(entries) || !Number.isSafeInteger(targetSeq) || targetSeq < cache.seq) {
+      throw new Error("invalid replay parameters");
+    }
+    const next = clone(cache);
+    // Safe if the server returns an empty log only when already current.
+    for (const entry of entries) {
+      if (entry.seq <= next.seq) continue;
+      if (entry.seq > targetSeq) break;
+      applyChange(next, entry);
+    }
+    if (next.seq !== targetSeq) throw new Error("change history gap or truncated log");
+    return next;
+  }
+  function parseHistory(raw) {
+    if (!raw || typeof raw !== "object") return [];
+    return Object.entries(raw).sort(([a],[b]) => a.localeCompare(b)).map(([key,e]) => {
+      if (seqKey(e && e.seq) !== key) throw new Error("invalid history key");
+      return e;
     });
+  }
+  function shouldReplaceRound(incoming, existing) {
+    return !existing || incoming.revision >= existing.revision;
+  }
+  function publicMatch(m) {
+    if (!m) return null;
+    // Whitelist only harmless public fields; never publish lock, auth or secrets.
+    return {a: String(m.a == null ? "待定" : m.a), b: String(m.b == null ? "待定" : m.b),
+      sa: m.sa == null ? "" : m.sa, sb: m.sb == null ? "" : m.sb,
+      winner: m.winner == null ? null : String(m.winner)};
+  }
+  return {CACHE_SCHEMA, MAX_CHANGE_PAGE, MAX_CACHE_AGE_MS, seqKey, isValidId,
+    newCache, usableCache, normalizeRound, applyChange, replay,
+    parseHistory, shouldReplaceRound, publicMatch, clone, packChange, expandMarker};
+});
 
-    if(generation!==streamGeneration)return false;
+"use strict";
+/* Read-only V0.1 viewer. Requires BXSync in same HTML before this script.
+ * No score writes, no callable function calls, no private reads.
+ */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+  ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[c]);
+const params = new URLSearchParams(location.search);
+const isDemo = params.has("demo");
+const eventId = isDemo ? "vnext-demo-24" : (params.get("event") || "");
+// V0.1 viewer uses production Firebase and V01 public paths; no direct writes.
+const DB = "https://ljt-beyblade-x-default-rtdb.asia-southeast1.firebasedatabase.app";
+const basePath = `eventsV01/${encodeURIComponent(eventId)}/public`;
+const CACHE_KEY = `bx-v01-public-cache-${eventId}`;
+const MAX_RETRIES = 2;
+let state = BXSync.newCache(eventId);
+let data = null;
+let scale = 1;
+let stream = null;
+let generation = 0;
+let streamOpen = false;
+let highestSeen = null;
+let reconcileRunning = false;
+let currentSyncRequest = null;
+let resumeTimer = null;
+let lastResumeAt = 0;
+let lastTinyCheckAt = 0;
+let persistTimer = null;
+let roundObserver = null;
+let roundLoading = new Map();
+let roundTargets = new Map();
+let rrLoading = false;
+let frameVersion = "";
+let demoData = null;
+let demoTimers = [];
+let browserReady = false;
+let initialMarkerTimer = null;
+let initialMarkerReceived = false;
+let lastSseFrameAt = 0;
+const HEALTHY_STALL_CHECK_MS = 20*60*1000 + Math.random()*5*60*1000;
+let userExploredRounds = false;
+let lazyScrollBound = false;
 
-    if(r.status===401||r.status===403){
-      setStatus(publicReadErrorText(),'error');
-      try{stream?.close()}catch{}
-      return false;
+function setStatus(message, kind = "") {
+  const el = $("status");
+  el.textContent = message;
+  el.className = "status" + (kind ? " " + kind : "");
+}
+function loadCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    if (BXSync.usableCache(c, eventId, Date.now())) {
+      state = c;
+      setStatus("先顯示本機公開賽程快取，正在核對雲端版本…");
+      renderFrame();
+    } else {
+      localStorage.removeItem(CACHE_KEY);
     }
-
-    if(!r.ok){
-      if(!quiet)setStatus('目前無法重新同步資料，正在保留即時連線…');
-      return false;
-    }
-
-    const fresh=await r.json();
-    if(generation!==streamGeneration)return false;
-    // 若 GET 期間已收到更新的 SSE 事件，不能用較早快照蓋掉它。
-    if(receivedEventSerial!==requestSerial)return false;
-
-    if(!fresh){
-      setStatus('找不到資料。','error');
-      return false;
-    }
-
-    // SSE 斷線後，以 Firebase 最新完整快照校正本機狀態。
-    // 快照寫入後，後續 SSE patch 會繼續套用在這份最新資料上。
-    data=fresh;
-    gotFirst=true;
-    lastResyncAt=Date.now();
-    scheduleRender();
-    setStatus('已重新同步・即時連線中','ok');
-    return true;
-  }catch(e){
-    if(generation!==streamGeneration)return false;
-    if(!quiet)setStatus('重新同步暫時失敗，正在等待連線恢復…');
+  } catch (e) { /* Safari private mode and localStorage disabled */ }
+}
+function persistCache() {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    if (!state.meta || !state.meta.publicOpen) return;
+    try {
+      state.updatedAt = Date.now();
+      localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+    } catch (e) { /* cache is optional */ }
+  }, 200);
+}
+function discardCache() {
+  try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+}
+function syncData() {
+  if (!state.meta) { data = null; return; }
+  data = {meta: state.meta,
+    rounds: (state.meta.rounds || []).map((d, ri) => ({...d,
+      matches: state.rounds[ri] ? state.rounds[ri].matches : {}})),
+    finalRR: state.finalRR};
+}
+function urlFor(path, query) {
+  const u = new URL(`${DB}/${basePath}/${path}.json`);
+  if (query) for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v);
+  return u.toString();
+}
+async function getJson(path, query) {
+  if (isDemo) return demoGet(path, query);
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const r = await fetch(urlFor(path, query), {cache: "no-store", signal: ctrl.signal});
+    if (r.status === 401 || r.status === 403) throw new Error("公開連結已關閉、過期或無權限");
+    if (!r.ok) throw new Error(`Firebase HTTPS ${r.status}`);
+    return await r.json();
+  } finally { clearTimeout(timeout); }
+}
+function validateMeta(meta) {
+  return Boolean(meta && meta.id === eventId && meta.appVersion === 'V0.1' &&
+    Array.isArray(meta.rounds) && meta.rounds.length <= 16 &&
+    meta.rounds.every((r) => Number.isInteger(r.matchCount) && r.matchCount >= 0 && r.matchCount <= 128) &&
+    Number(meta.publicUntil) > Date.now() && meta.publicOpen === true);
+}
+function isClosed(meta) {
+  return Boolean(meta && (meta.publicOpen === false || Number(meta.publicUntil) <= Date.now()));
+}
+function closePublic(reason) {
+  state.meta = null;
+  state.rounds = {};
+  state.finalRR = null;
+  discardCache();
+  stopStream();
+  $("eventView").classList.add("hidden");
+  setStatus(reason || "此賽事公開連結已關閉或過期。", "error");
+}
+async function ensureMeta(force = false) {
+  if (!force && validateMeta(state.meta)) return true;
+  const latest = await getJson("meta");
+  if (!validateMeta(latest)) {
+    if (isClosed(latest)) closePublic("賽事公開已結束。");
+    else closePublic("無法取得有效的公開賽事資料。");
     return false;
   }
-}
-
-function scheduleReconnectResync(kind,id,reason='reconnect'){
-  clearTimeout(reconnectResyncTimer);
-
-  // 多台手機同時恢復連線時加入少量 jitter，
-  // 避免 200+ viewer 在同一毫秒全部 GET Firebase。
-  const jitter=250+Math.floor(Math.random()*1250);
-
-  reconnectResyncTimer=setTimeout(()=>{
-    reconnectResyncTimer=null;
-
-    if(resyncPromise)return;
-
-    resyncPromise=fetchFreshSnapshot(kind,id,{quiet:false})
-      .finally(()=>{resyncPromise=null});
-  },jitter);
-}
-
-function hardReconnect(reason='manual'){
-  if(!streamKind||!streamId)return;
-
-  const kind=streamKind,id=streamId;
-  try{stream?.close()}catch{}
-  stream=null;
-
-  setStatus('正在重新建立即時連線…');
-  startStream(kind,id,{isRestart:true,reason});
-}
-
-function startStream(kind,id,{isRestart=false,reason='initial'}={}){
-  streamKind=kind;
-  streamId=id;
-  streamGeneration++;
-  const generation=streamGeneration;
-
-  clearTimeout(reconnectResyncTimer);
-  try{stream?.close()}catch{}
-  stream=null;
-
-  if(!isRestart){
-    gotFirst=false;
-    streamOpenedOnce=false;
-    reconnectCount=0;
-    setStatus('正在連線即時資料…');
+  if (state.meta && state.meta.structureVersion !== latest.structureVersion) {
+    state.rounds = {};
+    state.finalRR = null;
   }
-
-  const es=new EventSource(streamUrl(kind,id));
-  stream=es;
-
-  es.addEventListener('open',()=>{
-    if(generation!==streamGeneration || stream!==es)return;
-
-    lastStreamOpenAt=Date.now();
-
-    if(streamOpenedOnce || isRestart){
-      reconnectCount++;
-      setStatus('連線已恢復，正在校正最新資料…');
-      scheduleReconnectResync(kind,id,'sse-open');
-    }else{
-      streamOpenedOnce=true;
-      setStatus('即時連線已建立，正在載入資料…');
+  state.meta = latest;
+  renderFrame();
+  persistCache();
+  return true;
+}
+function roundIsVisible(ri) {
+  const el = document.querySelector(`.roundCol[data-round="${ri}"]`);
+  if (!el) return false;
+  const scroll = document.querySelector(".bracketScroll");
+  if (!scroll) return false;
+  const a = el.getBoundingClientRect(), b = scroll.getBoundingClientRect();
+  return a.right > b.left - 240 && a.left < b.right + 240;
+}
+async function loadRound(ri, force = false) {
+  if (!state.meta || !state.meta.rounds[ri]) return;
+  if (!force && state.rounds[ri]) return;
+  if (roundLoading.has(ri)) return roundLoading.get(ri);
+  const run = (async () => {
+    try {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const fresh = BXSync.normalizeRound(await getJson(`rounds/${ri}`));
+        const known = roundTargets.get(ri) || 0;
+        if (fresh.revision < known) continue; // Never overwrite a newer SSE delta.
+        if (BXSync.shouldReplaceRound(fresh, state.rounds[ri])) state.rounds[ri] = fresh;
+        if (fresh.revision >= known) roundTargets.delete(ri);
+        syncData();
+        renderRound(ri);
+        persistCache();
+        return;
+      }
+      throw new Error("場次快照版本落後即時更新");
+    } catch (e) {
+      setStatus(`第 ${ri + 1} 輪暫時無法同步：${e.message}，可點該輪重試。`, "error");
+      renderRound(ri, true);
     }
-  });
-
-  es.addEventListener('put',e=>{
-    if(generation!==streamGeneration || stream!==es)return;
-    try{
-      applyServerEvent('put',JSON.parse(e.data));
-      setStatus('即時同步中','ok');
-    }catch(err){
-      console.error(err);
-      scheduleReconnectResync(kind,id,'bad-put');
+  })();
+  roundLoading.set(ri, run);
+  try { await run; } finally { roundLoading.delete(ri); }
+}
+async function loadRR() {
+  if (!state.meta || !state.meta.hasFinalRR || state.finalRR || rrLoading) return;
+  rrLoading = true;
+  try {
+    const rr = await getJson("finalRR");
+    if (rr && state.meta) { state.finalRR = rr; syncData(); renderRR(); persistCache(); }
+  } catch (e) { setStatus(`循環賽資料暫時無法讀取：${e.message}`, "error"); }
+  finally { rrLoading = false; }
+}
+function observeVisibleRounds() {
+  if (roundObserver) { roundObserver.disconnect(); roundObserver = null; }
+  const scroll = document.querySelector(".bracketScroll");
+  if (!scroll) return;
+  if (typeof IntersectionObserver === "undefined") {
+    for (let i = 0; i < Math.min(2, state.meta.rounds.length); i++) loadRound(i);
+    return;
+  }
+  roundObserver = new IntersectionObserver((entries) => {
+    for (const ent of entries) {
+      if (!ent.isIntersecting) continue;
+      if (ent.target.dataset.round !== undefined) {
+        const ri = Number(ent.target.dataset.round);
+        if (ri === 0 || userExploredRounds) loadRound(ri);
+      }
+      if (ent.target.dataset.rr !== undefined && userExploredRounds) loadRR();
     }
-  });
-
-  es.addEventListener('patch',e=>{
-    if(generation!==streamGeneration || stream!==es)return;
-    try{
-      applyServerEvent('patch',JSON.parse(e.data));
-      setStatus('即時同步中','ok');
-    }catch(err){
-      console.error(err);
-      scheduleReconnectResync(kind,id,'bad-patch');
+  }, {root: scroll, rootMargin: "0px 32px 0px 32px", threshold: 0});
+  document.querySelectorAll(".roundCol[data-round], [data-rr]").forEach((el) => roundObserver.observe(el));
+  if (!lazyScrollBound) {
+    lazyScrollBound = true;
+    scroll.addEventListener("scroll", () => {
+      userExploredRounds = true;
+      state.meta?.rounds.forEach((_,ri) => { if (roundIsVisible(ri)) loadRound(ri); });
+      if (state.meta?.hasFinalRR) {
+        const rr = scroll.querySelector("[data-rr]");
+        if (rr) { const a=rr.getBoundingClientRect(),b=scroll.getBoundingClientRect();
+          if(a.left < b.right + 60 && a.right > b.left - 60) loadRR(); }
+      }
+    }, {passive: true});
+  }
+}
+function renderFrame() {
+  syncData();
+  if (!state.meta) return;
+  const meta = state.meta;
+  const mark = `${meta.id}:${meta.structureVersion}:${meta.rounds.length}`;
+  $("eventView").classList.remove("hidden");
+  $("pageSub").textContent = "雲端公開賽程・按輪次載入";
+  const count = eventCount();
+  $("hero").innerHTML = `<div class="muted">🏆 即時賽程（唯讀）</div>
+    <h1>${esc(meta.name || "Beyblade X Tournament")}</h1>
+    <div class="chips"><span class="chip">👤 ${count} 人</span>
+    <span class="chip">${meta.mode === "free" ? "自由編排" : "單淘汰"}</span>
+    <span class="chip">${esc(flowLabel())}</span></div>`;
+  if (frameVersion !== mark) {
+    frameVersion = mark;
+    const cols = meta.rounds.map((r, ri) => {
+      const l = layout(ri);
+      const placeholder = Array.from({length: r.matchCount}, (_, mi) =>
+        placeholderMatch(ri, mi)).join("");
+      return `<section class="roundCol" data-round="${ri}">
+        <div class="roundHead"><h3>${esc(stageLabel(ri, r))}</h3>
+        <div class="sub" data-round-info="${ri}">點選或捲動後載入這一輪</div></div>
+        <div class="roundMatches" style="--top:${l.top}px;--gap:${l.gap}px">${placeholder}</div>
+        <button class="loadRoundButton" type="button" data-load-round="${ri}">載入第 ${ri + 1} 輪</button>
+      </section>`;
+    }).join("") + (meta.hasFinalRR ? `<section class="rrPanel" data-rr="1">最後三人循環・移動到這裡時載入</section>` : "");
+    const canvas = document.querySelector(".bracketCanvas");
+    canvas.classList.toggle("compact32", count >= 32 && count < 64);
+    canvas.classList.toggle("compact64", count >= 64);
+    $("bracketCols").innerHTML = cols;
+    $("bracketCols").querySelectorAll("[data-load-round]").forEach((b) => {
+      b.onclick = () => loadRound(Number(b.dataset.loadRound), true);
+    });
+    autoScale();
+    observeVisibleRounds();
+  }
+  meta.rounds.forEach((_, ri) => renderRound(ri));
+  renderRR();
+  requestAnimationFrame(drawLinks);
+}
+function placeholderMatch(ri, mi) {
+  return `<div class="bracketMatch matchPlaceholder" data-ri="${ri}" data-mi="${mi}">
+    <div class="matchNo">第 ${mi + 1} 場</div>
+    <div class="placeholderText">尚未載入此輪資料</div></div>`;
+}
+function renderRound(ri, failed = false) {
+  const col = document.querySelector(`.roundCol[data-round="${ri}"]`);
+  if (!col || !state.meta || !state.meta.rounds[ri]) return;
+  const def = state.meta.rounds[ri], r = state.rounds[ri];
+  if (r) {
+    col.querySelector(".roundMatches").innerHTML = Array.from({length: def.matchCount}, (_, mi) =>
+      r.matches[mi] ? matchHtml(r.matches[mi], ri, mi, def) : placeholderMatch(ri, mi)).join("");
+    col.querySelector("[data-round-info]").textContent = `${def.matchCount} 場・已同步`;
+    col.querySelector(".loadRoundButton").classList.add("hidden");
+  } else {
+    col.querySelector("[data-round-info]").textContent = failed ? "讀取失敗・點擊重試" : "等待讀取";
+    col.querySelector(".loadRoundButton").classList.remove("hidden");
+    col.querySelector(".roundMatches").innerHTML = Array.from({length: def.matchCount}, (_, mi) =>
+      placeholderMatch(ri, mi)).join("");
+  }
+  $("finalBox").innerHTML = finalHtml(rounds());
+  requestAnimationFrame(drawLinks);
+}
+function renderRR() {
+  if (!state.meta || !state.meta.hasFinalRR) return;
+  const target = $("bracketCols").querySelector("[data-rr]");
+  if (!target) return;
+  if (!state.finalRR) target.textContent = "👑 最後三人循環・尚未載入";
+  else {
+    // Preserve the observer target when filling its content.
+    const html = rrHtml();
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html;
+    target.replaceChildren(...tpl.content.firstElementChild.childNodes);
+  }
+  requestAnimationFrame(drawLinks);
+}
+function updateVisibleAfterDelta(entry, oldState) {
+  if (entry.kind === "structure") { frameVersion = ""; renderFrame(); return; }
+  if (entry.kind === "meta") { renderFrame(); return; }
+  if (entry.kind === "closed") { closePublic("主辦已關閉賽程公開觀看。"); return; }
+  syncData();
+  if (entry.kind === "match" || entry.kind === "round") {
+    if (oldState.rounds[entry.ri] && !state.rounds[entry.ri] && roundIsVisible(entry.ri)) {
+      loadRound(entry.ri, true);
+    } else if (state.rounds[entry.ri]) renderRound(entry.ri);
+  } else if (entry.kind === "rr") renderRR();
+}
+function acceptEntries(entries, seq) {
+  const old = state;
+  state = BXSync.replay(state, entries, seq); // commit only after ALL seq are contiguous
+  const expanded = entries.filter((e) => e.seq > old.seq && e.seq <= state.seq)
+    .flatMap((e) => e.kind === "batch" ? e.items : [e]);
+  for (const entry of expanded) {
+    if (entry.kind === "match") roundTargets.set(entry.ri,
+      Math.max(roundTargets.get(entry.ri) || 0, entry.roundRevision));
+  }
+  syncData();
+  // After replay, render only changed rounds (a few) rather than all 64 matches.
+  const changed = expanded;
+  const kinds = new Set(changed.map((e) => e.kind));
+  if (kinds.has("closed")) { closePublic("主辦已關閉賽程公開觀看。"); return; }
+  if (kinds.has("structure")) { frameVersion = ""; renderFrame(); }
+  else {
+    if (kinds.has("meta")) renderFrame();
+    const roundsToRender = new Set(changed.filter((e) => e.kind === "match" || e.kind === "round")
+      .map((e) => e.ri));
+    for (const ri of roundsToRender) {
+      if (state.rounds[ri]) renderRound(ri);
+      else if (roundIsVisible(ri)) loadRound(ri, true);
     }
-  });
-
-  es.addEventListener('cancel',()=>{
-    if(generation!==streamGeneration || stream!==es)return;
-    setStatus(publicReadErrorText(),'error');
-    try{es.close()}catch{}
-  });
-
-  es.addEventListener('auth_revoked',()=>{
-    if(generation!==streamGeneration || stream!==es)return;
-    setStatus('公開讀取權限已失效。','error');
-    try{es.close()}catch{}
-  });
-
-  es.onerror=()=>{
-    if(generation!==streamGeneration || stream!==es)return;
-
-    if(gotFirst){
-      setStatus('連線中斷，Firebase 正在自動重連…');
-      // EventSource 本身會自動重連。
-      // 真正重新 open 時，再做完整 GET 校正，避免漏掉背景期間的更新。
-      return;
+    if (kinds.has("rr")) renderRR();
+  }
+  persistCache();
+}
+async function fallBackToVisibleSnapshot(remoteSync, reason) {
+  // Missing or too-old change log: refresh ONLY meta + visible rounds.
+  const oldMeta = state.meta;
+  const oldRounds = Object.keys(state.rounds).map(Number).filter((ri) => roundIsVisible(ri));
+  const next = BXSync.newCache(eventId);
+  next.seq = remoteSync.seq;
+  state = next;
+  frameVersion = "";
+  roundTargets.clear();
+  if (!(await ensureMeta(true))) return;
+  const initial = oldRounds.length ? oldRounds : [0];
+  await Promise.all(initial.filter((ri) => state.meta.rounds[ri]).slice(0, 3)
+    .map((ri) => loadRound(ri, true)));
+  setStatus(`已重新校正必要輪次（${reason}），其餘輪次按需載入。`, "ok");
+  persistCache();
+}
+async function readMissingChanges(targetSeq) {
+  if (targetSeq - state.seq > BXSync.MAX_CHANGE_PAGE) throw new Error("history too old");
+  const raw = await getJson("changes", {orderBy: '"$key"',
+    startAt: JSON.stringify(BXSync.seqKey(state.seq + 1)),
+    endAt: JSON.stringify(BXSync.seqKey(targetSeq)), limitToFirst: BXSync.MAX_CHANGE_PAGE});
+  return BXSync.parseHistory(raw);
+}
+async function processSync(marker) {
+  if (!marker || !Number.isSafeInteger(marker.seq) || marker.seq < 0) throw new Error("invalid sync marker");
+  if (marker.publicOpen === false) { closePublic("公開已關閉。"); return; }
+  if (marker.seq < state.seq) throw new Error("server sequence appears older than local cache");
+  if (marker.seq === state.seq && state.meta &&
+      marker.structureVersion !== state.meta.structureVersion) {
+    await fallBackToVisibleSnapshot(marker, "結構版本改變");
+    return;
+  }
+  if (!state.meta) {
+    state.seq = marker.seq;
+    if (await ensureMeta()) startStream();
+    return;
+  }
+  if (marker.seq === state.seq) {
+    setStatus("已確認最新公開賽程・即時同步中", "ok");
+    return;
+  }
+  if (marker.seq === state.seq + 1 && marker.last && marker.last.seq === marker.seq) {
+    acceptEntries([marker.last], marker.seq);
+  } else {
+    try {
+      const entries = await readMissingChanges(marker.seq);
+      acceptEntries(entries, marker.seq);
+    } catch (e) {
+      await fallBackToVisibleSnapshot(marker, "增量紀錄不完整");
     }
-
-    checkFailure(kind,id);
+  }
+  if (!state.meta) {
+    // A structure change invalidates only public view structure; fetch the tiny
+    // meta and the first visible round (not the whole event).
+    if (await ensureMeta(true)) await loadRound(0, true);
+  }
+  if (state.meta && !validateMeta(state.meta)) {
+    closePublic("公開連結已失效或已過期。"); return;
+  }
+  if (state.meta) setStatus("已確認最新公開賽程・即時同步中", "ok");
+}
+function enqueueSync(marker) {
+  marker = BXSync.expandMarker(marker);
+  if (!marker || !Number.isSafeInteger(marker.seq)) return;
+  if (!highestSeen || marker.seq > highestSeen.seq) highestSeen = marker;
+  // Keep a single reconciliation flight; new markers are processed on exit.
+  if (reconcileRunning) return;
+  reconcileRunning = true;
+  (async () => {
+    try {
+      while (highestSeen) {
+        const next = highestSeen;
+        highestSeen = null;
+        await processSync(next);
+      }
+    } catch (e) {
+      setStatus(`同步資料待校正：${e.message}，正在保留唯讀畫面。`, "error");
+    } finally {
+      reconcileRunning = false;
+      if (highestSeen) enqueueSync(highestSeen);
+    }
+  })();
+}
+async function checkTinyVersion() {
+  if (currentSyncRequest) return currentSyncRequest;
+  currentSyncRequest = (async () => {
+    lastTinyCheckAt = Date.now();
+    try { enqueueSync(await getJson("sync")); }
+    catch (e) { setStatus(`目前無法確認最新版本：${e.message}`, "error"); }
+    finally { currentSyncRequest = null; }
+  })();
+  return currentSyncRequest;
+}
+function stopStream() {
+  generation++;
+  clearTimeout(initialMarkerTimer);
+  initialMarkerTimer = null;
+  initialMarkerReceived = false;
+  if (stream) { try { stream.close(); } catch (e) {} stream = null; }
+  streamOpen = false;
+}
+function startStream() {
+  if (isDemo) { startDemoStream(); return; }
+  if (stream || document.visibilityState !== "visible") return;
+  if (typeof EventSource === "undefined") {
+    // SSE-unavailable browsers use the small HTTP sync check instead.
+    checkTinyVersion();
+    return;
+  }
+  const myGen = ++generation;
+  const s = new EventSource(urlFor("sync"));
+  stream = s;
+  let lastSnapshot = null;
+  initialMarkerReceived = false;
+  // If a proxy silently stalls the initial SSE snapshot, do ONE tiny GET.
+  // Healthy streams receive the initial put and never invoke this fallback.
+  initialMarkerTimer = setTimeout(() => {
+    if (myGen === generation && !initialMarkerReceived) checkTinyVersion();
+  }, 12000);
+  s.onopen = () => {
+    if (myGen !== generation || stream !== s) return;
+    streamOpen = true;
+    // Firebase SSE sends current sync marker via its initial `put`.
+    // Do NOT issue an additional GET from onopen; this doubled requests on
+    // every reconnection. Only the existing error/gap paths use HTTP fallback.
+    browserReady = true;
+  };
+  const eventHandler = (type, event) => {
+    if (myGen !== generation || stream !== s) return;
+    try {
+      const msg = JSON.parse(event.data);
+      if (!msg || typeof msg.path !== "string") return;
+      const path = msg.path.replace(/^\//, "").split("/").filter(Boolean);
+      if (type === "put" && path.length === 0) {
+        lastSnapshot = msg.data;
+        initialMarkerReceived = true;
+        clearTimeout(initialMarkerTimer);
+        initialMarkerTimer = null;
+      }
+      else if (!lastSnapshot) { checkTinyVersion(); return; }
+      else if (path.length) {
+        let obj = lastSnapshot;
+        for (let i = 0; i < path.length - 1; i++) {
+          if (!obj[path[i]]) obj[path[i]] = {};
+          obj = obj[path[i]];
+        }
+        if (msg.data === null) delete obj[path[path.length - 1]];
+        else if (type === "patch" && msg.data && typeof msg.data === "object") {
+          obj[path[path.length - 1]] = {...obj[path[path.length - 1]], ...msg.data};
+        } else obj[path[path.length - 1]] = msg.data;
+      } else if (type === "patch") lastSnapshot = {...lastSnapshot, ...msg.data};
+      if (lastSnapshot) { lastSseFrameAt = Date.now(); enqueueSync(lastSnapshot); }
+    } catch (e) { checkTinyVersion(); }
+  };
+  s.addEventListener("keep-alive", () => { lastSseFrameAt = Date.now(); });
+  s.addEventListener("put", (e) => eventHandler("put", e));
+  s.addEventListener("patch", (e) => eventHandler("patch", e));
+  s.addEventListener("cancel", () => closePublic("即時訂閱被拒絕：賽事可能已關閉。"));
+  s.addEventListener("auth_revoked", () => closePublic("公開讀取權限已失效。"));
+  s.onerror = () => {
+    if (myGen !== generation || stream !== s) return;
+    streamOpen = false;
+    setStatus("網路中斷，正在等待 Firebase SSE 自動重連…");
   };
 }
-
-async function checkFailure(kind,id){
-  if(failureCheckBusy)return;
-  failureCheckBusy=true;
-  try{
-    const r=await fetch(streamUrl(kind,id),{
-      cache:'no-store',
-      headers:{'Accept':'application/json'}
-    });
-
-    if(r.status===401||r.status===403){
-      setStatus(publicReadErrorText(),'error');
-      try{stream?.close()}catch{}
-    }else if(r.ok){
-      const j=await r.json();
-      if(j){
-        data=j;
-        gotFirst=true;
-        lastResyncAt=Date.now();
-        scheduleRender();
-        setStatus('已重新同步・即時連線中','ok');
-      }else{
-        setStatus('找不到資料。','error');
-      }
-    }else{
-      setStatus('目前無法讀取資料，請稍後重試。','error');
-    }
-  }catch(e){
-    setStatus('網路連線異常，Firebase 正在自動重連…');
-  }finally{
-    failureCheckBusy=false;
-  }
+function resume(reason = "resume") {
+  if (document.visibilityState !== "visible") return;
+  const now = Date.now();
+  if (now - lastResumeAt < 1800) return;
+  lastResumeAt = now;
+  clearTimeout(resumeTimer);
+  resumeTimer = setTimeout(async () => {
+    // Reconnect SSE FIRST: its initial `put` includes the authoritative marker.
+    // Do not GET the version and then GET the same marker through SSE.
+    if (isDemo) await checkTinyVersion();
+    else startStream();
+  }, isDemo ? 0 : 250 + Math.random() * 1250);
+}
+function goBack() { stopStream(); location.href = isDemo ? "demo.html" : "../index.html"; }
+function viewClosedIfExpired() {
+  if (state.meta && isClosed(state.meta)) closePublic("此公開連結已過期。");
 }
 
-// iOS Safari / Web App 從背景回前景時，SSE 有可能看似存在但其實已停住。
-// 回前景直接「重建 SSE + GET 最新快照」，不相信舊連線狀態。
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible' && streamKind && streamId){
-    hardReconnect('visibility');
-  }
-});
-
-window.addEventListener('pageshow',e=>{
-  if(e.persisted && streamKind && streamId){
-    hardReconnect('bfcache');
-  }
-});
-
-window.addEventListener('online',()=>{
-  if(streamKind && streamId){
-    hardReconnect('online');
-  }
-});
-
-// 若頁面長時間開著，每 4 分鐘做一次低頻安全校正。
-// 200 台 viewer 約等於平均每分鐘 50 次小型 GET，遠低於逐秒/逐分輪詢。
-setInterval(()=>{
-  if(!streamKind||!streamId||document.visibilityState!=='visible')return;
-  if(Date.now()-lastResyncAt<210000)return;
-  if(resyncPromise)return;
-
-  resyncPromise=fetchFreshSnapshot(streamKind,streamId,{quiet:true})
-    .finally(()=>{resyncPromise=null});
-},240000+Math.floor(Math.random()*60000));
+// The following rendering and SVG routines are preserved from the previous
+// public V1.0 viewer, with only frame/lazy-fetch entry points replaced.
 
 function eventCount(){
   const m=data?.meta||{};
@@ -467,30 +843,9 @@ function finalHtml(rs){
   return `<section class="rrPanel finalPlacings"><div class="rrHead"><b>🏆 最終名次</b><div class="muted">冠軍賽＋季軍賽完成後自動產生 1～4 名</div></div>
   <div class="rrRanks">${rows.map(([i,l,n])=>`<div class="rrRankRow"><span class="rrPos">${i}</span><b>${l}</b><span>${esc(n)}</span></div>`).join('')}</div></section>`;
 }
-function renderEvent(){
-  const meta=data?.meta;if(!meta)return;
-  $('eventView').classList.remove('hidden');
-  $('pageSub').textContent='公開即時賽程';
-  const count=eventCount();
-  $('hero').innerHTML=`<div class="muted">🏆 賽程表</div><h1>${esc(meta.name||'Beyblade X Tournament')}</h1>
-    <div class="chips"><span class="chip">👤 ${count} 人</span><span class="chip">${meta.mode==='free'?'↝ 自由編排':'🏆 單淘汰'}</span><span class="chip">⌘ ${esc(flowLabel())}</span></div>`;
-  const rs=rounds();
-  const cols=rs.map((r,ri)=>{const l=layout(ri),ms=matchesOf(r);return `<section class="roundCol" data-round="${ri}">
-    <div class="roundHead"><h3>${esc(stageLabel(ri,r))}</h3><div class="sub">${ms.length} 場對戰</div></div>
-    <div class="roundMatches" style="--top:${l.top}px;--gap:${l.gap}px">${ms.map((m,mi)=>matchHtml(m,ri,mi,r)).join('')}</div></section>`}).join('')+(data.finalRR?rrHtml():'');
-  const canvas=document.querySelector('.bracketCanvas');
-  canvas.classList.toggle('compact32',count>=32&&count<64);canvas.classList.toggle('compact64',count>=64);
-  $('bracketCols').innerHTML=cols;
-  $('finalBox').innerHTML=finalHtml(rs);
-  requestAnimationFrame(()=>{autoScale();requestAnimationFrame(drawLinks)});
-}
 
-function render(){
-  if(!data)return;
-  renderEvent();
-}
 function drawLinks(){
-  if(!eventId)return;
+  if(!eventId || !data?.meta)return;
 
   const canvas=document.querySelector('.bracketCanvas');
   const svg=document.querySelector('.bracketLinks');
@@ -525,7 +880,8 @@ function drawLinks(){
 
     dst.forEach((target,j)=>{
       const t=point(target,'left');
-      const pair=[src[j*2],src[j*2+1]].filter(Boolean);
+      const pair=(rs[ri+1]?.placementFinal && src.length===2)
+        ? src.filter(Boolean) : [src[j*2],src[j*2+1]].filter(Boolean);
       if(!pair.length)return;
 
       const sourcePoints=pair.map(el=>({el,...point(el,'right')}));
@@ -582,16 +938,130 @@ function autoScale(){
 function toggleFull(){document.body.classList.toggle('fullscreen');setTimeout(()=>{autoScale();drawLinks()},80)}
 addEventListener('resize',()=>{if(eventId){clearTimeout(window.__rz);window.__rz=setTimeout(()=>{autoScale();drawLinks()},120)}});
 
-window.addEventListener('pagehide',()=>{
-  clearTimeout(reconnectResyncTimer);
-  try{stream?.close()}catch{}
-  stream=null;
-  streamGeneration++;
+// On-demand requests are limited to the columns the user is actually viewing.
+async function loadAllRounds() {
+  if (!state.meta) return;
+  setStatus("手動載入完整公開樹狀圖中…");
+  const indices = state.meta.rounds.map((_, ri) => ri);
+  for (let i = 0; i < indices.length; i += 2) {
+    await Promise.all(indices.slice(i, i+2).map((ri) => loadRound(ri)));
+  }
+  if (state.meta.hasFinalRR) await loadRR();
+  if (state.meta) setStatus("已依要求載入全部輪次。", "ok");
+}
+$("loadAll").addEventListener("click", loadAllRounds);
+window.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") resume("visible");
+  else { stopStream(); clearTimeout(resumeTimer); }
 });
+window.addEventListener("pageshow", (e) => { if (e.persisted) resume("bfcache"); });
+window.addEventListener("online", () => resume("online"));
+window.addEventListener("pagehide", () => { stopStream(); clearTimeout(resumeTimer); });
+setInterval(() => {
+  if (document.visibilityState !== "visible") return;
+  viewClosedIfExpired();
+  if (!state.meta) return;
+  // Normally a connected SSE needs zero redundant GETs. Exception: if the
+  // connection is SILENT (including no keep-alive) for >20-25 minutes, one
+  // randomized health GET detects half-open proxies, preventing stuck scores.
+  const now = Date.now();
+  if (!streamOpen && now - lastTinyCheckAt >= 30000) checkTinyVersion();
+  else if (streamOpen && lastSseFrameAt > 0 &&
+    now - Math.max(lastSseFrameAt, lastTinyCheckAt) >= HEALTHY_STALL_CHECK_MS) {
+    checkTinyVersion();
+  }
+}, 30000 + Math.round(Math.random()*3000));
 
-if(!DB.startsWith('https://'))setStatus('Firebase 資料庫網址設定錯誤。','error');
-else if(eventId)startStream('publicEvents',eventId);
-else setStatus('網址缺少 event 參數。','error');
+// Off-network demonstration. Never writes Firebase and shows same UI as real viewer.
+function createDemo() {
+  const count = Number(params.get("demo") || "24") === 64 ? 64 : 24;
+  const rounds = [];
+  let n = count, k=0;
+  while (n > (count === 24 ? 3 : 2)) {
+    const matches = Array.from({length: Math.ceil(n/2)}, (_, i) => {
+      const initial = k===0;
+      return {a: initial ? `選手 ${i*2+1}` : "待定",
+        b: initial ? `選手 ${i*2+2}` : "待定", sa: "", sb: "", winner: null};
+    });
+    rounds.push({name:`第 ${k+1} 輪（${n} 強）`,matches});
+    n=Math.ceil(n/2);k++;
+  }
+  if (count===64) rounds.push({name:"冠軍及季軍賽",placementFinal:true,matches:[
+    {a:"待定",b:"待定",sa:"",sb:"",winner:null},
+    {a:"待定",b:"待定",sa:"",sb:"",winner:null}
+  ]});
+  const publicUntil = Date.now() + 86400000;
+  const pub = {
+    meta: {id: eventId, name:`離線示範・${count} 人賽（不會連線）`,
+      mode: count===24?"free":"single",freeFinal:count===24?"rr3":"champ",
+      rosterCount:count,rounds:rounds.map((r)=>({name:r.name,matchCount:r.matches.length,
+        placementFinal:!!r.placementFinal})),hasFinalRR:count===24,
+      publicOpen:true,publicUntil,structureVersion:1,appVersion:'V0.1'},
+    rounds:Object.fromEntries(rounds.map((r,ri)=>[ri,{
+      revision:0,matches:Object.fromEntries(r.matches.map((m,i)=>[i,m]))}])),
+    finalRR:count===24?{revision:0,players:["待定 A","待定 B","待定 C"],matches:[]}:null,
+    sync:{seq:0,structureVersion:1,publicOpen:true,last:null},changes:{}
+  };
+  return pub;
+}
+async function demoGet(path, query) {
+  if (!window.__bxDemoReads) window.__bxDemoReads = [];
+  window.__bxDemoReads.push(path);
+  await new Promise((resolve)=>setTimeout(resolve,50));
+  if (path==="changes") {
+    const start = JSON.parse(query.startAt), end = JSON.parse(query.endAt);
+    return Object.fromEntries(Object.entries(demoData.changes)
+      .filter(([k])=>k>=start&&k<=end));
+  }
+  const keys=path.split("/");
+  return BXSync.clone(keys.reduce((v,k)=>v==null?null:v[k],demoData));
+}
+function startDemoStream() {
+  streamOpen=true;
+  setStatus("離線示範模式：只讀模擬資料，完全不連 Firebase。", "ok");
+}
+function demoAdvance() {
+  const pub = demoData;
+  const match = pub.rounds[0].matches[0];
+  const updated = {...match,sa:Math.min(6,Number(match.sa||0)+1),sb:0};
+  if(updated.sa>=4)updated.winner=updated.a;
+  const seq=pub.sync.seq+1;
+  const rev=++pub.rounds[0].revision;
+  pub.rounds[0].matches[0]=updated;
+  const entry={seq,kind:"match",ri:0,mi:0,roundRevision:rev,match:updated};
+  pub.sync={seq,structureVersion:1,publicOpen:true,last:entry};
+  pub.changes[BXSync.seqKey(seq)]=entry;
+  enqueueSync(pub.sync);
+}
+function showDemoControls() {
+  const actions=$("demoControls");
+  actions.classList.remove("hidden");
+  $("demoAdvance").onclick=demoAdvance;
+  $("demoSkip").onclick=()=>{
+    for(let i=0;i<5;i++){
+      const m=demoData.rounds[0].matches[1];
+      const seq=demoData.sync.seq+1,rev=++demoData.rounds[0].revision;
+      const updated={...m,sa:i+1,sb:0,winner:i===4?m.a:null};
+      demoData.rounds[0].matches[1]=updated;
+      const entry={seq,kind:"match",ri:0,mi:1,roundRevision:rev,match:updated};
+      demoData.changes[BXSync.seqKey(seq)]=entry;
+      demoData.sync={seq,structureVersion:1,publicOpen:true,last:entry};
+    }
+    enqueueSync(demoData.sync); // Test history-gap recovery.
+  };
+}
+
+async function main() {
+  if (!BXSync.isValidId(eventId)) {
+    setStatus("網址缺少有效的賽事 event ID。", "error"); return;
+  }
+  if (isDemo) { demoData=createDemo(); showDemoControls(); }
+  else loadCache();
+  // SSE-first: its initial put includes the tiny sync marker, so no duplicate
+  // startup GET sync. Metadata and visible rounds remain lazy.
+  // Demo intentionally uses getJson("sync") to keep offline smoke tests valid.
+  resume("initial");
+}
+main();
 </script>
-</body>
-</html>
+</body></html>

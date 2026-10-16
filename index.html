@@ -1,1 +1,158 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>V0.1 升級維護｜主辦管理</title><style>body{margin:0;background:#0b0d12;color:#f7f8fa;font-family:system-ui,-apple-system,sans-serif;display:grid;min-height:100vh;place-items:center;padding:24px;text-align:center}main{max-width:440px;border:1px solid #303849;background:#151922;border-radius:18px;padding:28px}h1{color:#ff5a3c}p{line-height:1.8;color:#d0d5dd}</style></head><body><main><h1>報名系統版本升級中</h1><p>V0.1 開發版正在更換雲端服務，暫停主辦管理。請稍後再開啟。</p><p>目前不接受報名或修改，避免資料在清理過程中遺失。</p></main></body></html>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>戰鬥陀螺賽程表 V0.1</title><style>
+:root{color-scheme:dark;--bg:#0c1016;--pane:#19212c;--pane2:#222e3c;--line:#39465a;--text:#f4f7fc;--sub:#aab8ca;--accent:#ff633e;--good:#2dd08c;--warn:#ffc44d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;line-height:1.5}header{position:sticky;top:0;z-index:3;background:#111822f5;border-bottom:1px solid var(--line)}.top{max-width:1200px;margin:auto;padding:10px 14px;display:flex;align-items:center;gap:8px;justify-content:space-between}.brand{font-size:16px;font-weight:800}.bar{display:flex;gap:6px;flex-wrap:wrap}main{max-width:1200px;padding:15px 12px 70px;margin:auto}h1{font-size:24px;margin:0 0 12px}h2{font-size:18px;margin:0 0 12px}h3{font-size:16px;margin:9px 0}p{margin:7px 0}.muted{color:var(--sub);font-size:13px}.warn{color:var(--warn)}.good{color:var(--good)}.card{background:var(--pane);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}button,a.btn{min-height:40px;background:var(--accent);border:0;border-radius:10px;color:white;padding:9px 12px;font-weight:750;cursor:pointer;text-decoration:none;font-size:14px}button.alt,a.btn.alt{background:var(--pane2);border:1px solid var(--line);color:var(--text)}button:disabled{opacity:.44;cursor:not-allowed}input,select,textarea{display:block;min-width:0;width:100%;padding:10px 9px;min-height:42px;border-radius:9px;color:var(--text);border:1px solid #55677d;background:#111925;font-size:16px}label{display:block;margin:9px 0 4px;font-size:13px;color:var(--sub)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.row>*{flex-shrink:0}.hidden{display:none!important}.status{border-radius:10px;background:#293142;padding:9px 12px;border:1px solid #45556a;margin:10px 0}.rounds{display:flex;gap:12px;overflow-x:auto;padding:10px 0 15px;scroll-snap-type:x proximity}.round{width:210px;flex:0 0 210px;scroll-snap-align:start}.match{margin:10px 0;border:1px solid #405064;background:#101924;border-radius:10px;padding:10px;cursor:pointer}.match.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.match .names{display:flex;justify-content:space-between;gap:10px}.badge{background:#2d3a4a;color:#d2e9ff;font-size:11px;padding:3px 7px;border-radius:7px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.controls>*{min-width:0}.modal{position:fixed;inset:0;background:#000c;z-index:8;display:flex;align-items:center;justify-content:center;padding:12px}.sheet{max-height:92vh;overflow:auto;background:var(--pane);padding:20px;border:1px solid var(--line);border-radius:15px;width:min(450px,100%)}#qrTarget{width:210px;min-height:210px;background:white;color:#222;display:grid;place-content:center;margin:14px auto;overflow:hidden}code{overflow-wrap:anywhere}.loader{font-size:12px;color:var(--sub)}#log{white-space:pre-wrap;overflow-wrap:anywhere;max-height:110px;overflow:auto;font-size:12px} @media(max-width:550px){.round{width:180px;flex-basis:180px}.brand{font-size:13px}main{padding:10px 10px 60px}.top{align-items:flex-start;flex-direction:column}button{font-size:13px}}
+</style></head><body><header><div class="top"><span class="brand">戰鬥陀螺賽程表 <span class="badge">V0.1 開發版</span></span><div class="bar"><button id="homeBtn" class="alt">首頁</button><button id="googleBtn" class="alt">Google 登入</button><button id="logoutBtn" class="alt hidden">登出</button></div></div></header><main>
+<div class="status" id="notice">V0.1｜正式賽程網址（開發中）· 專用 V01 節點</div>
+<section id="homePanel"><h1>我的雲端賽事</h1><p class="muted">主辦使用 Google 登入；裁判透過 QR／動態驗證碼加入。觀眾使用獨立唯讀 viewer.html。</p><div class="card"><h2>新增賽事</h2><label>賽事名稱</label><input id="eventName" value="V0.1 測試盃" maxlength="70"><div class="grid"><div><label>賽制</label><select id="mode"><option value="free">自由編排</option><option value="single">標準單淘汰</option></select></div><div><label>人數</label><select id="count"><option>3</option><option>6</option><option>12</option><option selected>24</option><option>36</option><option>48</option><option>64</option></select></div><div><label>自由編排決賽</label><select id="freeFinal"><option value="rr3">最後三人循環</option><option value="champ">冠軍賽</option></select></div><div><label>配對方式</label><select id="pairing"><option value="ordered">依序</option><option value="random">抽籤</option></select></div></div><label>選手名單（每行一位；空白時自動產生測試名單）</label><textarea id="roster" rows="5" placeholder="選手一&#10;選手二"></textarea><button id="createBtn">建立 V0.1 雲端賽事</button></div><div class="card"><h2>我的賽事索引</h2><div id="eventList">Google 登入後才會顯示</div></div><div class="card"><h2>裁判掃碼入場</h2><label>賽事 ID</label><input id="joinEvent" placeholder="掃碼後會自動填入"><label>裁判名稱</label><input id="joinName" maxlength="24" placeholder="裁判一"><label>主辦提供的 6 位驗證碼</label><input id="joinCode" inputmode="numeric" maxlength="6" placeholder="6 位數字"><button id="joinBtn">驗證並進入賽事</button></div></section>
+<section id="eventPanel" class="hidden"><div class="row"><h1 id="eventTitle">賽事</h1><span id="roleBadge" class="badge">讀取中</span></div><p class="muted">雲端比分是唯一可信資料。選擇場次時才讀取該場版本；操作不會先額外呼叫 checkLogin。</p><div class="card row"><button id="viewerBtn" class="alt">複製觀眾網址</button><button id="qrBtn" class="alt">裁判 QR／驗證碼</button><button id="openBtn" class="alt">公開 2 小時</button><button id="closeBtn" class="alt">關閉公開</button><button id="deleteBtn" class="alt">刪除賽事</button></div><div class="card"><h2>對戰表 <span class="muted">點選場次編輯</span></h2><div class="rounds" id="bracket"></div><div id="rrPanel" class="hidden"></div></div><div class="card"><h2 id="editTitle">選擇一場比賽</h2><div id="matchInfo" class="status">未選擇場次</div><div class="row"><button id="claimBtn">開始執裁</button><button id="releaseBtn" class="alt">釋放場次</button></div><div class="controls"><div><label>左方比分（0–6）</label><select id="sa"></select></div><div><label>右方比分（0–6）</label><select id="sb"></select></div></div><div class="row" style="margin-top:14px"><button id="scoreBtn">儲存比分</button><button id="completeBtn">此場完成</button><button id="resetBtn" class="alt">比分歸零</button><button id="cancelBtn" class="alt">主辦取消完成（待實作）</button></div><p class="muted">未達 4 分不得完成；已完成場次的撤回暫時停用，避免破壞已進行的下一輪。</p></div><div class="card"><h3>操作回覆不明時</h3><p class="muted">先用原操作 ID 查詢，避免換新 ID 重送造成重複操作。</p><button id="queryBtn" class="alt">查詢上一筆操作結果</button><button id="abandonBtn" class="alt" type="button">放棄未確認操作</button><pre id="log"></pre></div></section></main>
+<div class="status muted" id="metrics" style="margin:10px auto;max-width:1150px">載入請求診斷中…</div>
+<div id="qrModal" class="modal hidden"><div class="sheet"><h2>裁判入場</h2><p class="muted">QR 只包含賽事連結，不含驗證碼。動態碼僅在主辦開啟此視窗時每分鐘更新一次，不會因比分更新而查詢。</p><div id="qrTarget">正在產生 QR…</div><div class="status">動態驗證碼：<strong id="showCode">讀取中</strong> <span id="codeExpiry" class="muted"></span></div><button id="copyJoin" class="alt">複製裁判入場網址</button><button id="closeQr">關閉</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut,signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
+import {getDatabase,ref,get,onValue} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
+// V0.1 uses production project ljt-beyblade-x with isolated eventsV01 paths.
+const CONFIG={apiKey:'AIzaSyD2PsTKnlcFbHQvkZCYeaM_DIoJcl1c5zk',authDomain:'ljt-beyblade-x.firebaseapp.com',databaseURL:'https://ljt-beyblade-x-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'ljt-beyblade-x',appId:'1:811309004070:web:2e246f0a0ac7dae2e8fde7'};
+const VERSION='V0.1';
+const ACTIVE=Boolean(CONFIG.apiKey&&CONFIG.appId&&CONFIG.projectId==='ljt-beyblade-x');
+const app=ACTIVE?initializeApp(CONFIG):null;
+const auth=ACTIVE?getAuth(app):null,db=ACTIVE?getDatabase(app):null,functions=ACTIVE?getFunctions(app,'asia-southeast1'):null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const op=()=>Date.now().toString(16).padStart(12,'0')+Array.from(crypto.getRandomValues(new Uint8Array(18)),x=>x.toString(16).padStart(2,'0')).join('');
+const PATH=id=>`eventsV01/${id}`;
+const log=x=>{if($('log'))$('log').textContent=JSON.stringify(x,null,2)+'\n'+$('log').textContent.slice(0,1800);};
+const notice=(msg,bad=false)=>{$('notice').textContent=msg;$('notice').style.borderColor=bad?'#ba5c4b':'#45556a';};
+let user=null,eventId='',owner=false,state=null,chosen=null,match=null,lockToken='',sub=null,qrClock=null,waiting=false,lastOp=null,loading=false;const claimTokens=new Map();
+let metrics={fn:0,get:0,streams:0};
+function metricsView(){let el=$('metrics');if(el)el.textContent=`本次開頁　Callable ${metrics.fn} 次｜一般 GET ${metrics.get} 次｜有效同步訂閱 ${metrics.streams} 條`}
+function mustAuth(){if(!ACTIVE)throw Error('Firebase 設定未完成，不能操作雲端');if(!user)throw Error('請先登入 Firebase');}
+async function invoke(name,data){mustAuth();metrics.fn++;metricsView();return (await httpsCallable(functions,name)({...data,clientVersion:VERSION})).data;}
+function pendingRead(){try{return JSON.parse(sessionStorage.getItem('bx-v01-pending')||'null')}catch{return null}}
+function pendingClear(){lastOp=null;try{sessionStorage.removeItem('bx-v01-pending')}catch{}}
+async function act(name,data){
+ mustAuth();if(waiting)throw Error('上一次操作尚未完成');
+ let p=pendingRead();const sig=JSON.stringify({name,data});
+ if(p&&p.sig!==sig)throw Error('上一筆操作結果尚未確認，請先點「查詢上一筆操作結果」');
+ if(!p){p={sig,name,data,opId:op(),at:Date.now()};try{sessionStorage.setItem('bx-v01-pending',JSON.stringify(p))}catch{}}
+ lastOp=p;waiting=true;
+ try{const r=await invoke(name,{...data,opId:p.opId});pendingClear();return r;}
+ finally{waiting=false;}
+}
+async function read(path){mustAuth();metrics.get++;metricsView();return (await get(ref(db,path))).val()}
+async function google(){if(!ACTIVE)return notice('Firebase 連線尚未設定',true);try{await signInWithPopup(auth,new GoogleAuthProvider());notice('Google 登入成功')}catch(e){if(e.code==='auth/popup-blocked')await signInWithRedirect(auth,new GoogleAuthProvider());else notice(e.message,true)}}
+$('googleBtn').onclick=google;$('logoutBtn').onclick=async()=>{if(auth)await signOut(auth)};
+$('homeBtn').onclick=()=>{location.hash='';leave();home()};
+function leave(){claimTokens.clear();if(sub){sub();sub=null;metrics.streams=Math.max(0,metrics.streams-1);metricsView();}state=null;chosen=null;match=null;lockToken='';eventId='';clearInterval(qrClock);$('qrModal').classList.add('hidden');}
+function home(){$('homePanel').classList.remove('hidden');$('eventPanel').classList.add('hidden');if(user&&!user.isAnonymous)loadIndex().catch(e=>notice(e.message,true));}
+async function loadIndex(){const items=await read('ownerIndexV01/'+user.uid);$('eventList').innerHTML=Object.entries(items||{}).map(([id,e])=>`<p><button class="alt" data-id="${esc(id)}">${esc(e.name)}　→</button></p>`).join('')||'<p class="muted">尚未建立賽事</p>';$('eventList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>enter(b.dataset.id));}
+function roster(){const names=$('roster').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);const n=Number($('count').value);return names.length?names:Array.from({length:n},(_,i)=>`選手 ${i+1}`);}
+$('mode').onchange=()=>{const single=$('mode').value==='single';$('freeFinal').disabled=single;if(single)$('freeFinal').value='champ';$('count').querySelector('[value="64"]').disabled=!single;if(!single&&$('count').value==='64')$('count').value='48';};
+$('createBtn').onclick=async()=>{try{
+ const names=roster();if($('mode').value==='free'&&![3,6,12,24,36,48].includes(names.length))throw Error('自由編排限 3、6、12、24、36、48 人');
+ notice('正在建立 V0.1 雲端賽事…');const r=await act('createEventV01',{name:$('eventName').value.trim(),mode:$('mode').value,freeFinal:$('freeFinal').value,pairing:$('pairing').value,roster:names});await enter(r.eventId);
+ }catch(e){notice(e.message,true)}};
+$('joinBtn').onclick=async()=>{try{
+ if(!ACTIVE)throw Error('Firebase 連線尚未設定');
+ if(!auth.currentUser)await signInAnonymously(auth);user=auth.currentUser;
+ const id=$('joinEvent').value.trim();const r=await invoke('joinEventV01',{eventId:id,code:$('joinCode').value.trim(),refereeName:$('joinName').value.trim()});
+ if(r.joined){await enter(id);notice('裁判權限驗證成功')}else notice('加入尚未確認',true);
+ }catch(e){notice('裁判入場失敗：'+e.message,true)}};
+async function enter(id){
+ if(!/^[a-zA-Z0-9_-]{6,100}$/.test(id))return notice('賽事 ID 不正確',true);
+ mustAuth();leave();eventId=id;history.replaceState(null,'','#event='+encodeURIComponent(id));$('homePanel').classList.add('hidden');$('eventPanel').classList.remove('hidden');
+ await reload(true);
+ // One tiny staff-only stream per active event; no full-board listener.
+ sub=onValue(ref(db,PATH(id)+'/staff/sync'),snap=>{
+  const marker=snap.val();if(!marker||!state||eventId!==id||marker.seq<=state.seq)return;
+  if(marker.seq!==state.seq+1){reload(false).catch(e=>notice('同步序號缺漏：'+e.message,true));return;}
+  try{const delta=decode(marker.d);applyDelta(delta);state.seq=marker.seq;render();}
+  catch(e){reload(false).catch(x=>notice(x.message,true));}
+ },e=>notice('主辦／裁判即時同步中斷：'+e.message,true));metrics.streams++;metricsView();
+}
+async function reload(initial=false){if(loading||!eventId)return;loading=true;try{
+ notice('正在核對雲端最新賽程…');const r=await invoke('getEventV01',{eventId});
+ if(r.version!==VERSION)throw Error('雲端後端版本與網站不一致，禁止操作');
+ state=r.event;owner=!!state.owner;$('eventTitle').textContent=state.name;$('roleBadge').textContent=owner?'主辦':'裁判';
+ ['qrBtn','openBtn','closeBtn','deleteBtn'].forEach(id=>$(id).classList.toggle('hidden',!owner));
+ $('cancelBtn').classList.add('hidden'); // Requires a separate safe descendant rollback design.
+ if(chosen){match=sourceMatch(chosen);showMatch();}render();
+ notice(initial?'賽程已同步，可以開始執裁':'已重新載入最新雲端賽程');
+ }finally{loading=false;}}
+const unpackKeys={x:'sa',y:'sb',w:'winner',v:'matchVersion',c:'claimed'};
+function decode(raw){if(!Array.isArray(raw))return null;
+ if(raw[0]==='m')return {kind:'match',ri:raw[1],mi:raw[2],roundRevision:raw[3],patch:Object.fromEntries(Object.entries(raw[4]||{}).map(([k,v])=>[unpackKeys[k]||k,v]))};
+ if(raw[0]==='b')return {kind:'batch',items:(raw[1]||[]).map(decode)};
+ if(raw[0]==='r')return {kind:'rr',finalRR:raw[1]};if(raw[0]==='t')return {kind:'meta',meta:raw[1]};if(raw[0]==='c')return {kind:'closed'};if(raw[0]==='s')return {kind:'structure'};if(raw[0]==='R')return {kind:'round',ri:raw[1]};return null;}
+function applyDelta(delta){if(!delta)return;const items=delta.kind==='batch'?delta.items:[delta];for(const x of items){
+ if(x.kind==='match'){const m=state.rounds[x.ri]?.matches?.[x.mi];if(m)Object.assign(m,x.patch);if(chosen?.kind==='round'&&chosen.ri===x.ri&&chosen.mi===x.mi){match=sourceMatch(chosen);showMatch();}}
+ else if(x.kind==='rr'){state.finalRR=x.finalRR;if(chosen?.kind==='rr'){match=sourceMatch(chosen);showMatch();}}
+ else if(x.kind==='meta') {state.open=x.meta.publicOpen;state.until=x.meta.publicUntil;}
+ else if(x.kind==='closed')state.open=false;
+ else if(x.kind==='round'||x.kind==='structure') {reload(false);return;}
+}}
+function sourceMatch(t){return t?.kind==='rr'?state?.finalRR?.matches?.[t.mi]:state?.rounds?.[t.ri]?.matches?.[t.mi]}
+function render(){if(!state)return;
+ $('bracket').innerHTML=(state.rounds||[]).map((r,ri)=>`<section class="round"><h3>${esc(r.name||'第 '+(ri+1)+' 輪')}</h3>${(r.matches||[]).map((m,mi)=>renderMatch(m,{kind:'round',ri,mi})).join('')}</section>`).join('');
+ $('bracket').querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>select(JSON.parse(b.dataset.target)));
+ if(state.finalRR){$('rrPanel').classList.remove('hidden');$('rrPanel').innerHTML='<h3>最後三人循環</h3><div class="rounds">'+(state.finalRR.matches||[]).map((m,mi)=>renderMatch(m,{kind:'rr',mi})).join('')+'</div>'+rankTable();$('rrPanel').querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>select(JSON.parse(b.dataset.target)));}
+ else $('rrPanel').classList.add('hidden');
+}
+function rankTable(){
+ const rr=state?.finalRR;if(!rr)return '';
+ const standings=rr.standings||rr.players.map(name=>({player:name,wins:0,losses:0,for:0,against:0,diff:0}));
+ return '<h3>三人循環得失分表</h3><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;text-align:center"><thead><tr><th>名次</th><th>選手</th><th>勝</th><th>負</th><th>得分</th><th>失分</th><th>分差</th></tr></thead><tbody>'+standings.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.player)}</td><td>${r.wins||0}</td><td>${r.losses||0}</td><td>${r.for||0}</td><td>${r.against||0}</td><td>${r.diff||0}</td></tr>`).join('')+'</tbody></table></div>';
+}
+function renderMatch(m,t){return `<article class="match ${JSON.stringify(chosen)===JSON.stringify(t)?'selected':''}" data-target='${esc(JSON.stringify(t))}'><div class="names"><b>${esc(m.a)}</b><b>${esc(m.sa===''?'—':m.sa)}</b></div><div class="names"><b>${esc(m.b)}</b><b>${esc(m.sb===''?'—':m.sb)}</b></div><span class="badge">${esc(m.winner?'勝者：'+m.winner:m.claimed?'執裁中':'待完成')}</span></article>`;}
+function lockKey(t){return JSON.stringify(t)}
+function select(t){chosen=t;match=sourceMatch(t);lockToken=claimTokens.get(lockKey(t))||'';render();$('editTitle').textContent=(t.kind==='rr'?'三人循環':'第 '+(t.ri+1)+' 輪')+' 第 '+(t.mi+1)+' 場';showMatch();}
+function showMatch(){if(!match)return;$('matchInfo').textContent=`${match.a} VS ${match.b}　${match.sa===''?'0':match.sa}：${match.sb===''?'0':match.sb}　場次版本 ${match.matchVersion}　${match.winner?'已完成：'+match.winner:'未完成'}`;
+ $('sa').value=match.sa===''?0:match.sa;$('sb').value=match.sb===''?0:match.sb;}
+async function operate(name,extra={}){if(!chosen||!match)return notice('先選擇場次',true);try{
+ const input={eventId,target:chosen,...extra};if(name!=='claimMatchV01')input.expectedMatchVersion=match.matchVersion;
+ if(name!=='claimMatchV01')input.lockToken=lockToken;
+ const r=await act(name,input);if(!r.ok)throw Error('雲端未回覆成功');
+ if(name==='claimMatchV01'){claimTokens.clear();lockToken=r.lockToken;claimTokens.set(lockKey(chosen),lockToken);}
+ if(name==='releaseMatchV01'||name==='completeMatchV01'){claimTokens.delete(lockKey(chosen));lockToken='';}
+ if(Number.isInteger(r.matchVersion))match.matchVersion=r.matchVersion;
+ if(name==='scoreMatchV01'){match.sa=extra.sa;match.sb=extra.sb;}
+ if(name==='completeMatchV01'){match.winner=r.winner;}
+ if(name==='resetMatchV01'){match.sa=0;match.sb=0;}
+ render();showMatch();notice(r.publicationPending?'比分已由雲端確認，公開同步正在補發':'雲端操作完成');
+ }catch(e){notice('操作未確認：'+e.message+'。如版本衝突，請重新同步或查詢原操作代碼。',true);
+ if(/aborted|版本/.test(e.code||e.message||''))reload(false).catch(()=>{});
+ }}
+$('claimBtn').onclick=()=>operate('claimMatchV01');$('releaseBtn').onclick=()=>operate('releaseMatchV01');
+$('scoreBtn').onclick=()=>operate('scoreMatchV01',{sa:+$('sa').value,sb:+$('sb').value});
+$('completeBtn').onclick=()=>operate('completeMatchV01');$('resetBtn').onclick=()=>operate('resetMatchV01');
+$('cancelBtn').onclick=()=>notice('已完成比分的復原需要下游防衝突交易；目前 V0.1 禁用此功能',true);
+// Quick scoring modifies only on-screen controls; one Save sends one Callable.
+const scoreButtons=document.createElement('div');scoreButtons.className='grid';
+scoreButtons.innerHTML=['sa','sb'].map(side=>`<div class="card"><h3>${side==='sa'?'左方':'右方'}快速加分</h3><div class="row">${[['違規',1],['轉停',1],['爆裂',2],['擊飛',2],['極限',3]].map(([label,points])=>`<button type="button" class="alt sm" data-side="${side}" data-points="${points}">${label} +${points}</button>`).join('')}</div></div>`).join('');
+$('scoreBtn').parentNode.before(scoreButtons);
+scoreButtons.querySelectorAll('[data-points]').forEach(b=>b.onclick=()=>{const input=$(b.dataset.side);input.value=Math.min(6,Number(input.value)+Number(b.dataset.points));});
+for(const id of ['sa','sb'])for(let n=0;n<=6;n++)$(id).insertAdjacentHTML('beforeend',`<option value="${n}">${n}</option>`);
+$('queryBtn').onclick=async()=>{try{const p=pendingRead()||lastOp;if(!p)return notice('目前沒有待確認的操作');const r=await invoke('getOperationV01',{eventId:p.data.eventId||eventId,opId:p.opId});
+ if(r.found){if(r.result.lockToken)lockToken=r.result.lockToken;pendingClear();await reload(false);notice('原操作已在雲端確認');}
+ else notice('雲端尚未找到原操作結果，請稍候再用相同資料重試',true);
+ }catch(e){notice(e.message,true)}};
+$('abandonBtn').onclick=()=>{if(!pendingRead())return notice('沒有待確認操作');if(confirm('確認已核對雲端且決定放棄此操作？若雲端其實已完成，重送可能產生另一筆操作。')){pendingClear();notice('已清除手機待確認的操作代碼；重新操作前請先同步最新比分');}};
+$('viewerBtn').onclick=()=>copy(new URL('viewer/viewer.html?event='+encodeURIComponent(eventId),location.href).href);
+async function copy(v){try{await navigator.clipboard.writeText(v);notice('已複製連結')}catch{prompt('長按複製',v)}}
+function joinUrl(){return new URL(location.pathname+'#join='+encodeURIComponent(eventId),location.href).href;}
+$('qrBtn').onclick=()=>{if(!owner)return;const box=$('qrTarget');box.innerHTML='';if(typeof window.QRCode==='function')new window.QRCode(box,{text:joinUrl(),width:200,height:200});else box.textContent='QR 尚未載入，請使用複製連結';
+ $('qrModal').classList.remove('hidden');updateCode();clearInterval(qrClock);qrClock=setInterval(()=>{const left=60000-Date.now()%60000;if(left<1200)updateCode();else $('codeExpiry').textContent=`${Math.ceil(left/1000)} 秒後更新`;},1000);};
+async function updateCode(){try{const r=await invoke('getJoinCodeV01',{eventId});$('showCode').textContent=r.code;$('codeExpiry').textContent='有效至 '+new Date(r.expiresAt).toLocaleTimeString('zh-TW',{hour12:false});}catch(e){$('showCode').textContent='無法取得：'+e.message;}}
+$('copyJoin').onclick=()=>copy(joinUrl());$('closeQr').onclick=()=>{clearInterval(qrClock);$('qrModal').classList.add('hidden');};
+$('openBtn').onclick=()=>changePublic(true);$('closeBtn').onclick=()=>changePublic(false);
+async function changePublic(open){try{const r=await act('setPublicV01',{eventId,open});state.open=open;notice(r.publicationPending?'公開狀態正在同步':open?'已公開兩小時':'已關閉公開');}catch(e){notice(e.message,true)}}
+$('deleteBtn').onclick=async()=>{if(!confirm('刪除此 V0.1 賽事？會停止公開與執裁；開發清理時才會物理移除節點。'))return;try{await act('deleteEventV01',{eventId});leave();history.replaceState(null,'',location.pathname);home();notice('已停止此賽事並標記刪除')}catch(e){notice(e.message,true)}};
+function route(){const h=location.hash.slice(1);if(h.startsWith('join=')){const id=decodeURIComponent(h.slice(5));leave();home();$('joinEvent').value=id;$('joinEvent').scrollIntoView({block:'center'});}
+ else if(h.startsWith('event=')&&user){enter(decodeURIComponent(h.slice(6))).catch(e=>notice(e.message,true))}}
+addEventListener('hashchange',route);
+if(ACTIVE){onAuthStateChanged(auth,u=>{user=u;$('googleBtn').classList.toggle('hidden',!!u);$('logoutBtn').classList.toggle('hidden',!u);if(!u){leave();home();}else if(location.hash)route();else home()});notice('請使用 Google 主辦登入，或掃碼以裁判身份加入');}
+else notice('V0.1 前後端已統一，但 Firebase 測試 Web App 參數尚未設定，尚不可操作雲端',true);
+metricsView();
+
+</script></body></html>
