@@ -2747,7 +2747,7 @@ async function deleteSavedEvent(id){
     if(remote.authorityBBX==='active'){
       deleteStep='由 Cloud Functions 刪除整場權威賽事';
       if(btn)btn.textContent='雲端刪除中…';
-      const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV01DeleteAuthority');
+      const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV02DeleteAuthority');
       const reply=(await fn({clientVersion:V1_AUTH_CLIENT,eventId:id})).data;
       if(!reply?.deleted)throw new Error('伺服器沒有確認刪除');
     }else{
@@ -2931,7 +2931,7 @@ function publicEventProjectionFromEvent(e){
 }
 
 // Cloud authority adapter: same V1.0 markup and event model, only match operations move server-side.
-const V1_AUTH_CLIENT='bbx-v0.1-authority-1';
+const V1_AUTH_CLIENT='bbx-v0.2-authority-1';
 const isV1Authority=()=>!!ev&&!ev.testOnly&&ev.authorityBBX==='active';
 const makeV1OpId=()=>Date.now().toString(16).padStart(12,'0')+
  Array.from(crypto.getRandomValues(new Uint8Array(18)),b=>b.toString(16).padStart(2,'0')).join('');
@@ -2946,7 +2946,7 @@ async function v1CloudMatchCommand(action,kind,ri,mi,options={}){
    expectedMatchVersion:Number(m.matchVersion)||0,referee:name,
    sa:options.sa??Number(m.sa||0),sb:options.sb??Number(m.sb||0)};
  try{
-   const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV01CommandAuthority');
+   const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV02CommandAuthority');
    const res=(await fn(body)).data;
    if(!res?.ok)throw new Error('伺服器未確認操作成功');
    // The server is authoritative. Never retry a new opId after an ambiguous response.
@@ -2982,7 +2982,7 @@ async function v1CloudOrganizerCommand(action,payload={},targetId=ev?.id){
     if(gate!=='active')throw new Error('雲端權威版本未啟用');
   }
   const currentSeq=await rtdbRestGet(`events/${targetId}/authoritySeq`,7000);
-  const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV01OrganizerAuthority');
+  const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV02OrganizerAuthority');
   // Never submit a locally cached board or public state: only a scoped command.
   const req={clientVersion:V1_AUTH_CLIENT,eventId:targetId,opId:makeV1OpId(),
     expectedSeq:Number(currentSeq)||0,action,...payload};
@@ -4290,7 +4290,7 @@ async function createTournament(){
       finalRR:null,
       created:now,
       cloudVersion:5,
-      releaseTag:'BBX-V0.1',
+      releaseTag:'BBX-V0.2',
       ownerUid:fbUser.uid,
       publicOpen:true,
       publicUntil:now+PUBLIC_WINDOW_MS,
@@ -4325,9 +4325,9 @@ async function createTournament(){
       [`admins/${ev.id}/${fbUser.uid}`]:code
     },6000);
 
-    // Activate only newly created BBX-V0.1 cloud tournaments. The server
+    // Activate only newly created BBX-V0.2 cloud tournaments. The server
     // compares the complete source bracket before switching on version protection.
-    const activate=firebase.app().functions('asia-southeast1').httpsCallable('bbxV01ActivateAuthority');
+    const activate=firebase.app().functions('asia-southeast1').httpsCallable('bbxV02ActivateAuthority');
     try{
       const activated=(await activate({clientVersion:V1_AUTH_CLIENT,eventId:ev.id})).data;
       if(!activated?.active)throw new Error('雲端權威模式未確認');
