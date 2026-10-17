@@ -591,7 +591,21 @@ window.addEventListener('pagehide',()=>{
 });
 
 if(!DB.startsWith('https://'))setStatus('Firebase 資料庫網址設定錯誤。','error');
-else if(eventId)startStream('publicEvents',eventId);
+else if(eventId){
+  // Public alias lookup is one GET on first load, never listened to.
+  // Match ID in Firebase always remains the immutable internal event ID.
+  if(/^[A-HJ-NP-Z2-9]{5}$/.test(eventId)){
+    fetch(`${DB}/bbxPublicCodeLookup/${encodeURIComponent(eventId)}.json`,{cache:'no-store'})
+      .then(r=>{if(!r.ok)throw Error('lookup HTTP '+r.status);return r.json()})
+      .then(real=>{
+        if(typeof real!=='string'||!/^[A-Za-z0-9_-]{6,100}$/.test(real)){
+          setStatus('活動 ID 不存在、已刪除或不可使用。','error');return;
+        }
+        startStream('publicEvents',real);
+      })
+      .catch(()=>setStatus('活動 ID 查詢失敗，請稍後再試。','error'));
+  }else startStream('publicEvents',eventId);
+}
 else setStatus('網址缺少 event 參數。','error');
 </script>
 </body>
