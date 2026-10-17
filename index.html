@@ -2430,7 +2430,7 @@ async function closePublicEvent(id){
     let closedAt=now;
     if(e.authorityBBX==='active'){
       const answer=await v1CloudOrganizerCommand('closePublic',{},id);
-      if(!answer.published)throw new Error('公開關閉尚未完成同步，請重新整理確認');
+      if(!answer.published){alert('關閉請求已記錄，公開同步仍在進行；系統會繼續發布，請稍候重新確認狀態。');await backgroundRefreshCurrentEvent(id).catch(()=>{});return;}
       closedAt=answer.publicUntil;
     }else{
       await cloudUpdate({
@@ -2482,7 +2482,7 @@ async function extendPublicEvent(id){
     let nextUntil=Date.now()+PUBLIC_WINDOW_MS;
     if(e.authorityBBX==='active'){
       const answer=await v1CloudOrganizerCommand('extendPublic',{},id);
-      if(!answer.published)throw new Error('延長公開時間尚未完成同步，請重新整理確認');
+      if(!answer.published){alert('延長請求已記錄，公開同步仍在進行；請稍候重新確認狀態。');await backgroundRefreshCurrentEvent(id).catch(()=>{});return;}
       nextUntil=answer.publicUntil;
     }else{
       await cloudUpdate({
@@ -2747,7 +2747,7 @@ async function deleteSavedEvent(id){
     if(remote.authorityBBX==='active'){
       deleteStep='由 Cloud Functions 刪除整場權威賽事';
       if(btn)btn.textContent='雲端刪除中…';
-      const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV04DeleteAuthority');
+      const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV05DeleteAuthority');
       const reply=(await fn({clientVersion:V1_AUTH_CLIENT,eventId:id})).data;
       if(!reply?.deleted)throw new Error('伺服器沒有確認刪除');
     }else{
@@ -2931,8 +2931,8 @@ function publicEventProjectionFromEvent(e){
 }
 
 // Cloud authority adapter: same V1.0 markup and event model, only match operations move server-side.
-const V1_AUTH_CLIENT='bbx-v0.4-authority-1';
-const isV1Authority=()=>!!ev&&!ev.testOnly&&ev.authorityBBX==='active'&&ev.releaseTag==='BBX-V0.4';
+const V1_AUTH_CLIENT='bbx-v0.5-authority-1';
+const isV1Authority=()=>!!ev&&!ev.testOnly&&ev.authorityBBX==='active'&&ev.releaseTag==='BBX-V0.5';
 const makeV1OpId=()=>Date.now().toString(16).padStart(12,'0')+
  Array.from(crypto.getRandomValues(new Uint8Array(18)),b=>b.toString(16).padStart(2,'0')).join('');
 function v1Match(kind,ri,mi){return kind==='rr'?ev.finalRR?.matches?.[mi]:ev.rounds?.[ri]?.matches?.[mi]}
@@ -2943,10 +2943,10 @@ async function v1CloudMatchCommand(action,kind,ri,mi,options={}){
  const name=options.referee??currentRefereeName();
  const body={clientVersion:V1_AUTH_CLIENT,eventId:ev.id,
    opId:makeV1OpId(),action,target:{kind,ri:kind==='rr'?0:ri,mi},
-   expectedMatchVersion:Number(m.matchVersion)||0,referee:name,
+   expectedMatchVersion:Number(m.matchVersion)||0,expectedStructureVersion:Number(ev.structureVersion)||0,referee:name,
    sa:options.sa??Number(m.sa||0),sb:options.sb??Number(m.sb||0)};
  try{
-   const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV04CommandAuthority');
+   const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV05CommandAuthority');
    const res=(await fn(body)).data;
    if(!res?.ok)throw new Error('伺服器未確認操作成功');
    // The server is authoritative. Never retry a new opId after an ambiguous response.
@@ -2981,8 +2981,12 @@ async function v1CloudOrganizerCommand(action,payload={},targetId=ev?.id){
     const gate=await rtdbRestGet(`events/${targetId}/authorityBBX`,7000);
     if(gate!=='active')throw new Error('雲端權威版本未啟用');
   }
-  const currentSeq=await rtdbRestGet(`events/${targetId}/authoritySeq`,7000);
-  const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV04OrganizerAuthority');
+  // Send the seq attached to the UI snapshot, not a just-fetched seq that
+  // could incorrectly authorize a command made against stale displayed data.
+  const currentSeq=Number.isInteger(Number(known?.authoritySeq))
+    ? Number(known.authoritySeq)
+    : Number(await rtdbRestGet(`events/${targetId}/authoritySeq`,7000))||0;
+  const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV05OrganizerAuthority');
   // Never submit a locally cached board or public state: only a scoped command.
   const req={clientVersion:V1_AUTH_CLIENT,eventId:targetId,opId:makeV1OpId(),
     expectedSeq:Number(currentSeq)||0,action,...payload};
@@ -3011,7 +3015,7 @@ function publicMatchCloudPath(kind,ri,mi){
 }
 
 async function writeMatchCloudBoth(kind,ri,mi,m,timeoutMs=5000){
-  if(ev?.authorityBBX==='active'&&!isV1Authority())throw new Error('此賽事使用其他版本的雲端權威，禁止直接寫入；請建立 V0.4 測試賽事');
+  if(ev?.authorityBBX==='active'&&!isV1Authority())throw new Error('此賽事使用其他版本的雲端權威，禁止直接寫入；請建立 V0.5 測試賽事');
   if(isV1Authority()){
     await v1CloudMatchCommand('score',kind,ri,mi,{sa:Number(m.sa||0),sb:Number(m.sb||0)});
     return true;
@@ -4278,24 +4282,24 @@ async function createTournament(){
     }
 
 fbUser=fbAuth.currentUser;
-// V0.4: ONE callable creates authoritative private board, management view,
+// V0.5: ONE callable creates authoritative private board, management view,
 // public projection and owner's index in ONE server-side atomic multipath update.
 // No client writes /events or /publicEvents and no stage/activate saga.
 if(createBtn)createBtn.textContent='建立雲端賽事…';
-const createFn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV04CreateAuthority');
-const draftKey='BBX-V0.4:create:'+fbUser.uid+':'+JSON.stringify({name:$('eventName').value.trim(),r,mode:draftMode,pairing,freeFinal:$('freeFinal').value});
+const createFn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV05CreateAuthority');
+const draftKey='BBX-V0.5:create:'+fbUser.uid+':'+JSON.stringify({name:$('eventName').value.trim(),r,mode:draftMode,pairing,freeFinal:$('freeFinal').value});
 let createOpId;
-try{createOpId=sessionStorage.getItem('BBX-V0.4:pendingOp:'+draftKey)||makeV1OpId();sessionStorage.setItem('BBX-V0.4:pendingOp:'+draftKey,createOpId)}catch(e){createOpId=makeV1OpId()}
+try{createOpId=sessionStorage.getItem('BBX-V0.5:pendingOp:'+draftKey)||makeV1OpId();sessionStorage.setItem('BBX-V0.5:pendingOp:'+draftKey,createOpId)}catch(e){createOpId=makeV1OpId()}
 const created=(await createFn({clientVersion:V1_AUTH_CLIENT,opId:createOpId,
   name:$('eventName').value.trim()||'Beyblade X Tournament',
   roster:r,mode:draftMode,pairing,freeFinal:$('freeFinal').value})).data;
 if(!created?.ok || !created?.eventId)throw new Error('建立操作未回傳完整確認資訊');
 createdEventId=created.eventId;
 const authoritative=await rtdbRestGet(`events/${created.eventId}`,10000);
-if(!authoritative||authoritative.authorityBBX!=='active'||authoritative.releaseTag!=='BBX-V0.4')
+if(!authoritative||authoritative.authorityBBX!=='active'||authoritative.releaseTag!=='BBX-V0.5')
   throw new Error('雲端資料尚未可讀；建立操作已送出，請返回首頁刷新賽事清單，不要重複建立');
 ev=authoritative;
-try{sessionStorage.removeItem('BBX-V0.4:pendingOp:'+draftKey)}catch(e){}
+try{sessionStorage.removeItem('BBX-V0.5:pendingOp:'+draftKey)}catch(e){}
 cloudEventSlots[ev.id]=String(created.slot);
 
     isAdmin=true;
@@ -5167,7 +5171,7 @@ async function cloudSet(path,value,timeoutMs=5000){
 }
 
 async function cloudUpdate(updates,timeoutMs=8000){
-  if(ev?.authorityBBX==='active' && ev.releaseTag!=='BBX-V0.4')throw new Error('舊版權威賽事不可使用本頁面寫入');
+  if(ev?.authorityBBX==='active' && ev.releaseTag!=='BBX-V0.5')throw new Error('舊版權威賽事不可使用本頁面寫入');
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
   if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
 
