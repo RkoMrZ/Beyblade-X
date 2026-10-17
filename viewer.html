@@ -250,7 +250,13 @@ function startStream(kind,id,{isRestart=false,reason='initial'}={}){
     if(streamOpenedOnce || isRestart){
       reconnectCount++;
       setStatus('連線已恢復，正在校正最新資料…');
-      scheduleReconnectResync(kind,id,'sse-open');
+      // 新 SSE 連線會自行送出初始 put 快照。只有逾時未收到快照才 GET。
+      const serialOnOpen=receivedEventSerial;
+      reconnectResyncTimer=setTimeout(()=>{
+        reconnectResyncTimer=null;
+        if(generation!==streamGeneration||stream!==es)return;
+        if(receivedEventSerial===serialOnOpen) scheduleReconnectResync(kind,id,'missing-resume-snapshot');
+      },4000+Math.floor(Math.random()*2000));
     }else{
       streamOpenedOnce=true;
       setStatus('即時連線已建立，正在載入資料…');
@@ -341,9 +347,12 @@ async function checkFailure(kind,id){
 // iOS Safari / Web App 從背景回前景時，SSE 有可能看似存在但其實已停住。
 // 回前景直接「重建 SSE + GET 最新快照」，不相信舊連線狀態。
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible' && streamKind && streamId){
-    hardReconnect('visibility');
-  }
+  if(document.visibilityState==='hidden'){
+    // 背景觀看不維持 RTDB 連線；返回前景再同步最新快照。
+    clearTimeout(reconnectResyncTimer);
+    try{stream?.close()}catch(e){}
+    stream=null;streamGeneration++;
+  } else if(streamKind&&streamId) hardReconnect('visibility');
 });
 
 window.addEventListener('pageshow',e=>{
@@ -358,8 +367,8 @@ window.addEventListener('online',()=>{
   }
 });
 
-// Authority mode: no periodic whole-event re-fetch while SSE is healthy.
-// Reconnect and visibility recovery continue to fetch a fresh snapshot when needed.
+// BBX-V0.4: SSE 長連線即時接收變更，不做固定完整快照輪詢；
+// 只有斷線重連 / 回前景時，才依需要重新同步。
 
 function eventCount(){
   const m=data?.meta||{};
