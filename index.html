@@ -2940,7 +2940,10 @@ function v1Match(kind,ri,mi){return kind==='rr'?ev.finalRR?.matches?.[mi]:ev.rou
 // but never start a second score command before the previous one is confirmed.
 // The server matchVersion is held here independently of the delayed public mirror.
 const v05ScoreQueues=new Map();
+// Fence local edits and duplicate taps during an authoritative completion.
+const v05FinishInFlight=new Set();
 const v05ScoreKey=(eventId,kind,ri,mi)=>`${eventId}:${kind}:${ri}:${mi}`;
+const v05Finishing=(kind,ri,mi)=>v05FinishInFlight.has(v05ScoreKey(ev?.id,kind,ri,mi));
 function v05ScoreState(kind,ri,mi){
  const eventId=ev?.id;
  return v05ScoreQueues.get(v05ScoreKey(eventId,kind,ri,mi));
@@ -2982,6 +2985,7 @@ function v05QueueScore(kind,ri,mi,delay=150){
  const m=v1Match(kind,ri,mi),eventId=ev?.id;
  if(!m||!isV1Authority())return;
  const key=v05ScoreKey(eventId,kind,ri,mi);
+ if(v05FinishInFlight.has(key))return;
  let state=v05ScoreQueues.get(key);
  if(!state){
   state={eventId,kind,ri,mi,version:Number(m.matchVersion)||0,
@@ -3122,24 +3126,63 @@ async function v1CloudMatchCommand(action,kind,ri,mi,options={}){
 }
 async function v1FinishCloud(kind,ri,mi){
  const eventId=ev?.id;
+ const key=v05ScoreKey(eventId,kind,ri,mi);
+ if(!isV1Authority()||v05FinishInFlight.has(key))return;
+ const local=v1Match(kind,ri,mi);
+ if(!local)return alert('找不到場次，請重新整理');
+ // Snapshot what the judge explicitly approved before any pending HTTP callback.
+ const intended={sa:Number(local.sa||0),sb:Number(local.sb||0),a:local.a,b:local.b};
+ v05FinishInFlight.add(key);
  try{
-   // Drain only this match's pending score requests; unrelated judges proceed.
-   await v05FlushScores(kind,ri,mi);
-   const m=v1Match(kind,ri,mi);
-   if(!m||!canCompleteMatch(m))throw new Error('比分尚未符合完賽條件，請確認最新分數');
-   // The score command receipt already confirmed this matchVersion. Avoid an
-   // unnecessary extra GET on every successful completion. The server verifies
-   // both the match version AND the exact persisted score before advancing.
-   await v1CloudMatchCommand('complete',kind,ri,mi,{
-    sa:Number(m.sa||0),sb:Number(m.sb||0),
-    expectedMatchVersion:Number(m.matchVersion)||0});
-   if(ev?.id===eventId){
-    backToBracketFromMatch();
-    // Rebuild the visual bracket asynchronously; do not block completion on
-    // eventual projection/observer updates.
-    backgroundRefreshCurrentEvent(eventId).catch(()=>{});
+   let scoreError=null;
+   try{await v05FlushScores(kind,ri,mi)}catch(error){scoreError=error;}
+   // A stale local error or a lost response must not permanently block the
+   // match. Read this private match, not the lagging public projection.
+   let authoritative;
+   try{authoritative=(await v05ReadAuthoritativeMatch(kind,ri,mi,{apply:false})).match;}
+   catch(error){
+     if(scoreError)throw new Error('上一筆比分未確認，且目前無法讀取雲端比分。請等待連線恢復後再核對；本次未晉級');
+     throw error;
    }
- }catch(e){alert('雲端完成未確認：'+(e.message||e));}
+   if(!authoritative)throw new Error('找不到雲端權威比分，本次未晉級');
+   const server={sa:Number(authoritative.sa||0),sb:Number(authoritative.sb||0)};
+   const state=v05ScoreState(kind,ri,mi);
+   const samePlayers=authoritative.a===intended.a&&authoritative.b===intended.b;
+   const sameScore=server.sa===intended.sa&&server.sb===intended.sb;
+   if(state){
+     state.version=Number(authoritative.matchVersion)||0;
+     state.desired=null;
+     state.confirmed={...server,matchVersion:state.version};
+   }
+   // The pending write has settled. Show the true server scores even after
+   // an interrupted score request, never treating a painted value as saved.
+   v05AcceptServerMatch(kind,ri,mi,authoritative,{force:true});
+   if(!samePlayers||!sameScore){
+     if(state)state.lastError=new Error('必須由裁判核對雲端比分');
+     throw new Error(`手機剛才顯示 ${intended.sa}：${intended.sb}，雲端實際保存 ${server.sa}：${server.sb}。已還原雲端比分，請核對後重新選擇；本次未晉級`);
+   }
+   // Matching an AUTHORITATIVE server read suffices to request completion;
+   // the reducer checks exact score AND matchVersion again when committing.
+   if(state)state.lastError=null;
+   if(authoritative.winner){
+     // Previous completion may have succeeded despite losing the HTTP reply.
+     if(ev?.id===eventId){backToBracketFromMatch();backgroundRefreshCurrentEvent(eventId).catch(()=>{});}
+     return;
+   }
+   if(!canCompleteMatch(authoritative))throw new Error('雲端比分尚未達完賽條件，本次未晉級');
+   await v1CloudMatchCommand('complete',kind,ri,mi,{
+     sa:server.sa,sb:server.sb,expectedMatchVersion:Number(authoritative.matchVersion)||0});
+   if(ev?.id===eventId){
+     backToBracketFromMatch();
+     backgroundRefreshCurrentEvent(eventId).catch(()=>{});
+   }
+ }catch(error){alert('雲端完成未確認：'+(error.message||error));}
+ finally{
+   v05FinishInFlight.delete(key);
+   if(ev?.id===eventId && $('matchModal')&&!$('matchModal').classList.contains('hidden')){
+     if(kind==='rr')openRRMatch(mi);else openMatchEditor(ri,mi);
+   }
+ }
 }
 async function v1CloudOrganizerCommand(action,payload={},targetId=ev?.id){
   if(!targetId)throw new Error('賽事代碼遺失');
@@ -4786,6 +4829,7 @@ let resetChoiceTarget=null;
 
 function openResetChoice(kind,ri,mi){
   if(!isAdmin&&!isReferee&&!ev?.testOnly)return alert('目前沒有重設權限。');
+  if(isV1Authority()&&v05Finishing(kind,ri,mi))return alert('正在完成比賽，請稍候確認');
   resetChoiceTarget={kind,ri,mi};
   $('resetChoiceModal').classList.remove('hidden');
 }
@@ -5624,6 +5668,10 @@ function chooseScore(v){
   if(scoreValue>(activeScoreTarget.maxAllowed??6))return;
 
   const id=activeScoreTarget.inputId;
+  const targetRound=id.match(/^s(\d+)-(\d+)[ab]$/);
+  const targetRR=id.match(/^rr(\d+)[ab]$/);
+  if(targetRound&&v05Finishing('round',Number(targetRound[1]),Number(targetRound[2])))return;
+  if(targetRR&&v05Finishing('rr',0,Number(targetRR[1])))return;
   let matchInfo=null;
 
   let mm=id.match(/^s(\d+)-(\d+)([ab])$/);
@@ -5735,7 +5783,7 @@ function quickScoreHtml(m,kind,ri,mi,quickEnabled,scoreEditEnabled=quickEnabled)
     </div>
 
     <div class=quickScoreHint>
-      ${isV1Authority()&&v05ScorePending(kind,ri,mi)?'⏳ 比分正在送往雲端，完成比賽前會先確認。':''}
+      ${isV1Authority()?(v05Finishing(kind,ri,mi)?'⏳ 正在核對雲端比分並完成比賽。':v05ScorePending(kind,ri,mi)?'⏳ 比分正在送往雲端，完成比賽前會先確認。':v05ScoreState(kind,ri,mi)?.lastError?'⚠️ 上一筆記分未確認，請先核對雲端比分。':v05ScoreState(kind,ri,mi)?.confirmed?'✓ 最近一筆比分已取得雲端確認。':'尚無最新比分的雲端確認紀錄。'):''}
       點右側數字可隨時修改比分。若一方已達 4 分以上，另一方只能選 0～3 分；確認無誤後再按「此場完成」。
     </div>
   </div>`;
@@ -5755,6 +5803,7 @@ function quickAddMatchScore(ri,mi,side,points,reason){
   let m=ev.rounds?.[ri]?.matches?.[mi];
   if(!m)return alert('找不到這場比賽資料。');
   if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
+ if(v05Finishing('round',ri,mi))return;
   if(matchReachedFinishThreshold(m))return;
 
   if(m.winner){
@@ -5785,6 +5834,7 @@ function quickAddRRScore(i,side,points,reason){
   let m=ev.finalRR?.matches?.[i];
   if(!m)return alert('找不到這場循環賽資料。');
   if(!canEditMatchScore(m))return alert('請先按「開始執裁／修改比分」。');
+ if(v05Finishing('rr',0,i))return;
   if(matchReachedFinishThreshold(m))return;
 
   if(m.winner){
@@ -5856,23 +5906,24 @@ function openMatchEditor(ri,mi){
   if(m.a==='BYE'||m.b==='BYE')return alert('這是自動晉級場，不需要執裁。');
 
   const scoreEnabled=canEditMatchScore(m);
+  const finishing=isV1Authority()&&v05Finishing('round',ri,mi);
   const finishLocked=scoreEnabled && matchReachedFinishThreshold(m);
-  const quickEnabled=scoreEnabled && !finishLocked;
+  const quickEnabled=scoreEnabled && !finishLocked && !finishing;
 
-  const completeEnabled=scoreEnabled && canCompleteMatch(m);
+  const completeEnabled=scoreEnabled && canCompleteMatch(m) && !finishing;
   const completeDisabled=completeEnabled?'':'disabled';
   const backDisabled=finishLocked?'disabled':'';
 
   $('matchSheet').innerHTML=`<div class=sheetHandle></div><div class=sheetTitle><div><div class=muted>${stageLabel(ri,ev.rounds[ri])}・第 ${mi+1} 場</div><h3>編輯比賽</h3></div><button class=sheetClose onclick=closeMatchEditor()>✕</button></div>
     <div class=sheetRef><b>裁判狀態</b>${refereeStatusHtml(m,'round',ri,mi)}</div>
-    ${quickScoreHtml(m,'round',ri,mi,quickEnabled,scoreEnabled)}
+    ${quickScoreHtml(m,'round',ri,mi,quickEnabled,scoreEnabled&&!finishing)}
     ${!scoreEnabled?`<div class=refHint style="margin:10px 0">必須先按「開始執裁」，才能修改比分。</div>`:''}
     ${finishLocked?`<div class=refHint style="margin:7px 0">已有人達到 4 分以上。另一方仍可修正比分，但只能選 0～3；若要改判另一方獲勝，請先把目前 4 分以上的一方調回 0～3。</div>`:''}
 
     <div class=sheetFooter style="grid-template-columns:1fr 1fr 1fr">
       <button class=secondary ${backDisabled} onclick="backToBracketFromMatch()">回到對戰表</button>
       <button class=secondary ${completeDisabled} onclick="score(${ri},${mi})">此場完成</button>
-      <button class=danger onclick="resetMatch(${ri},${mi})">重設比分</button>
+      <button class=danger ${finishing?'disabled':''} onclick="resetMatch(${ri},${mi})">重設比分</button>
     </div>`;
 
   $('matchModal').classList.remove('hidden');
@@ -6444,10 +6495,11 @@ function openRRMatch(i){
   let m=ev.finalRR.matches[i];
 
   const scoreEnabled=canEditMatchScore(m);
+  const finishing=isV1Authority()&&v05Finishing('rr',0,i);
   const finishLocked=scoreEnabled && matchReachedFinishThreshold(m);
-  const quickEnabled=scoreEnabled && !finishLocked;
+  const quickEnabled=scoreEnabled && !finishLocked && !finishing;
 
-  const completeEnabled=scoreEnabled && canCompleteMatch(m);
+  const completeEnabled=scoreEnabled && canCompleteMatch(m) && !finishing;
   const completeDisabled=completeEnabled?'':'disabled';
   const backDisabled=finishLocked?'disabled':'';
 
@@ -6467,7 +6519,7 @@ function openRRMatch(i){
       ${refereeStatusHtml(m,'rr',0,i)}
     </div>
 
-    ${quickScoreHtml(m,'rr',0,i,quickEnabled,scoreEnabled)}
+    ${quickScoreHtml(m,'rr',0,i,quickEnabled,scoreEnabled&&!finishing)}
 
     ${!scoreEnabled?`
       <div class=refHint style="margin:10px 0">
@@ -6484,7 +6536,7 @@ function openRRMatch(i){
     <div class=sheetFooter style="grid-template-columns:1fr 1fr 1fr">
       <button class=secondary ${backDisabled} onclick="backToBracketFromMatch()">回到對戰表</button>
       <button class=secondary ${completeDisabled} onclick="rrScore(${i})">此場完成</button>
-      <button class=danger onclick="resetRRMatch(${i})">重設比分</button>
+      <button class=danger ${finishing?'disabled':''} onclick="resetRRMatch(${i})">重設比分</button>
     </div>`;
 
   $('matchModal').classList.remove('hidden');
