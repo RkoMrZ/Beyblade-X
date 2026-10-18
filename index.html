@@ -2747,7 +2747,7 @@ async function deleteSavedEvent(id){
     if(remote.authorityBBX==='active'){
       deleteStep='由 Cloud Functions 刪除整場權威賽事';
       if(btn)btn.textContent='雲端刪除中…';
-      const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV06DeleteAuthority');
+      const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV07DeleteAuthority');
       const reply=(await fn({clientVersion:V1_AUTH_CLIENT,eventId:id})).data;
       if(!reply?.deleted)throw new Error('伺服器沒有確認刪除');
     }else{
@@ -2931,8 +2931,8 @@ function publicEventProjectionFromEvent(e){
 }
 
 // Cloud authority adapter: same V1.0 markup and event model, only match operations move server-side.
-const V1_AUTH_CLIENT='bbx-v0.6-authority-1';
-const isV1Authority=()=>!!ev&&!ev.testOnly&&ev.authorityBBX==='active'&&ev.releaseTag==='BBX-V0.6';
+const V1_AUTH_CLIENT='bbx-v0.7-authority-1';
+const isV1Authority=()=>!!ev&&!ev.testOnly&&ev.authorityBBX==='active'&&ev.releaseTag==='BBX-V0.7';
 const makeV1OpId=()=>Date.now().toString(16).padStart(12,'0')+
  Array.from(crypto.getRandomValues(new Uint8Array(18)),b=>b.toString(16).padStart(2,'0')).join('');
 function v1Match(kind,ri,mi){return kind==='rr'?ev.finalRR?.matches?.[mi]:ev.rounds?.[ri]?.matches?.[mi]}
@@ -2961,13 +2961,15 @@ function v05AcceptServerMatch(kind,ri,mi,remote,{force=false}={}){
  const pending=v05ScorePending(kind,ri,mi);
  if(!force && (pending||Number(m.matchVersion||0)>Number(remote.matchVersion||0)))return false;
  Object.assign(m,remote);
+ const state=v05ScoreState(kind,ri,mi);
+ if(state&&!pending){state.version=Number(remote.matchVersion)||0;state.confirmed=null;}
  localEventSave();
  return true;
 }
 async function v05ReadAuthoritativeMatch(kind,ri,mi,{apply=true}={}){
  if(!isV1Authority()||!(await initCloud()))throw new Error('賽事權威狀態無法讀取');
  const eventId=ev.id;
- const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV06GetOperation');
+ const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV07GetOperation');
  const r=(await fn({clientVersion:V1_AUTH_CLIENT,eventId,readMatch:true,
   target:{kind,ri:kind==='rr'?0:ri,mi}})).data;
  if(!r?.found||!r.match)throw new Error('雲端尚未提供這場比賽的權威比分');
@@ -2975,7 +2977,7 @@ async function v05ReadAuthoritativeMatch(kind,ri,mi,{apply=true}={}){
  return r;
 }
 async function v05ReadOperationReceipt(eventId,opId){
- const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV06GetOperation');
+ const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV07GetOperation');
  return (await fn({clientVersion:V1_AUTH_CLIENT,eventId,opId})).data;
 }
 function v05QueueScore(kind,ri,mi,delay=150){
@@ -2988,6 +2990,7 @@ function v05QueueScore(kind,ri,mi,delay=150){
    desired:null,timer:null,run:null,lastError:null,confirmed:null};
   v05ScoreQueues.set(key,state);
  }
+ if(!state.run&&!state.desired&&!state.timer)state.version=Number(m.matchVersion)||0;
  state.desired={sa:Number(m.sa||0),sb:Number(m.sb||0)};
  state.lastError=null;
  if(state.run)return;
@@ -3035,7 +3038,10 @@ function v05DrainScores(state){
      confirmedVersion=state.version;
     }else{
      state.desired=null;
-     if(authoritative)renderAdmin();
+     if(authoritative){
+      v05AcceptServerMatch(state.kind,state.ri,state.mi,authoritative,{force:true});
+      renderAdmin();
+     }
      throw error;
     }
    }
@@ -3051,7 +3057,7 @@ function v05DrainScores(state){
   state.lastError=e;
   state.desired=null;
   if(ev?.id===state.eventId)
-   backgroundSyncAlert('比分尚未取得雲端確認，已停止後續記分。請核對最新比分再操作。');
+   backgroundSyncAlert('比分尚未取得雲端確認，已停止後續記分。請核對最新比分再操作。\n原因：'+(e.code||'unknown')+' '+(e.message||'未取得回應'));
   throw e;
  }).finally(()=>{state.run=null;});
  return state.run;
@@ -3075,7 +3081,7 @@ async function v1CloudMatchCommand(action,kind,ri,mi,options={}){
    expectedMatchVersion:options.expectedMatchVersion??(Number(m.matchVersion)||0),expectedStructureVersion:Number(ev.structureVersion)||0,referee:name,
    sa:options.sa??Number(m.sa||0),sb:options.sb??Number(m.sb||0)};
  try{
-   const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV06CommandAuthority');
+   const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV07CommandAuthority');
    const res=(await fn(body)).data;
    if(!res?.ok)throw new Error('伺服器未確認操作成功');
    // The server is authoritative. Never retry a new opId after an ambiguous response.
@@ -3155,7 +3161,7 @@ async function v1CloudOrganizerCommand(action,payload={},targetId=ev?.id){
   const currentSeq=Number.isInteger(Number(known?.authoritySeq))
     ? Number(known.authoritySeq)
     : Number(await rtdbRestGet(`events/${targetId}/authoritySeq`,7000))||0;
-  const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV06OrganizerAuthority');
+  const fn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV07OrganizerAuthority');
   // Never submit a locally cached board or public state: only a scoped command.
   const req={clientVersion:V1_AUTH_CLIENT,eventId:targetId,opId:makeV1OpId(),
     expectedSeq:Number(currentSeq)||0,action,...payload};
@@ -3184,7 +3190,7 @@ function publicMatchCloudPath(kind,ri,mi){
 }
 
 async function writeMatchCloudBoth(kind,ri,mi,m,timeoutMs=5000){
-  if(ev?.authorityBBX==='active'&&!isV1Authority())throw new Error('此賽事使用其他版本的雲端權威，禁止直接寫入；請建立 V0.6 測試賽事');
+  if(ev?.authorityBBX==='active'&&!isV1Authority())throw new Error('此賽事使用其他版本的雲端權威，禁止直接寫入；請建立 V0.7 測試賽事');
   if(isV1Authority()){
     await v1CloudMatchCommand('score',kind,ri,mi,{sa:Number(m.sa||0),sb:Number(m.sb||0)});
     return true;
@@ -4474,20 +4480,20 @@ fbUser=fbAuth.currentUser;
 // public projection and owner's index in ONE server-side atomic multipath update.
 // No client writes /events or /publicEvents and no stage/activate saga.
 if(createBtn)createBtn.textContent='建立雲端賽事…';
-const createFn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV06CreateAuthority');
-const draftKey='BBX-V0.6:create:'+fbUser.uid+':'+JSON.stringify({name:$('eventName').value.trim(),r,mode:draftMode,pairing,freeFinal:$('freeFinal').value});
+const createFn=firebase.app().functions('asia-southeast1').httpsCallable('bbxV07CreateAuthority');
+const draftKey='BBX-V0.7:create:'+fbUser.uid+':'+JSON.stringify({name:$('eventName').value.trim(),r,mode:draftMode,pairing,freeFinal:$('freeFinal').value});
 let createOpId;
-try{createOpId=sessionStorage.getItem('BBX-V0.6:pendingOp:'+draftKey)||makeV1OpId();sessionStorage.setItem('BBX-V0.6:pendingOp:'+draftKey,createOpId)}catch(e){createOpId=makeV1OpId()}
+try{createOpId=sessionStorage.getItem('BBX-V0.7:pendingOp:'+draftKey)||makeV1OpId();sessionStorage.setItem('BBX-V0.7:pendingOp:'+draftKey,createOpId)}catch(e){createOpId=makeV1OpId()}
 const created=(await createFn({clientVersion:V1_AUTH_CLIENT,opId:createOpId,
   name:$('eventName').value.trim()||'Beyblade X Tournament',
   roster:r,mode:draftMode,pairing,freeFinal:$('freeFinal').value})).data;
 if(!created?.ok || !created?.eventId)throw new Error('建立操作未回傳完整確認資訊');
 createdEventId=created.eventId;
 const authoritative=await rtdbRestGet(`events/${created.eventId}`,10000);
-if(!authoritative||authoritative.authorityBBX!=='active'||authoritative.releaseTag!=='BBX-V0.6')
+if(!authoritative||authoritative.authorityBBX!=='active'||authoritative.releaseTag!=='BBX-V0.7')
   throw new Error('雲端資料尚未可讀；建立操作已送出，請返回首頁刷新賽事清單，不要重複建立');
 ev=authoritative;
-try{sessionStorage.removeItem('BBX-V0.6:pendingOp:'+draftKey)}catch(e){}
+try{sessionStorage.removeItem('BBX-V0.7:pendingOp:'+draftKey)}catch(e){}
 cloudEventSlots[ev.id]=String(created.slot);
 
     isAdmin=true;
@@ -5359,7 +5365,7 @@ async function cloudSet(path,value,timeoutMs=5000){
 }
 
 async function cloudUpdate(updates,timeoutMs=8000){
-  if(ev?.authorityBBX==='active' && ev.releaseTag!=='BBX-V0.6')throw new Error('舊版權威賽事不可使用本頁面寫入');
+  if(ev?.authorityBBX==='active' && ev.releaseTag!=='BBX-V0.7')throw new Error('舊版權威賽事不可使用本頁面寫入');
   if(!(await initCloud()))throw new Error('Firebase 尚未初始化');
   if(!fbAuth?.currentUser)throw new Error('目前沒有寫入權限登入身分');
 
@@ -7156,7 +7162,7 @@ async function startRefereeCodeRotation(){
 async function assignFiveCode(){
  if(!ev?.id||!isEventOwner()||!isGoogleUser())return alert('僅原建立者能配置五碼活動 ID');
  try{
-   const call=firebase.app().functions('asia-southeast1').httpsCallable('bbxV06AssignPublicCode');
+   const call=firebase.app().functions('asia-southeast1').httpsCallable('bbxV07AssignPublicCode');
    const result=(await call({clientVersion:V1_AUTH_CLIENT,eventId:ev.id})).data;
    if(!result?.ok||!/^[A-HJ-NP-Z2-9]{5}$/.test(result.publicCode||''))throw Error('伺服器未確認五碼 ID');
    ev.publicCode=result.publicCode;
@@ -8077,7 +8083,7 @@ async function backgroundRefreshCurrentEvent(id){
     const keepTab=currentAdminTab||'bracket';
     // Public projection can lag the private authority. Never let an older
     // events/ snapshot roll a confirmed or still-pending score backwards.
-    if(isV1Authority()&&data.releaseTag==='BBX-V0.6'){
+    if(isV1Authority()&&data.releaseTag==='BBX-V0.7'){
       for(const [kind,rounds] of [['round',ev.rounds],['rr',ev.finalRR?.matches?[{matches:ev.finalRR.matches}]:[]]]){
        (rounds||[]).forEach((r,ri)=>(r.matches||[]).forEach((old,mi)=>{
         const dest=kind==='rr'?data.finalRR?.matches?.[mi]:data.rounds?.[ri]?.matches?.[mi];
